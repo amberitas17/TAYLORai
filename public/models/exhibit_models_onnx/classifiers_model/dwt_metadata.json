@@ -1,0 +1,38 @@
+{
+  "model_name": "DWT Exhibit Classifier",
+  "num_classes": 22,
+  "class_names": [
+    "DWT-01 Entrance Statement",
+    "DWT-02 Kopi Talk",
+    "DWT-03 Experiencing Dementia",
+    "DWT-04 Brain",
+    "DWT-05 Reaction Time Game",
+    "DWT-06 Bones & Joints",
+    "DWT-07 Cell Ageing",
+    "DWT-08_Puberty",
+    "DWT-09 Circulatory System",
+    "DWT-10 Skin Ageing",
+    "DWT-11 Did You Know",
+    "DWT-12 Cell Division",
+    "DWT-13 Cell Growth",
+    "DWT-14 Sense of Balance",
+    "DWT-15 Tremor",
+    "DWT-16 Complex Tasks",
+    "DWT-17 Mobility",
+    "DWT-18 Hearing",
+    "DWT-19 Vision",
+    "DWT-20 Hand-Eye Coordination",
+    "DWT-21 Retirement Bench",
+    "DWT-22 The Diversity of Ageing"
+  ],
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "accuracy": 90.0,
+  "model_type": "exhibit_classification",
+  "framework": "pytorch_to_onnx",
+  "architecture": "EfficientNet-B0"
+}

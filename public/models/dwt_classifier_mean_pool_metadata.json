@@ -1,0 +1,58 @@
+{
+  "model_name": "DWT Classifier",
+  "classes": [
+    "DWT-01_Entrance_Statement",
+    "DWT-02_Kopi_Talk",
+    "DWT-03_Experiencing_Dementia",
+    "DWT-04_Brain",
+    "DWT-05_Reaction_Time_Game",
+    "DWT-06_Bones_and_Joints",
+    "DWT-07_Cell_Ageing",
+    "DWT-08_Puberty",
+    "DWT-09_Circulatory_System",
+    "DWT-10_Skin_Ageing",
+    "DWT-11_Did_You_Know_",
+    "DWT-12_Cell_Division",
+    "DWT-13_Cell_Growth",
+    "DWT-14_Sense_of_Balance",
+    "DWT-15_Tremor",
+    "DWT-16_Complex_Tasks",
+    "DWT-17_Mobility",
+    "DWT-18_Hearing",
+    "DWT-19_Vision",
+    "DWT-20_Hand-Eye Coordination",
+    "DWT-21_Retirement Bench",
+    "DWT-22_The Diversity of Ageing"
+  ],
+  "num_classes": 22,
+  "img_size": 224,
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "output_shape": [
+    1,
+    22
+  ],
+  "preprocessing": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "architecture": "YOLOv5Tiny with manual mean pooling",
+  "modifications": [
+    "Dropout layers removed (disabled in eval mode)",
+    "AdaptiveAvgPool2d replaced with manual mean pooling operations"
+  ],
+  "quality": "Very close to original (manual pooling approximates adaptive pooling)",
+  "onnx_file": "dwt_classifier_mean_pool.onnx"
+}

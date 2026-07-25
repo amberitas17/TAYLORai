@@ -1,0 +1,22 @@
+.hologram-container {
+    position: absolute;
+    top: 50%;
+    left: 55%; /* keep to the right on desktop */
+    transform: translate(-50%, -50%);
+    width: 500px;
+    height: 700px;
+  }
+  
+  /* Mobile adjustments */
+  @media (max-width: 480px) {
+    .hologram-container {
+      position: relative;   /* no absolute overlay */
+      top: 70px;
+      left: 100px;
+      transform: none;
+      margin: 20px auto;    /* center horizontally */
+      width: 300px;         /* smaller hologram */
+      height: 370px;
+    }
+  }
+  

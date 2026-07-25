@@ -1,0 +1,556 @@
+/* Container and background */
+.ai-vision-container {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0F172A 0%, #1E293B 50%, #334155 100%);
+  font-family: 'Inter', Arial, sans-serif;
+  color: white;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  padding: 45px 20px 15px 20px;
+}
+.back-button {
+  padding: 8px;
+  margin-right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.header-content {
+  flex: 1;
+}
+.header-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+}
+.header-subtitle {
+  font-size: 11px;
+  color: rgba(255,255,255,0.8);
+  margin-top: 2px;
+}
+
+/* Camera/Image */
+.camera-container {
+  position: relative;
+  margin: 0 20px 20px 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+.camera-view {
+  width: 100%;
+  height: 60vh;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+/* Scanning Overlay */
+.scanning-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.scanning-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.scanning-text {
+  color: #00BCD4;
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 16px;
+}
+.scanning-progress {
+  margin-top: 12px;
+}
+.progress-text {
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Face Detection Overlay */
+.face-box {
+  position: absolute;
+  border: 2px solid #4CAF50;
+  border-radius: 8px;
+  padding: 4px;
+  background: rgba(0,0,0,0.2);
+}
+.face-id-badge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  background: rgba(0,0,0,0.8);
+  border-radius: 12px;
+  padding: 4px 8px;
+}
+.face-id-text {
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+.age-badge, .emotion-badge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  padding: 4px 8px;
+  gap: 4px;
+}
+.age-badge {
+  top: -6px;
+  right: -6px;
+  background: #FF6B35;
+}
+.emotion-badge {
+  bottom: -6px;
+  left: -6px;
+  background: #4CAF50;
+}
+.badge-text {
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+}
+.confidence-text {
+  color: rgba(255,255,255,0.8);
+  font-size: 8px;
+}
+.attention-indicator {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.attention-bar {
+  width: 40px;
+  height: 4px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.attention-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #4CAF50;
+}
+.attention-text {
+  color: white;
+  font-size: 8px;
+  margin-top: 2px;
+  text-align: center;
+}
+
+/* Real-time/Upload Indicators */
+.realtime-indicator {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+.live-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(244,67,54,0.9);
+  padding: 6px 12px;
+  border-radius: 16px;
+  gap: 6px;
+}
+.live-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: #FF5252;
+}
+.live-text {
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+.upload-indicator {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+}
+.upload-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(255,107,53,0.9);
+  padding: 6px 12px;
+  border-radius: 16px;
+  gap: 6px;
+}
+.upload-text {
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Analysis Results */
+.analysis-results {
+  background: rgba(255,255,255,0.1);
+  margin: 0 20px 20px 20px;
+  padding: 20px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+.results-title {
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  flex: 1 1 45%;
+  background: rgba(255,255,255,0.1);
+  padding: 16px;
+  border-radius: 12px;
+  align-items: center;
+  text-align: center;
+}
+.stat-number {
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  margin-top: 8px;
+}
+.stat-label {
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Emotion Distribution */
+.emotion-distribution {
+  margin-top: 12px;
+}
+.distribution-title {
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+.emotion-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+.emotion-label {
+  color: white;
+  font-size: 14px;
+  width: 80px;
+}
+.emotion-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.emotion-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: #4CAF50;
+}
+.emotion-count {
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  width: 20px;
+  text-align: center;
+}
+
+/* Control Panel */
+.control-panel {
+  display: flex;
+  gap: 12px;
+  margin: 0 20px 20px 20px;
+}
+.control-button {
+  flex: 1;
+  background: rgba(255,255,255,0.1);
+  padding: 16px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Location Control */
+.location-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 20px 20px 20px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.current-location-label {
+  color: rgba(255,255,255,0.7);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.current-location-name {
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+.change-location-button {
+  display: flex;
+  align-items: center;
+  background: rgba(0,188,212,0.1);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,188,212,0.3);
+  gap: 6px;
+  min-width: 80px;
+  color: #00BCD4;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Location Selector Popup */
+.location-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 150px;
+  padding-left: 20px;
+  padding-right: 20px;
+  z-index: 1000;
+}
+.location-popup-card {
+  background: #1E293B;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  max-width: 350px;
+  width: 85%;
+}
+.location-selector-title {
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.location-choice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: white;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.location-choice.selected {
+  background: rgba(0,188,212,0.2);
+  border-color: rgba(0,188,212,0.5);
+}
+.checkmark {
+  color: #00BCD4;
+  font-size: 18px;
+  font-weight: bold;
+}
+.close-selector-button {
+  background: rgba(255,255,255,0.1);
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  align-items: center;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Additional Controls */
+.additional-controls {
+  margin: 0 20px 20px 20px;
+}
+.restart-button {
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.1);
+  padding: 12px 16px;
+  border-radius: 12px;
+  gap: 6px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+/* Detailed Analysis */
+.detailed-analysis {
+  background: rgba(255,255,255,0.05);
+  margin: 0 20px 20px 20px;
+  padding: 20px;
+  border-radius: 16px;
+}
+.details-title {
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+.summary-card {
+  background: rgba(255,255,255,0.1);
+  padding: 16px;
+  border-radius: 12px;
+  gap: 12px;
+}
+.summary-text {
+  color: rgba(255,255,255,0.9);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.modal-container {
+  background: #1E293B;
+  border-radius: 20px;
+  width: 85%;
+  max-width: 400px;
+  padding: 20px;
+  align-items: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.modal-header {
+  align-items: center;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.modal-title {
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+.modal-subtitle {
+  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+  text-align: center;
+}
+.choice-container {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+.choice-button {
+  flex: 1;
+  height: 120px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  border: none;
+  cursor: pointer;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.choice-title {
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+.choice-description {
+  color: rgba(255,255,255,0.9);
+  font-size: 11px;
+  text-align: center;
+  line-height: 14px;
+}
+.modal-close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+}
+
+/* Permission Modal */
+.permission-message {
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+.permission-buttons {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+.permission-button {
+  flex: 1;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  align-items: center;
+  background: none;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.permission-button.primary {
+  background: #FF6B35;
+  border-color: #FF6B35;
+  color: white;
+}

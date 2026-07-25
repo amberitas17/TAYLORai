@@ -1,0 +1,62 @@
+{
+  "model_name": "EGN Exhibit Classifier",
+  "classes": [
+    "EGN-1",
+    "EGN-10",
+    "EGN-12",
+    "EGN-13",
+    "EGN-14",
+    "EGN-15",
+    "EGN-16",
+    "EGN-17",
+    "EGN-18",
+    "EGN-19",
+    "EGN-2",
+    "EGN-20",
+    "EGN-21",
+    "EGN-22",
+    "EGN-23",
+    "EGN-24",
+    "EGN-25",
+    "EGN-26",
+    "EGN-3",
+    "EGN-4",
+    "EGN-5",
+    "EGN-6",
+    "EGN-7",
+    "EGN-9"
+  ],
+  "num_classes": 24,
+  "img_size": 224,
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "output_shape": [
+    1,
+    24
+  ],
+  "preprocessing": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "architecture": "YOLOv5Tiny with manual mean pooling",
+  "modifications": [
+    "Dropout layers disabled in eval mode (standard behavior)",
+    "AdaptiveAvgPool2d replaced with manual mean pooling operations"
+  ],
+  "weight_preservation": "ALL trained weights preserved exactly",
+  "quality": "Identical to original 99.60% accuracy model",
+  "training_accuracy": 99.6,
+  "onnx_file": "egn_model_exact_weights.onnx"
+}

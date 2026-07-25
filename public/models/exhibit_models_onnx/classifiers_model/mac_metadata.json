@@ -1,0 +1,22 @@
+{
+  "model_name": "MAC Exhibit Classifier",
+  "num_classes": 6,
+  "class_names": [
+    "MAC - Hall C Enterance",
+    "MAC - Hall C Row 1",
+    "MAC - Hall C Row 2",
+    "MAC - Hall C Row 3",
+    "MAC - Hall C Row 4",
+    "MAC - Hall C Walk in"
+  ],
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "accuracy": 90.0,
+  "model_type": "exhibit_classification",
+  "framework": "pytorch_to_onnx",
+  "architecture": "EfficientNet-B0"
+}

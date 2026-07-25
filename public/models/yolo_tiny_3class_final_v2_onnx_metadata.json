@@ -1,0 +1,65 @@
+{
+  "model_name": "YOLOv5-Tiny Final V2",
+  "classes": [
+    "DWT",
+    "EAP",
+    "EGN"
+  ],
+  "class_to_idx": {
+    "DWT": 0,
+    "EAP": 1,
+    "EGN": 2
+  },
+  "num_classes": 3,
+  "input_size": [
+    224,
+    224
+  ],
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "architecture": "YOLOv5-Tiny with Fixed Pooling",
+  "width_multiple": 0.25,
+  "depth_multiple": 0.33,
+  "preprocessing": {
+    "resize": [
+      224,
+      224
+    ],
+    "normalize": {
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ]
+    },
+    "transforms": [
+      "Resize to 224x224",
+      "Convert to tensor",
+      "Normalize with ImageNet stats"
+    ]
+  },
+  "model_files": {
+    "onnx_model": "yolo_tiny_3class_final_v2.onnx",
+    "pytorch_model": "best_yolo_tiny_3class_final_v2.pth",
+    "model_info": "yolo_tiny_3class_final_info.pth"
+  },
+  "export_info": {
+    "opset_version": 11,
+    "input_names": [
+      "input"
+    ],
+    "output_names": [
+      "output"
+    ],
+    "dynamic_axes": true
+  }
+}

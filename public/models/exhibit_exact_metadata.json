@@ -1,0 +1,66 @@
+{
+  "modelType": "ExactYOLOv5Tiny",
+  "version": "1.0.0",
+  "classes": [
+    "DWT",
+    "EAP"
+  ],
+  "classNames": {
+    "DWT": "Dialogue with Time",
+    "EAP": "Earth Alive"
+  },
+  "classToIdx": {
+    "DWT": 0,
+    "EAP": 1
+  },
+  "numClasses": 2,
+  "inputSize": [
+    224,
+    224
+  ],
+  "inputShape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "outputShape": [
+    1,
+    2
+  ],
+  "normalization": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "description": "ImageNet normalization"
+  },
+  "preprocessing": {
+    "resize": [
+      224,
+      224
+    ],
+    "normalize": true,
+    "channels": "RGB",
+    "format": "NCHW",
+    "description": "Resize to 224x224, apply ImageNet normalization"
+  },
+  "conversion": {
+    "source": "best_yolo_tiny_exhibit.pth",
+    "method": "Exact architecture reconstruction -> ONNX",
+    "framework": "ONNX Runtime Web",
+    "note": "Preserves original model architecture and weights"
+  },
+  "usage": {
+    "framework": "ONNX Runtime Web",
+    "inputFormat": "RGB image tensor [1, 3, 224, 224] (NCHW)",
+    "outputFormat": "class logits [1, 2]",
+    "postprocessing": "Apply softmax for probabilities"
+  }
+}

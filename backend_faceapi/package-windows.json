@@ -1,0 +1,55 @@
+{
+  "name": "ssc-person-detection-backend",
+  "version": "1.0.0",
+  "description": "Singapore Science Centre Person Detection & Emotion Backend with TensorFlow.js (Windows Compatible)",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest",
+    "convert-models": "node scripts/convert-models.js",
+    "install-windows": "npm install --package-lock-only && npm ci --omit=dev"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.20.0",
+    "@tensorflow/tfjs-converter": "^4.20.0",
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "qrcode": "^1.5.4",
+    "axios": "^1.7.2",
+    "form-data": "^4.0.0",
+    "uuid": "^10.0.0",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.4.5",
+    "jimp": "^0.22.12"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "optionalDependencies": {
+    "@tensorflow/tfjs-node": "^4.20.0",
+    "sharp": "^0.33.4",
+    "canvas": "^2.11.2",
+    "face-api.js": "^0.22.2"
+  },
+  "keywords": [
+    "tensorflow",
+    "person-detection",
+    "emotion-recognition",
+    "age-detection",
+    "nodejs",
+    "ai",
+    "computer-vision"
+  ],
+  "author": "SSC Development Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

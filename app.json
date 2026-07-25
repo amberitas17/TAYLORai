@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Singapore Science Centre",
+    "slug": "singaporesciencecentre",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FF6B35"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.singaporesciencecentre.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FF6B35"
+      },
+      "package": "com.singaporesciencecentre.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "platforms": ["ios", "android", "web"],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "scheme": "singaporesciencecentre",
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}

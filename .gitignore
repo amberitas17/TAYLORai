@@ -1,0 +1,46 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+
+# Local/editor files
+*.local
+.env
+.env.*
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build/deploy output
+dist/
+.vercel/
+
+# Generated exhibit-training artifacts
+runs/
+datasets/
+gate_dataset/
+.tmp_video_frames/
+
+# Training checkpoints and local weights
+*.pt
+*.pth
+yolo*.pt
+
+# ONNX files are usually generated, except deployed browser models.
+*.onnx
+*.onnx.data
+!public/models/**/*.onnx
+!public/models/**/*.onnx.data

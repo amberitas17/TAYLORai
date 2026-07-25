@@ -1,0 +1,32 @@
+{
+  "model_name": "EAP Exhibit Classifier",
+  "num_classes": 16,
+  "class_names": [
+    "EAP-01 Earth Alive",
+    "EAP-03 Bend the Carbon Curve",
+    "EAP-07 Disaster Teamwork",
+    "EAP-08 Survivor stories",
+    "EAP-10 Condensation & Evaporation",
+    "EAP-11 Rain and Terrain",
+    "EAP-16 Swirling storms",
+    "EAP-18 Atmosphere Hydrosphere",
+    "EAP-19 Building for Quakes",
+    "EAP-20 Un-solid Ground",
+    "EAP-21 Seeing Earth",
+    "EAP-27 Measuring Quakes",
+    "EAP-28 Shaking Waves",
+    "EAP-29 GeoSphere",
+    "EAP-30 Earth-quake",
+    "EAP-31 Folded Rocks"
+  ],
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "accuracy": 90.0,
+  "model_type": "exhibit_classification",
+  "framework": "pytorch_to_onnx",
+  "architecture": "EfficientNet-B0"
+}

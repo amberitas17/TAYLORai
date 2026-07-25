@@ -1,0 +1,104 @@
+{
+    "modelType": "main_zone_classifier",
+    "architecture": "EfficientNet-B3",
+    "framework": "PyTorch -> ONNX",
+    "inputSize": [224, 224, 3],
+    "outputSize": 24,
+    "classes": ["AT", "BTN", "CCP", "DWT", "EAP", "EGN", "MAC", "MEP", "QS", "UMP", "SV", "KYP", "ES", "GV", "SCS", "FM", "PB", "MM", "TS", "SNP", "KG", "LMGI", "EG", "WW"],
+    "classMapping": {
+        "AT": "Atrium",
+        "BTN": "Bioethics",
+        "CCP": "Climate Changed",
+        "DWT": "Dialogue with Time",
+        "EAP": "Earth Alive Planet",
+        "EGN": "Energy Story",
+        "MAC": "Mechanics Alive",
+        "MEP": "Mind Eye",
+        "QS": "Quanta School",
+        "UMP": "Urban Mutations",
+        "SV": "Savage Garden",
+        "KYP": "Know Your Poo",
+        "ES": "Everyday Science",
+        "GV": "Going Viral",
+        "SCS": "Some Call it Science",
+        "FM": "Future Makers",
+        "PB": "Phobia",
+        "MM": "Mirror Maze",
+        "TS": "Tinkering Studio",
+        "SNP": "Smart Nation Playscape",
+        "KG": "Kinetic Garden",
+        "LMGI": "Lazer Maze + Giant Isotrope",
+        "EG": "Ecogarden",
+        "WW": "Waterworks"
+    },
+    "trainingInfo": {
+        "dataset": "intelligently_balanced_224",
+        "totalImages": 12000,
+        "epochs": 8,
+        "trainingTime": "177.1 minutes",
+        "batchSize": 16,
+        "optimizer": "AdamW",
+        "learningRate": {
+            "backbone": 1e-5,
+            "classifier": 1e-3
+        },
+        "scheduler": "ReduceLROnPlateau",
+
+        "augmentation": {
+            "resize": [224, 224],
+            "horizontalFlip": 1.0,
+            "rotation": 40,
+            "perspective": { "distortion_scale": 0.6, "probability": 0.6 },
+            "affine": { "degrees": 25, "translate": [0.15, 0.15], "scale": [0.85, 1.15] },
+            "colorJitter": { "brightness": 0.2, "contrast": 0.2, "saturation": 0.2 },
+            "normalize": { "mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225] }
+        },
+
+        "split": {
+            "train": 0.85,
+            "validation": 0.15,
+            "strategy": "StratifiedShuffleSplit"
+        }
+    },
+
+    "modelDetails": {
+        "pretrainedBackbone": true,
+        "backboneSource": "timm efficientnet_b3 ImageNet",
+        "customClassifier": {
+            "layers": [
+                "Dropout(0.3)",
+                "Linear(feature_dim, 512)",
+                "ReLU(inplace=True)",
+                "Dropout(0.2)",
+                "Linear(512, 24)"
+            ]
+        },
+        "gradientClipping": 1.0,
+        "weightDecay": 0.01
+    },
+
+    "performance": {
+        "bestAccuracy": "97.72%",
+        "validationSplit": "15%",
+        "improvement": "+30.01% over baseline"
+    },
+
+    "preprocessing": {
+        "inputFormat": "RGB",
+        "normalization": "ImageNet standard",
+        "resize": [224, 224],
+        "dataType": "float32"
+    },
+
+    "outputFormat": {
+        "type": "logits",
+        "shape": [1, 24],
+        "postprocessing": "softmax for probabilities"
+    },
+
+    "modelFile": "efficientnet_b3_target_99.onnx",
+    "modelSize": "~50MB",
+    "created": "2024",
+    "version": "1.0",
+    "description": "EfficientNet-B3 classifier achieving 97.72% validation accuracy on 24 museum exhibit classes using a 12,000-image balanced dataset."
+}

@@ -1,0 +1,60 @@
+{
+  "model_name": "EAP Classifier",
+  "classes": [
+    "EAP-01_Earth_Alive",
+    "EAP-03_Bend_the_Carbon_Curve",
+    "EAP-04_Climate_Chat",
+    "EAP-05_Freeloader",
+    "EAP-07_Disaster_Teamwork",
+    "EAP-08_Survivor_stories",
+    "EAP-09_Typhoon_Simulator",
+    "EAP-10_Condensation_and_Evaporation",
+    "EAP-11_Rain_and_Terrain",
+    "EAP-16_Swirling_storms",
+    "EAP-17_Sandflow",
+    "EAP-18_Atmosphere_Hydrosphere",
+    "EAP-19_Building_for_Quakes",
+    "EAP-20_Un-solid_Ground",
+    "EAP-21_Seeing_Earth",
+    "EAP-27_Measuring_Quakes",
+    "EAP-28_Shaking_Waves",
+    "EAP-29_GeoSphere",
+    "EAP-30_Earth-quake",
+    "EAP-31_Folded_Rocks",
+    "EAP-32_Rock_Slices",
+    "EAP-33_Singapore_Rocks",
+    "EAP-34_Microfossils",
+    "EAP-35_Volcano"
+  ],
+  "num_classes": 24,
+  "img_size": 224,
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "output_shape": [
+    1,
+    24
+  ],
+  "preprocessing": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "architecture": "YOLOv5Tiny with manual mean pooling",
+  "modifications": [
+    "Dropout layers removed (disabled in eval mode)",
+    "AdaptiveAvgPool2d replaced with manual mean pooling operations"
+  ],
+  "quality": "Very close to original (manual pooling approximates adaptive pooling)",
+  "onnx_file": "eap_classifier_mean_pool.onnx"
+}

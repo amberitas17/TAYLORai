@@ -1,0 +1,522 @@
+{
+  "format": "graph-model",
+  "generatedBy": "TensorFlow.js Converter v4.0.0",
+  "convertedBy": "Custom H5 to Graph Model Converter",
+  "signature": {
+    "inputs": {
+      "input": {
+        "name": "input:0",
+        "dtype": "DT_FLOAT",
+        "tensorShape": {
+          "dim": [
+            {
+              "size": "-1"
+            },
+            {
+              "size": "48"
+            },
+            {
+              "size": "48"
+            },
+            {
+              "size": "1"
+            }
+          ]
+        }
+      }
+    },
+    "outputs": {
+      "output": {
+        "name": "output:0",
+        "dtype": "DT_FLOAT",
+        "tensorShape": {
+          "dim": [
+            {
+              "size": "-1"
+            },
+            {
+              "size": "7"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "modelTopology": {
+    "node": [
+      {
+        "name": "input",
+        "op": "Placeholder",
+        "attr": {
+          "dtype": {
+            "type": "DT_FLOAT"
+          },
+          "shape": {
+            "shape": {
+              "dim": [
+                {
+                  "size": "-1"
+                },
+                {
+                  "size": "48"
+                },
+                {
+                  "size": "48"
+                },
+                {
+                  "size": "1"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "output",
+        "op": "Identity",
+        "input": [
+          "model_output"
+        ],
+        "attr": {
+          "T": {
+            "type": "DT_FLOAT"
+          }
+        }
+      }
+    ],
+    "versions": {
+      "producer": 1407
+    }
+  },
+  "weightsManifest": [
+    {
+      "paths": [
+        "model.weights.bin"
+      ],
+      "weights": [
+        {
+          "name": "model_weights/batch_normalization_1/batch_normalization_1/beta:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_1/batch_normalization_1/gamma:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_1/batch_normalization_1/moving_mean:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_1/batch_normalization_1/moving_variance:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_2/batch_normalization_2/beta:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_2/batch_normalization_2/gamma:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_2/batch_normalization_2/moving_mean:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_2/batch_normalization_2/moving_variance:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_3/batch_normalization_3/beta:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_3/batch_normalization_3/gamma:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_3/batch_normalization_3/moving_mean:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_3/batch_normalization_3/moving_variance:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_4/batch_normalization_4/beta:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_4/batch_normalization_4/gamma:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_4/batch_normalization_4/moving_mean:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_4/batch_normalization_4/moving_variance:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_5/batch_normalization_5/beta:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_5/batch_normalization_5/gamma:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_5/batch_normalization_5/moving_mean:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_5/batch_normalization_5/moving_variance:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_6/batch_normalization_6/beta:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_6/batch_normalization_6/gamma:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_6/batch_normalization_6/moving_mean:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_6/batch_normalization_6/moving_variance:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_7/batch_normalization_7/beta:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_7/batch_normalization_7/gamma:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_7/batch_normalization_7/moving_mean:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_7/batch_normalization_7/moving_variance:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_8/batch_normalization_8/beta:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_8/batch_normalization_8/gamma:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_8/batch_normalization_8/moving_mean:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_8/batch_normalization_8/moving_variance:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_9/batch_normalization_9/beta:0",
+          "shape": [
+            256
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_9/batch_normalization_9/gamma:0",
+          "shape": [
+            256
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_9/batch_normalization_9/moving_mean:0",
+          "shape": [
+            256
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/batch_normalization_9/batch_normalization_9/moving_variance:0",
+          "shape": [
+            256
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_1/conv2d_1/bias:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_1/conv2d_1/kernel:0",
+          "shape": [
+            7,
+            7,
+            16,
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_2/conv2d_2/bias:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_2/conv2d_2/kernel:0",
+          "shape": [
+            5,
+            5,
+            16,
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_3/conv2d_3/bias:0",
+          "shape": [
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_3/conv2d_3/kernel:0",
+          "shape": [
+            5,
+            5,
+            32,
+            32
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_4/conv2d_4/bias:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_4/conv2d_4/kernel:0",
+          "shape": [
+            3,
+            3,
+            32,
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_5/conv2d_5/bias:0",
+          "shape": [
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_5/conv2d_5/kernel:0",
+          "shape": [
+            3,
+            3,
+            64,
+            64
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_6/conv2d_6/bias:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_6/conv2d_6/kernel:0",
+          "shape": [
+            3,
+            3,
+            64,
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_7/conv2d_7/bias:0",
+          "shape": [
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_7/conv2d_7/kernel:0",
+          "shape": [
+            3,
+            3,
+            128,
+            128
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_8/conv2d_8/bias:0",
+          "shape": [
+            256
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_8/conv2d_8/kernel:0",
+          "shape": [
+            3,
+            3,
+            128,
+            256
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_9/conv2d_9/bias:0",
+          "shape": [
+            7
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/conv2d_9/conv2d_9/kernel:0",
+          "shape": [
+            3,
+            3,
+            256,
+            7
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/image_array/image_array/bias:0",
+          "shape": [
+            16
+          ],
+          "dtype": "float32"
+        },
+        {
+          "name": "model_weights/image_array/image_array/kernel:0",
+          "shape": [
+            7,
+            7,
+            1,
+            16
+          ],
+          "dtype": "float32"
+        }
+      ]
+    }
+  ]
+}

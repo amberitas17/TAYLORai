@@ -1,0 +1,182 @@
+{
+  "input_shape": [
+    48,
+    48,
+    1
+  ],
+  "num_classes": 5,
+  "class_labels": [
+    "Angry",
+    "Happy",
+    "Neutral",
+    "Sad",
+    "Surprise"
+  ],
+  "preprocessing": {
+    "normalization": "divide_by_255",
+    "resize": [
+      48,
+      48
+    ],
+    "color_mode": "grayscale"
+  },
+  "architecture": [
+    {
+      "type": "conv2d",
+      "filters": 32,
+      "kernel_size": 3,
+      "activation": "elu",
+      "name": "conv2d_1"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_1"
+    },
+    {
+      "type": "conv2d",
+      "filters": 32,
+      "kernel_size": 3,
+      "activation": "elu",
+      "name": "conv2d_2"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_2"
+    },
+    {
+      "type": "max_pool",
+      "pool_size": 2
+    },
+    {
+      "type": "dropout",
+      "rate": 0.2
+    },
+    {
+      "type": "conv2d",
+      "filters": 64,
+      "kernel_size": 3,
+      "activation": "elu",
+      "name": "conv2d_3"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_3"
+    },
+    {
+      "type": "conv2d",
+      "filters": 64,
+      "kernel_size": 3,
+      "activation": "elu",
+      "name": "conv2d_4"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_4"
+    },
+    {
+      "type": "max_pool",
+      "pool_size": 2
+    },
+    {
+      "type": "dropout",
+      "rate": 0.2
+    },
+    {
+      "type": "conv2d",
+      "filters": 128,
+      "kernel_size": 3,
+      "activation": "elu",
+      "name": "conv2d_5"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_5"
+    },
+    {
+      "type": "conv2d",
+      "filters": 128,
+      "kernel_size": 3,
+      "activation": "elu",
+      "name": "conv2d_6"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_6"
+    },
+    {
+      "type": "max_pool",
+      "pool_size": 2
+    },
+    {
+      "type": "dropout",
+      "rate": 0.2
+    },
+    {
+      "type": "conv2d",
+      "filters": 256,
+      "kernel_size": 3,
+      "activation": "elu",
+      "name": "conv2d_7"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_7"
+    },
+    {
+      "type": "conv2d",
+      "filters": 256,
+      "kernel_size": 3,
+      "activation": "elu",
+      "name": "conv2d_8"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_8"
+    },
+    {
+      "type": "max_pool",
+      "pool_size": 2
+    },
+    {
+      "type": "dropout",
+      "rate": 0.2
+    },
+    {
+      "type": "flatten"
+    },
+    {
+      "type": "dense",
+      "units": 64,
+      "activation": "elu",
+      "name": "dense_1"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_9"
+    },
+    {
+      "type": "dropout",
+      "rate": 0.5
+    },
+    {
+      "type": "dense",
+      "units": 64,
+      "activation": "elu",
+      "name": "dense_2"
+    },
+    {
+      "type": "batch_norm",
+      "name": "batch_normalization_10"
+    },
+    {
+      "type": "dropout",
+      "rate": 0.5
+    },
+    {
+      "type": "dense",
+      "units": 5,
+      "activation": "softmax",
+      "name": "dense_3"
+    }
+  ]
+}

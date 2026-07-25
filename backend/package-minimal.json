@@ -1,0 +1,32 @@
+{
+  "name": "ssc-person-detection-backend",
+  "version": "1.0.0",
+  "description": "Singapore Science Centre Person Detection & Emotion Backend (Windows Minimal)",
+  "main": "src/server-minimal.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server-minimal.js",
+    "dev": "node src/server-minimal.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.4.5",
+    "qrcode": "^1.5.4",
+    "axios": "^1.7.2",
+    "uuid": "^10.0.0"
+  },
+  "keywords": [
+    "singapore-science-centre",
+    "person-detection",
+    "api"
+  ],
+  "author": "SSC Development Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

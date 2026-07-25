@@ -1,0 +1,52 @@
+# Face-API.js Backend Requirements
+# This is a Node.js project. Use npm install to install dependencies.
+
+# Node.js Version Requirements
+# Node.js >= 18.0.0
+
+# Core Dependencies (from package.json):
+# express@^4.19.2               - Web framework
+# face-api.js@^0.22.2          - Face detection and analysis
+# canvas@^3.2.0                - HTML5 Canvas API for Node.js
+# cors@^2.8.5                  - Cross-Origin Resource Sharing
+# helmet@^7.1.0                - Security middleware
+# compression@^1.7.4           - Response compression
+# morgan@^1.10.0               - HTTP request logger
+# dotenv@^16.4.5               - Environment variables
+# axios@^1.7.2                 - HTTP client
+# qrcode@^1.5.4                - QR code generator
+# uuid@^10.0.0                 - UUID generator
+
+# TensorFlow.js Dependencies (fallback support):
+# @tensorflow/tfjs@^4.22.0
+# @tensorflow/tfjs-backend-cpu@^4.22.0
+# @tensorflow/tfjs-converter@^4.22.0
+# @tensorflow/tfjs-node@^4.22.0
+
+# Installation Instructions:
+# 1. Install Node.js >= 18.0.0
+# 2. Run: npm install
+# 3. Run: npm start
+# 4. Backend will start on port 3033 (configurable via PORT environment variable)
+
+# Environment Variables:
+# PORT=3033                    - Server port
+# NODE_ENV=development         - Environment mode
+
+# API Endpoints:
+# GET  /health                 - Health check
+# GET  /api/v1/status          - Service status
+# POST /api/v1/face-analysis   - Face analysis endpoint
+# GET  /docs                   - API documentation
+
+# Features:
+# - Face detection using TinyFaceDetector
+# - Emotion recognition (7 emotions)
+# - Age and gender estimation
+# - Face landmarks detection
+# - Real-time face analysis
+# - Proper error handling
+# - CORS enabled for cross-origin requests
+# - Security headers with Helmet
+# - Request logging with Morgan
+# - Response compression

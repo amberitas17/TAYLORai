@@ -1,0 +1,8 @@
+# Requirements for ONNX model conversion scripts
+torch>=2.0.0
+onnx>=1.15.0
+numpy>=1.21.0
+
+# Optional: for enhanced conversions
+# onnx2tf>=1.22.0
+# tensorflowjs>=4.0.0

@@ -1,0 +1,360 @@
+/* AI Navigation Component Styles */
+
+.ai-navigation-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #FF6B35, #FF8C42);
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  padding: 20px;
+}
+
+/* Header */
+.navigation-header {
+  position: relative;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.back-button {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.back-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.header-content h1 {
+  font-size: 22px;
+  font-weight: bold;
+  margin: 0 0 5px 0;
+}
+
+.header-content p {
+  font-size: 14px;
+  opacity: 0.9;
+  margin: 0;
+}
+
+/* Detect Button */
+.detect-button-container {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.detect-exhibit-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 25px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.detect-exhibit-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.02);
+}
+
+/* Map Section */
+.map-section {
+  margin-bottom: 20px;
+}
+
+.map-section h2 {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.map-container {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.exhibit-map {
+  width: 100%;
+  height: 250px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.exhibit-marker {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.exhibit-marker:hover {
+  r: 4;
+  filter: brightness(1.2);
+}
+
+.current-location-pulse {
+  animation: locationPulse 2s infinite;
+}
+
+@keyframes locationPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+.navigation-path {
+  animation: pathDash 3s infinite linear;
+}
+
+@keyframes pathDash {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 20; }
+}
+
+/* Progress Section */
+.progress-section {
+  margin-bottom: 20px;
+}
+
+.progress-card {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 15px;
+  padding: 20px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.progress-card h3 {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #E8F5E8;
+}
+
+.progress-dots {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transition: all 0.3s;
+}
+
+.progress-dot.active {
+  background: #4CAF50;
+}
+
+.progress-dot.current {
+  background: #FF9800;
+  transform: scale(1.3);
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+}
+
+/* Location Info */
+.location-info {
+  margin-bottom: 20px;
+}
+
+.location-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.location-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.location-dot.current {
+  background: #FF9800;
+}
+
+.location-dot.path {
+  background: #4CAF50;
+}
+
+/* Navigation Stats */
+.navigation-stats {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 15px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.stat-item:last-child {
+  margin-bottom: 0;
+}
+
+.stat-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+/* Live tracking elements */
+.tracking-status {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.tracking-indicator {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.3s;
+}
+
+.tracking-indicator.active {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4CAF50;
+  animation: trackingPulse 2s infinite;
+}
+
+@keyframes trackingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Map image display */
+.map-image-container {
+  position: relative;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.map-image {
+  width: 100%;
+  height: 250px;
+  object-fit: contain;
+  display: block;
+  background-color: #f8f9fa;
+}
+
+.map-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  padding: 20px 15px 15px;
+  color: white;
+}
+
+.map-label {
+  font-size: 16px;
+  font-weight: bold;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .ai-navigation-container {
+    padding: 15px;
+  }
+
+  .header-content h1 {
+    font-size: 20px;
+  }
+
+  .exhibit-map {
+    height: 200px;
+  }
+
+  .map-container {
+    padding: 15px;
+  }
+
+  .progress-dots {
+    gap: 8px;
+  }
+
+  .progress-dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .map-image {
+    height: 150px;
+  }
+
+  .map-label {
+    font-size: 14px;
+  }
+}
+
+/* Enhanced animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-navigation-container {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.map-container {
+  animation: fadeIn 0.8s ease-out 0.2s both;
+}
+
+.progress-card {
+  animation: fadeIn 1s ease-out 0.4s both;
+}
+
+.navigation-stats {
+  animation: fadeIn 1.2s ease-out 0.6s both;
+}

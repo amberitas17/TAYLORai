@@ -1,0 +1,8 @@
+staticSites:
+  - name: singaporesciencecenterpwa
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    redirects:
+      - source: /*
+        destination: /index.html
+        status: 200

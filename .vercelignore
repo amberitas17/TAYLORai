@@ -1,0 +1,13 @@
+datasets/
+runs/
+gate_dataset/
+dist/
+node_modules/
+backend/
+backend_faceapi/
+Documentation/
+scripts/
+*.pt
+requirements.txt
+train_yolo_tiny.py
+.git/

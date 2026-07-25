@@ -1,0 +1,24 @@
+{
+  "model_name": "QS Exhibit Classifier",
+  "num_classes": 8,
+  "class_names": [
+    "QS Overview",
+    "QS-2 Double or More",
+    "QS-3 By chance",
+    "QS-4 to 6 Schrodingers Cards",
+    "QS-4.1 More is more",
+    "QS-5 Linked Lamps",
+    "QS-7 to 8.1 Certainly uncertain Atomic Clock",
+    "QS-9 Topic of the month quantum"
+  ],
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "accuracy": 90.0,
+  "model_type": "exhibit_classification",
+  "framework": "pytorch_to_onnx",
+  "architecture": "EfficientNet-B0"
+}

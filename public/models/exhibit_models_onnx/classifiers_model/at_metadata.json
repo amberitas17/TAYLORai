@@ -1,0 +1,24 @@
+{
+  "model_name": "AT Exhibit Classifier",
+  "num_classes": 8,
+  "class_names": [
+    "AT Strobe Fountain",
+    "AT Vertical Waves",
+    "AT Void",
+    "AT-06 Cloud Rings",
+    "AT-40 Cartesian Diver",
+    "AT-43 Jacob_s Ladder",
+    "AT-50 Icy Bodies",
+    "AT-54 Spin Browser"
+  ],
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "accuracy": 90.0,
+  "model_type": "exhibit_classification",
+  "framework": "pytorch_to_onnx",
+  "architecture": "EfficientNet-B0"
+}

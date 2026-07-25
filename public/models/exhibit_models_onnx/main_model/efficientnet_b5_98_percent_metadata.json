@@ -1,0 +1,100 @@
+{
+    "modelType": "main_zone_classifier",
+    "architecture": "EfficientNet-B3",
+    "framework": "PyTorch -> ONNX",
+    "inputSize": [224, 224, 3],
+    "outputSize": 10,
+    "classes": ["AT", "BTN", "CCP", "DWT", "EAP", "EGN", "MAC", "MEP", "QS", "UMP", "SV", "KYP", "ES", "GV", "SCS", "FM", "PB", "MM", "TS", "SNP", "KG", "LMGI", "EG", "WW"],
+    "classMapping": {
+        "AT": "Atrium",
+        "BTN": "Bioethics",
+        "CCP": "Climate Changed",
+        "DWT": "Dialogue with Time",
+        "EAP": "Earth Alive Planet",
+        "EGN": "Energy Story",
+        "MAC": "Mechanics Alive",
+        "MEP": "Mind Eye",
+        "QS": "Quanta School",
+        "UMP": "Urban Mutations",
+        "SV": "Savage Garden",
+        "KYP": "Know Your Poo",
+        "ES": "Everyday Science",
+        "GV": "Going Viral",
+        "SCS": "Some Call it Science",
+        "FM": "Future Makers",
+        "PB": "Phobia",
+        "MM": "Mirror Maze",
+        "TS": "Tinkering Studio",
+        "SNP": "Smart Nation Playscape",
+        "KG": "Kinetic Garden",
+        "LMGI": "Lazer Maze + Giant Isotrope",
+        "EG": "Ecogarden",
+        "WW": "Waterworks"
+    },
+    "trainingInfo": {
+        "dataset": "intelligently_balanced_224",
+        "totalImages": 5817,
+        "epochs": 8,
+        "trainingTime": "208.3 minutes",
+        "batchSize": 16,
+        "optimizer": "AdamW",
+        "learningRate": {
+            "backbone": 1e-5,
+            "classifier": 1e-3
+        },
+        "scheduler": "CosineAnnealingLR",
+        "augmentation": {
+            "resize": [224, 224],
+            "horizontalFlip": 0.5,
+            "rotation": 15,
+            "colorJitter": true,
+            "affine": true,
+            "normalize": {
+                "mean": [0.485, 0.456, 0.406],
+                "std": [0.229, 0.224, 0.225]
+            }
+        },
+        "split": {
+            "train": 0.95,
+            "validation": 0.05
+        }
+    },
+    "modelDetails": {
+        "pretrainedBackbone": true,
+        "backboneSource": "timm efficientnet_b5 ImageNet",
+        "customClassifier": {
+            "layers": [
+                "Dropout(0.3)",
+                "Linear(feature_dim, 512)",
+                "ReLU",
+                "Dropout(0.2)",
+                "Linear(512, 10)"
+            ]
+        },
+        "gradientClipping": 1.0,
+        "weightDecay": 0.01
+    },
+    "performance": {
+        "bestAccuracy": "98.01%",
+        "comparisonBaseline": "YOLOv8s: 68.0%",
+        "validationSplit": "5%",
+        "trainingTime": "208.3 minutes",
+        "improvement": "+30.01% over baseline"
+    },
+    "preprocessing": {
+        "inputFormat": "RGB",
+        "normalization": "ImageNet standard",
+        "resize": [224, 224],
+        "dataType": "float32"
+    },
+    "outputFormat": {
+        "type": "logits",
+        "shape": [1, 10],
+        "postprocessing": "softmax for probabilities"
+    },
+    "modelFile": "efficientnet_b5_98_percentvalidated.onnx",
+    "modelSize": "~112MB",
+    "created": "2024",
+    "version": "1.0",
+    "description": "High-performance EfficientNet-B5 model achieving 98.01% accuracy for 18-class exhibit zone classification using intelligently balanced dataset (5,817 images) with comprehensive data augmentation and transfer learning."
+}

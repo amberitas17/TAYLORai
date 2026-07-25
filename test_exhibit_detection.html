@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Exhibit Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .result {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        button:hover { background: #0056b3; }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏛️ Exhibit Detection Test</h1>
+
+    <div class="test-section">
+        <h2>1. Service Initialization Test</h2>
+        <button onclick="testInitialization()">Test Initialization</button>
+        <div id="init-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Camera Access Test</h2>
+        <button onclick="testCamera()">Test Camera</button>
+        <video id="test-video" width="224" height="224" style="display:none;"></video>
+        <canvas id="test-canvas" width="224" height="224"></canvas>
+        <div id="camera-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Model Prediction Test</h2>
+        <button onclick="testPrediction()">Test Prediction</button>
+        <div id="prediction-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Image Processing Test</h2>
+        <button onclick="testImageProcessing()">Test Image Processing</button>
+        <div id="processing-result" class="result"></div>
+    </div>
+
+    <script type="module">
+        import * as tf from '@tensorflow/tfjs';
+
+        window.tf = tf;
+        window.testResults = {
+            initialization: false,
+            camera: false,
+            prediction: false,
+            imageProcessing: false
+        };
+
+        window.testInitialization = async function() {
+            const resultDiv = document.getElementById('init-result');
+            resultDiv.innerHTML = 'Testing initialization...';
+
+            try {
+                // Test TensorFlow.js loading
+                console.log('TensorFlow.js version:', tf.version.tfjs);
+                resultDiv.innerHTML += `<br>✅ TensorFlow.js loaded: ${tf.version.tfjs}`;
+
+                // Test service import
+                const { default: exhibitDetectionService } = await import('./src/services/exhibitDetectionService.js');
+                resultDiv.innerHTML += '<br>✅ Service imported successfully';
+
+                // Test initialization
+                await exhibitDetectionService.initialize();
+                resultDiv.innerHTML += '<br>✅ Service initialized successfully';
+
+                window.exhibitService = exhibitDetectionService;
+                window.testResults.initialization = true;
+
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML += '<br><strong>✅ Initialization test passed!</strong>';
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Initialization failed: ${error.message}`;
+                console.error('Initialization error:', error);
+            }
+        };
+
+        window.testCamera = async function() {
+            const resultDiv = document.getElementById('camera-result');
+            const video = document.getElementById('test-video');
+            const canvas = document.getElementById('test-canvas');
+            const ctx = canvas.getContext('2d');
+
+            resultDiv.innerHTML = 'Testing camera access...';
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+
+                video.srcObject = stream;
+                await video.play();
+
+                resultDiv.innerHTML = '✅ Camera access granted<br>📹 Capturing test frame...';
+
+                // Wait a bit for the video to start
+                setTimeout(() => {
+                    try {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        resultDiv.innerHTML += '<br>✅ Frame captured to canvas';
+
+                        window.testResults.camera = true;
+                        resultDiv.className = 'result success';
+                        resultDiv.innerHTML += '<br><strong>✅ Camera test passed!</strong>';
+
+                        // Stop the video stream
+                        stream.getTracks().forEach(track => track.stop());
+
+                    } catch (error) {
+                        resultDiv.className = 'result error';
+                        resultDiv.innerHTML += `<br>❌ Frame capture failed: ${error.message}`;
+                    }
+                }, 1000);
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Camera access failed: ${error.message}`;
+                console.error('Camera error:', error);
+            }
+        };
+
+        window.testPrediction = async function() {
+            const resultDiv = document.getElementById('prediction-result');
+            resultDiv.innerHTML = 'Testing model prediction...';
+
+            try {
+                if (!window.exhibitService) {
+                    throw new Error('Service not initialized. Run initialization test first.');
+                }
+
+                // Create a test image (random data)
+                const canvas = document.createElement('canvas');
+                canvas.width = 224;
+                canvas.height = 224;
+                const ctx = canvas.getContext('2d');
+
+                // Fill with a test pattern
+                const imageData = ctx.createImageData(224, 224);
+                for (let i = 0; i < imageData.data.length; i += 4) {
+                    imageData.data[i] = Math.random() * 255;     // Red
+                    imageData.data[i + 1] = Math.random() * 255; // Green
+                    imageData.data[i + 2] = Math.random() * 255; // Blue
+                    imageData.data[i + 3] = 255;                 // Alpha
+                }
+                ctx.putImageData(imageData, 0, 0);
+
+                resultDiv.innerHTML += '<br>🎨 Test image created';
+
+                // Run prediction
+                const prediction = await window.exhibitService.detectExhibit(canvas);
+
+                resultDiv.innerHTML += `<br>✅ Prediction completed:`;
+                resultDiv.innerHTML += `<br>  • Exhibit: ${prediction.exhibit}`;
+                resultDiv.innerHTML += `<br>  • Class: ${prediction.class}`;
+                resultDiv.innerHTML += `<br>  • Confidence: ${(prediction.confidence * 100).toFixed(1)}%`;
+                resultDiv.innerHTML += `<br>  • Processing time: ${prediction.processingTime.toFixed(2)}ms`;
+
+                window.testResults.prediction = true;
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML += '<br><strong>✅ Prediction test passed!</strong>';
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Prediction failed: ${error.message}`;
+                console.error('Prediction error:', error);
+            }
+        };
+
+        window.testImageProcessing = async function() {
+            const resultDiv = document.getElementById('processing-result');
+            resultDiv.innerHTML = 'Testing image processing...';
+
+            try {
+                // Create a test image
+                const canvas = document.createElement('canvas');
+                canvas.width = 640;  // Different size to test resizing
+                canvas.height = 480;
+                const ctx = canvas.getContext('2d');
+
+                // Draw a test pattern
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(0, 0, 320, 240);
+                ctx.fillStyle = '#00ff00';
+                ctx.fillRect(320, 0, 320, 240);
+                ctx.fillStyle = '#0000ff';
+                ctx.fillRect(0, 240, 320, 240);
+                ctx.fillStyle = '#ffff00';
+                ctx.fillRect(320, 240, 320, 240);
+
+                resultDiv.innerHTML += '<br>🎨 Test pattern created (640x480)';
+
+                // Test tensor conversion
+                const tensor = tf.browser.fromPixels(canvas);
+                resultDiv.innerHTML += `<br>✅ Tensor created: shape ${tensor.shape}`;
+
+                // Test resizing
+                const resized = tf.image.resizeBilinear(tensor, [224, 224]);
+                resultDiv.innerHTML += `<br>✅ Resized to: shape ${resized.shape}`;
+
+                // Test normalization
+                const normalized = resized.cast('float32').div(255.0);
+                resultDiv.innerHTML += `<br>✅ Normalized to [0,1] range`;
+
+                // Test ImageNet normalization
+                const mean = tf.tensor1d([0.485, 0.456, 0.406]);
+                const std = tf.tensor1d([0.229, 0.224, 0.225]);
+                const imagenetNorm = normalized.sub(mean).div(std);
+                resultDiv.innerHTML += `<br>✅ ImageNet normalization applied`;
+
+                // Test batch dimension
+                const batched = imagenetNorm.expandDims(0);
+                resultDiv.innerHTML += `<br>✅ Batch dimension added: shape ${batched.shape}`;
+
+                // Cleanup
+                tensor.dispose();
+                resized.dispose();
+                normalized.dispose();
+                imagenetNorm.dispose();
+                batched.dispose();
+                mean.dispose();
+                std.dispose();
+
+                window.testResults.imageProcessing = true;
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML += '<br><strong>✅ Image processing test passed!</strong>';
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Image processing failed: ${error.message}`;
+                console.error('Image processing error:', error);
+            }
+        };
+
+        // Auto-run initialization test
+        window.addEventListener('load', () => {
+            setTimeout(testInitialization, 500);
+        });
+    </script>
+</body>
+</html>

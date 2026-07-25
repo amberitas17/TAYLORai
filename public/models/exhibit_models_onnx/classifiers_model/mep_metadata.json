@@ -1,0 +1,42 @@
+{
+  "model_name": "MEP Exhibit Classifier",
+  "num_classes": 26,
+  "class_names": [
+    "MEN-01 Don_t stop now",
+    "MEN-04 The Haunted Castle",
+    "MEN-05 Something moving, MEP-15 Classical Illusions",
+    "MEN-09 The Watchers",
+    "MEN-13 Infinity Arch",
+    "MEN-15c Bloom",
+    "MEN-18 View with a Twist",
+    "MEN-20 Further Reflection",
+    "MEN-28 A reversal  in Prespective",
+    "MEP AT-10 Face Matching",
+    "MEP- Hall F Walkthrough",
+    "MEP-03 The unexpected Dinner Guest",
+    "MEP-06 Misleading Shadows",
+    "MEP-07 One Vase Two Faces",
+    "MEP-10 The Colourless Room",
+    "MEP-11 Just like it sounds",
+    "MEP-12 Ever Ascending",
+    "MEP-14 Ball Rolling Uphill",
+    "MEP-15 Temporal Distortion",
+    "MEP-16 Flash Dance",
+    "MEP-25 Didn_t feel that coming",
+    "MEP-29 Magic Shadows",
+    "MEP-30 Your Move",
+    "MEP-31 Unlikely Pair",
+    "MEP-32 The Giant Chair",
+    "MEP-36 Infinity Tunnel"
+  ],
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "accuracy": 90.0,
+  "model_type": "exhibit_classification",
+  "framework": "pytorch_to_onnx",
+  "architecture": "EfficientNet-B0"
+}
