@@ -4,7 +4,7 @@ import Hologram from './hologram.jsx';
 import { textToSpeech } from './services/speechAPI.js';
 import './HomePage.css';
 
-const API_URL = import.meta.env.VITE_NODEJS_API_URL || 'http://localhost:3033';
+const API_URL = import.meta.env.VITE_NODEJS_API_URL || '';
 
 const suggestionItems = [
   { key: 'bulsu', label: 'What is BulSU?', answer: 'Bulacan State University is a premier public university in the Philippines, known for academic excellence, innovation, and service to the community.' },
