@@ -5,6 +5,7 @@ import { textToSpeech } from './services/speechAPI.js';
 import './HomePage.css';
 
 const API_URL = import.meta.env.VITE_NODEJS_API_URL || '';
+const CHAT_ENDPOINT = API_URL ? `${API_URL.replace(/\/$/, '')}/api/chat` : '/api/chat';
 
 const suggestionItems = [
   { key: 'bulsu', label: 'What is BulSU?', answer: 'Bulacan State University is a premier public university in the Philippines, known for academic excellence, innovation, and service to the community.' },
@@ -94,13 +95,27 @@ export default function TaylorDashboard() {
     setIsThinking(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/chat`, {
+      const response = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [...nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text }))] })
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data = {};
+
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { reply: text };
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || data.reply || 'Chat request failed');
+      }
+
       const reply = data.reply || 'I am TAYLOR and I am here to assist you.';
       setMessages((prev) => [...prev, { speaker: 'guide', text: reply }]);
       speakWithPreferredVoice(reply);
