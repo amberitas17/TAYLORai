@@ -101,27 +101,28 @@ export default function TaylorDashboard() {
         body: JSON.stringify({ messages: [...nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text }))] })
       });
 
-      const text = await response.text();
+      const responseText = await response.text();
       let data = {};
 
-      if (text) {
+      if (responseText) {
         try {
-          data = JSON.parse(text);
+          data = JSON.parse(responseText);
         } catch {
-          data = { reply: text };
+          data = { reply: responseText };
         }
       }
 
-      if (!response.ok) {
-        throw new Error(data.error || data.reply || 'Chat request failed');
+      const fallbackReply = 'I am sorry, I am having trouble responding right now. Please try again in a moment.';
+      if (!response.ok && !data.reply) {
+        throw new Error(data.error || 'Chat request failed');
       }
 
-      const reply = data.reply || 'I am TAYLOR and I am here to assist you.';
+      const reply = data.reply || fallbackReply;
       setMessages((prev) => [...prev, { speaker: 'guide', text: reply }]);
       speakWithPreferredVoice(reply);
     } catch (error) {
       console.error('Chat request failed:', error);
-      const fallback = 'I am sorry, I am having trouble responding right now.';
+      const fallback = 'I am sorry, I am having trouble responding right now. Please try again in a moment.';
       setMessages((prev) => [...prev, { speaker: 'guide', text: fallback }]);
       speakWithPreferredVoice(fallback);
     } finally {

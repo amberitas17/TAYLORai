@@ -5,6 +5,8 @@ dotenv.config();
 
 const SYSTEM_PROMPT = 'You are TAYLOR, the official AI Hologram Guide of Bulacan State University (BulSU) and ARICC. You assist visitors with BulSU information, ARICC information, academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.';
 
+const fallbackReply = 'I am here to help with BulSU and ARICC. I am currently having trouble reaching the AI service, but I can still share general information about programs, services, scholarships, and campus facilities.';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -30,7 +32,7 @@ export default async function handler(req, res) {
 
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      res.status(500).json({ error: 'Groq API key is not configured on the server.' });
+      res.status(200).json({ reply: fallbackReply });
       return;
     }
 
@@ -46,6 +48,6 @@ export default async function handler(req, res) {
     res.status(200).json({ reply });
   } catch (error) {
     console.error('Groq chat API error:', error);
-    res.status(500).json({ error: 'Unable to generate a response right now.' });
+    res.status(200).json({ reply: fallbackReply });
   }
 }
