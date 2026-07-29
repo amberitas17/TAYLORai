@@ -6,7 +6,7 @@ import './HomePage.css';
 
 const API_URL = (import.meta.env.VITE_NODEJS_API_URL || '').trim();
 const CHAT_ENDPOINT = API_URL && !/localhost|127\.0\.0\.1/i.test(API_URL)
-  ? `${API_URL.replace(/\/$/, '')}/api/chat`
+  ? `${API_URL.replace(/\/$/, '')}/chat`
   : '/api/chat';
 
 const suggestionItems = [
