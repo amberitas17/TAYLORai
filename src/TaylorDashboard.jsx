@@ -4,8 +4,10 @@ import Hologram from './hologram.jsx';
 import { textToSpeech } from './services/speechAPI.js';
 import './HomePage.css';
 
-const API_URL = import.meta.env.VITE_NODEJS_API_URL || '';
-const CHAT_ENDPOINT = API_URL ? `${API_URL.replace(/\/$/, '')}/api/chat` : '/api/chat';
+const API_URL = (import.meta.env.VITE_NODEJS_API_URL || '').trim();
+const CHAT_ENDPOINT = API_URL && !/localhost|127\.0\.0\.1/i.test(API_URL)
+  ? `${API_URL.replace(/\/$/, '')}/api/chat`
+  : '/api/chat';
 
 const suggestionItems = [
   { key: 'bulsu', label: 'What is BulSU?', answer: 'Bulacan State University is a premier public university in the Philippines, known for academic excellence, innovation, and service to the community.' },
@@ -84,6 +86,23 @@ export default function TaylorDashboard() {
     textToSpeech(text, false, 'taylor', 'en').finally(() => setIsSpeaking(false));
   };
 
+  const getFriendlyErrorMessage = (error) => {
+    const message = error?.message || 'Backend unavailable';
+    if (message.includes('Invalid API key') || message.includes('invalid-api-key')) {
+      return 'The AI service key is invalid. Please contact the site administrator.';
+    }
+    if (message.includes('Rate limit') || message.includes('rate-limit')) {
+      return 'The AI service is temporarily rate-limiting requests. Please try again soon.';
+    }
+    if (message.includes('API not found') || message.includes('not found')) {
+      return 'The chat endpoint could not be found. Please try again in a moment.';
+    }
+    if (message.includes('Network') || message.includes('network')) {
+      return 'A network error prevented the chat request from completing.';
+    }
+    return 'The chat service is temporarily unavailable. Please try again in a moment.';
+  };
+
   const handleSendMessage = async (overrideText) => {
     const text = (overrideText ?? inputText).trim();
     if (!text) return;
@@ -95,10 +114,15 @@ export default function TaylorDashboard() {
     setIsThinking(true);
 
     try {
+      console.info('[taylor] chat request', {
+        endpoint: CHAT_ENDPOINT,
+        payload: { messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })) }
+      });
+
       const response = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text }))] })
+        body: JSON.stringify({ messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })) })
       });
 
       const responseText = await response.text();
@@ -112,19 +136,23 @@ export default function TaylorDashboard() {
         }
       }
 
-      const fallbackReply = 'I am sorry, I am having trouble responding right now. Please try again in a moment.';
-      if (!response.ok && !data.reply) {
-        throw new Error(data.error || 'Chat request failed');
+      console.info('[taylor] chat response', {
+        status: response.status,
+        body: responseText
+      });
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || data.error || data.errorType || 'Backend unavailable');
       }
 
-      const reply = data.reply || fallbackReply;
+      const reply = data.reply || 'I am sorry, I am having trouble responding right now. Please try again in a moment.';
       setMessages((prev) => [...prev, { speaker: 'guide', text: reply }]);
       speakWithPreferredVoice(reply);
     } catch (error) {
-      console.error('Chat request failed:', error);
-      const fallback = 'I am sorry, I am having trouble responding right now. Please try again in a moment.';
-      setMessages((prev) => [...prev, { speaker: 'guide', text: fallback }]);
-      speakWithPreferredVoice(fallback);
+      console.error('[taylor] chat request failed', error);
+      const friendly = getFriendlyErrorMessage(error);
+      setMessages((prev) => [...prev, { speaker: 'guide', text: friendly }]);
+      speakWithPreferredVoice(friendly);
     } finally {
       setIsThinking(false);
     }
