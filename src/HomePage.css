@@ -216,21 +216,21 @@
 
 .avatar-card {
   min-height: 620px;
-  padding: 0;
+  padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  margin: -24px 0 -36px -20px;
+  margin: -12px 0 -18px -8px;
   position: relative;
   z-index: 1;
-  right: 60px;
+  right: 0;
 }
 
 .avatar-card canvas,
 .avatar-card iframe,
 .avatar-card > div {
-  transform: scale(1.28);
+  transform: scale(1.05);
   transform-origin: center center;
 }
 

@@ -305,7 +305,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
     }
 
     if (groupRef.current) {
-      groupRef.current.position.y = 0;
+      groupRef.current.position.y = 0.08;
       groupRef.current.rotation.z = 0;
       groupRef.current.rotation.x = isAnimating ? Math.sin(t * 1.0) * 0.008 : 0;
       groupRef.current.rotation.y = isAnimating ? Math.sin(t * 1.5) * 0.012 : 0;
@@ -314,7 +314,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
 
   return (
     <group ref={groupRef}>
-      <primitive object={displayScene} position={[0, 0, 0]} scale={1} />
+      <primitive object={displayScene} position={[0, 0.04, 0]} scale={1.02} />
     </group>
   );
 }
@@ -331,8 +331,8 @@ function LoadingFallback() {
 export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto' }) {
   return (
     <div className="hologram-container">
-      <Canvas camera={{ position: [0, 1.2, 4], fov: 42 }} dpr={[1, 1.5]}>
-        <PerspectiveCamera makeDefault position={[0, 1.5, 2.2]} fov={44} />
+      <Canvas camera={{ position: [0, 1.3, 4.3], fov: 30 }} dpr={[1, 1.5]}>
+        <PerspectiveCamera makeDefault position={[0, 1.35, 2.9]} fov={30} />
         <ambientLight intensity={1.2} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
         <directionalLight position={[-5, 5, -5]} intensity={0.6} />
@@ -340,7 +340,7 @@ export default function Hologram({ emotion, isAnimating = false, spokenText = ''
         <Suspense fallback={<LoadingFallback />}>
           <AvatarModel emotion={emotion} isAnimating={isAnimating} spokenText={spokenText} disableAnimations={disableAnimations} poseMode={poseMode} assetPreset={assetPreset} />
         </Suspense>
-        <OrbitControls enableZoom={false} target={[0, 1.1, 0]} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
+        <OrbitControls enableZoom={false} enablePan={false} target={[0, 1.18, 0]} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
       </Canvas>
     </div>
   );
