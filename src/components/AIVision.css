@@ -4,16 +4,17 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #FF6B35, #FF8C42);
-  color: white;
+  background: linear-gradient(135deg, #eaf6ff 0%, #d9ecff 100%);
+  color: #12324a;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  box-sizing: border-box;
 }
 
 /* Permission States */
 .permission-container {
   justify-content: center;
   align-items: center;
-  padding: 30px;
+  padding: clamp(20px, 4vw, 30px);
   position: relative;
 }
 
@@ -57,7 +58,7 @@
 
 .permission-button {
   background: white;
-  color: #FF6B35;
+  color: #2f6fa3;
   border: none;
   border-radius: 25px;
   padding: 12px 30px;
@@ -109,7 +110,7 @@
 
 .skip-button:hover {
   background: white;
-  color: #FF6B35;
+  color: #2f6fa3;
 }
 
 /* Success State */
@@ -185,8 +186,8 @@
 
 /* Main Container */
 .main-container {
-  padding: 20px;
-  padding-top: 20px;
+  padding: clamp(12px, 3vw, 20px);
+  padding-top: clamp(12px, 3vw, 20px);
 }
 
 /* Header with Back Button */
@@ -254,18 +255,19 @@
   95% { transform: scale(0.3); }
 }
 .ai-header {
-  position: fixed;
-  top: 50%;               /* center vertically */
-  left: 20px;             /* distance from left edge */
-  transform: translateY(-50%); /* vertically center */
+  position: sticky;
+  top: 12px;
+  left: 0;
+  transform: none;
   text-align: left;
   padding: 10px 15px;
   background: rgba(0, 0, 0, 0.6);
   border-radius: 12px;
   color: white;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  max-width: 220px;       /* smaller width */
+  max-width: min(220px, 100%);
   font-size: 14px;
+  margin-bottom: 16px;
 }
 
 /* Eye animation smaller */
@@ -312,21 +314,21 @@
 } */
 
 .camera-container {
-  position: absolute;   /* instead of flex-centered */
-  top: 16px;
-  right: 16px;
-  margin: 0;            /* remove extra spacing */
-  z-index: 10;          /* ensure it’s above avatar */
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  z-index: 10;
 }
 
 .camera-frame {
-  width: 320px;
-  height: 240px;
+  width: min(320px, 100%);
+  aspect-ratio: 4 / 3;
   border-radius: 20px;
   overflow: hidden;
   border: 3px solid white;
   position: relative;
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.8); /* glow effect */
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
 }
 
 .camera-video {
@@ -492,12 +494,21 @@
 @media (max-width: 768px) {
   .main-container {
     padding: 15px;
-    padding-top: 30px;
+    padding-top: 20px;
+  }
+
+  .camera-container {
+    justify-content: center;
   }
 
   .camera-frame {
-    width: 280px;
-    height: 210px;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .ai-header {
+    max-width: 100%;
+    margin-bottom: 12px;
   }
 
   .ai-header h1 {
@@ -512,6 +523,25 @@
   .upload-button {
     padding: 12px 30px;
     font-size: 14px;
+    width: 100%;
+    max-width: 280px;
+  }
+}
+
+@media (max-width: 480px) {
+  .permission-content {
+    width: 100%;
+  }
+
+  .permission-button,
+  .upload-button,
+  .skip-button {
+    width: 100%;
+    margin: 8px 0;
+  }
+
+  .status-section {
+    padding: 0;
   }
 }
 

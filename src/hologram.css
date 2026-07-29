@@ -1,22 +1,22 @@
 .hologram-container {
-    position: absolute;
-    top: 50%;
-    left: 55%; /* keep to the right on desktop */
-    transform: translate(-50%, -50%);
-    width: 500px;
-    height: 700px;
+  position: relative;
+  width: min(100%, 500px);
+  height: min(70vh, 700px);
+  min-height: 280px;
+  margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+  .hologram-container {
+    height: min(56vh, 480px);
   }
-  
-  /* Mobile adjustments */
-  @media (max-width: 480px) {
-    .hologram-container {
-      position: relative;   /* no absolute overlay */
-      top: 70px;
-      left: 100px;
-      transform: none;
-      margin: 20px auto;    /* center horizontally */
-      width: 300px;         /* smaller hologram */
-      height: 370px;
-    }
+}
+
+@media (max-width: 480px) {
+  .hologram-container {
+    width: 100%;
+    height: 320px;
+    min-height: 280px;
   }
+}
   

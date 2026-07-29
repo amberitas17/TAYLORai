@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Shield, User, Smile, Upload, Eye, Zap, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clientSideFaceAnalysisService from '../services/clientSideFaceAnalysis.js';
+import { textToSpeech } from '../services/speechAPI.js';
 import './AIVision.css';
 import Hologram from '../../src/hologram'
 
@@ -13,17 +14,15 @@ export default function AIVision() {
   const [detectedProfile, setDetectedProfile] = useState(null);
   const [personDetected, setPersonDetected] = useState(false);
   const [entertainmentPhase, setEntertainmentPhase] = useState('detecting');
+  const [isGreeting, setIsGreeting] = useState(false);
+  const [avatarSpeaking, setAvatarSpeaking] = useState(false);
+  const [welcomeDone, setWelcomeDone] = useState(false);
+  const [flowError, setFlowError] = useState('');
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const detectionInterval = useRef(null);
-
-  useEffect(() => {
-    if (cameraPermission === 'granted') {
-      startCamera();
-    }
-  }, [cameraPermission]);
-  
+  const hasWelcomedRef = useRef(false);
 
   useEffect(() => {
     initializeModels();
@@ -36,10 +35,24 @@ export default function AIVision() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!stream || !videoRef.current) return;
+
+    videoRef.current.srcObject = stream;
+    videoRef.current.muted = true;
+    videoRef.current.playsInline = true;
+
+    videoRef.current.play().catch((error) => {
+      console.error('Unable to start video playback:', error);
+      setFlowError('Camera stream connected, but the video could not start automatically.');
+    });
+  }, [stream]);
+
   const initializeModels = async () => {
     try {
       console.log('🧠 Loading face-api.js models...');
       setModelStatus('loading');
+      setFlowError('');
 
       const success = await clientSideFaceAnalysisService.initialize();
 
@@ -48,37 +61,73 @@ export default function AIVision() {
         console.log('✅ Face-api.js models loaded successfully!');
       } else {
         setModelStatus('error');
+        setFlowError('Detection models failed to load.');
         console.error('❌ Failed to load face-api.js models');
       }
 
     } catch (error) {
       console.error('❌ Model loading failed:', error);
       setModelStatus('error');
+      setFlowError('Unable to initialize detection models.');
     }
   };
 
   const startCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraPermission('denied');
+      setFlowError('This browser does not support camera access.');
+      return;
+    }
+
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' }
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
       });
 
       setStream(mediaStream);
       setCameraPermission('granted');
-
-      if (videoRef.current) videoRef.current.srcObject = mediaStream;
+      setFlowError('');
 
       console.log('🎥 Camera started successfully');
     } catch (error) {
       console.error('❌ Camera access denied:', error);
       setCameraPermission('denied');
+
+      if (error.name === 'NotAllowedError') {
+        setFlowError('Camera permission was blocked. Please allow camera access and try again.');
+      } else if (error.name === 'NotFoundError') {
+        setFlowError('No camera device was found on this machine.');
+      } else {
+        setFlowError('Camera access is required for emotion detection.');
+      }
     }
+  };
+
+  const speakWelcomeOnce = () => {
+    if (hasWelcomedRef.current) return;
+
+    hasWelcomedRef.current = true;
+    setIsGreeting(true);
+    setAvatarSpeaking(true);
+    setEntertainmentPhase('greeting');
+
+    const fallbackComplete = () => {
+      setIsGreeting(false);
+      setAvatarSpeaking(false);
+      setWelcomeDone(true);
+      setEntertainmentPhase('analyzing');
+    };
+
+    const text = 'Welcome to Bulacan State University.';
+    textToSpeech(text, false, 'taylor', 'en').then(() => fallbackComplete()).catch(() => fallbackComplete());
   };
 
   // Live continuous emotion + age group detection
   useEffect(() => {
     if (stream && modelStatus === 'ready') {
-      setEntertainmentPhase('analyzing');
+      if (!isGreeting) {
+        setEntertainmentPhase('analyzing');
+      }
 
       detectionInterval.current = setInterval(async () => {
         if (!videoRef.current || !canvasRef.current) return;
@@ -97,13 +146,28 @@ export default function AIVision() {
 
         if (result && result.success) {
           setPersonDetected(true);
-          setDetectedProfile({
+          const profile = {
             emotion: result.emotion,
             emotionConfidence: result.emotionConfidence,
             allEmotions: result.allEmotions,
             ageGroup: result.ageGroup, // adult/child
             timestamp: result.timestamp
-          });
+          };
+
+          setDetectedProfile(profile);
+          localStorage.setItem('latestDetectedEmotionAge', JSON.stringify(profile));
+
+          if (!hasWelcomedRef.current) {
+            const profileWithAge = {
+              ...profile,
+              age: result.age,
+              emotion: result.emotion
+            };
+
+            localStorage.setItem('firstDetectedEmotionAge', JSON.stringify(profileWithAge));
+            navigate('/taylor', { replace: true, state: { detectedProfile: profileWithAge } });
+            speakWelcomeOnce();
+          }
         } else {
           setPersonDetected(false);
           setDetectedProfile({
@@ -120,7 +184,7 @@ export default function AIVision() {
     return () => {
       if (detectionInterval.current) clearInterval(detectionInterval.current);
     };
-  }, [stream, modelStatus]);
+  }, [stream, modelStatus, isGreeting]);
 
   const analyzeFrame = async (canvas) => {
     try {
@@ -134,6 +198,7 @@ export default function AIVision() {
 
         return {
           success: true,
+          age: ageValue,
           emotion: result.predictions.emotion.label,
           emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
           allEmotions: Object.fromEntries(Object.entries(result.predictions.all_emotions || {}).map(([k, v]) => [k, v])),
@@ -200,11 +265,16 @@ export default function AIVision() {
   const handleReset = () => {
     if (detectionInterval.current) clearInterval(detectionInterval.current);
     if (stream) stream.getTracks().forEach(track => track.stop());
+    window.speechSynthesis?.cancel();
 
     setStream(null);
     setDetectedProfile(null);
     setPersonDetected(false);
     setEntertainmentPhase('detecting');
+    setIsGreeting(false);
+    setWelcomeDone(false);
+    setFlowError('');
+    hasWelcomedRef.current = false;
 
     startEntertainmentSequence();
   };
@@ -246,7 +316,13 @@ export default function AIVision() {
         <div className="ai-header">
           <div className="ai-eye-container"><Eye size={40} /></div>
           <h1>AI Vision — Live Emotion & Age</h1>
-          <p>{entertainmentPhase === 'detecting' ? 'Scanning for visitors...' : 'Live emotion and age detection running'}</p>
+          <p>
+            {entertainmentPhase === 'detecting' && 'Detecting emotion...'}
+            {entertainmentPhase === 'greeting' && 'Emotion detected. Greeting visitor...'}
+            {entertainmentPhase === 'analyzing' && 'Live emotion and age detection running'}
+          </p>
+          {flowError && <p style={{ color: '#e53935', fontWeight: 600 }}>{flowError}</p>}
+          {welcomeDone && <p style={{ color: '#2e7d32', fontWeight: 600 }}>Welcome greeting completed.</p>}
           <div className="status-section">
             <div className="status-row">
               <div className={`status-dot ${personDetected ? 'green' : 'yellow'}`} />
@@ -273,7 +349,7 @@ export default function AIVision() {
         </div>
       </div>
 
-      <Hologram emotion={detectedProfile?.emotion} />
+      <Hologram emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" />
 
       <div className="camera-container">
         <div className="camera-frame">
