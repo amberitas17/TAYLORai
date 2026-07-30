@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Hologram from './hologram.jsx';
-import { textToSpeech } from './services/speechAPI.js';
+import { handleSpeechInteraction, onSpeechStarted, textToSpeech, getSpeechSupportState } from './services/speechAPI.js';
 import './HomePage.css';
 
 const API_URL = (import.meta.env.VITE_NODEJS_API_URL || '').trim();
@@ -24,7 +24,7 @@ const getSessionContext = () => {
   try {
     const saved = window.sessionStorage.getItem('taylorSessionContext');
     return saved ? JSON.parse(saved) : null;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
@@ -38,10 +38,37 @@ export default function TaylorDashboard() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [speechText, setSpeechText] = useState('');
+  const [speechWarning, setSpeechWarning] = useState('');
+  const [speechStatus, setSpeechStatus] = useState(getSpeechSupportState());
   const [greetingPlayed, setGreetingPlayed] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.sessionStorage.getItem('taylorGreetingPlayed') === 'true';
   });
+
+  useEffect(() => {
+    const stopListening = onSpeechStarted(() => setIsSpeaking(true));
+    return () => stopListening();
+  }, []);
+
+  const speakWithPreferredVoice = useCallback(async (text) => {
+    if (!text) return;
+
+    setSpeechText(text);
+    setSpeechWarning('');
+
+    try {
+      const speechStarted = await textToSpeech(text, false, 'taylor', 'en');
+      if (!speechStarted) {
+        setSpeechWarning('Speech synthesis is unavailable or blocked on this device. Tap the Test Voice button to verify audio.');
+      }
+    } catch (error) {
+      console.error('[taylor] speech request failed', error);
+      setSpeechWarning('Speech synthesis failed. Try the Test Voice button after tapping the screen.');
+    } finally {
+      setSpeechStatus(getSpeechSupportState());
+      setIsSpeaking(false);
+    }
+  }, []);
 
   useEffect(() => {
     const profile = location.state?.detectedProfile || getSessionContext();
@@ -78,13 +105,28 @@ export default function TaylorDashboard() {
         { speaker: 'guide', text: 'How may I assist you today?' }
       ];
     });
-  }, [location.state]);
+  }, [location.state, greetingPlayed, speakWithPreferredVoice]);
 
-  const speakWithPreferredVoice = (text) => {
-    setSpeechText(text);
-    setIsSpeaking(true);
-    textToSpeech(text, false, 'taylor', 'en').finally(() => setIsSpeaking(false));
-  };
+  useEffect(() => {
+    const syncSpeechStatus = () => setSpeechStatus(getSpeechSupportState());
+    syncSpeechStatus();
+
+    if (typeof window === 'undefined') return undefined;
+
+    const triggerInteraction = () => {
+      handleSpeechInteraction().then(syncSpeechStatus);
+    };
+
+    window.addEventListener('pointerdown', triggerInteraction, { passive: true });
+    window.addEventListener('touchstart', triggerInteraction, { passive: true });
+    window.addEventListener('keydown', triggerInteraction, { passive: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', triggerInteraction);
+      window.removeEventListener('touchstart', triggerInteraction);
+      window.removeEventListener('keydown', triggerInteraction);
+    };
+  }, []);
 
   const getFriendlyErrorMessage = (error) => {
     const message = error?.message || 'Backend unavailable';
@@ -162,10 +204,6 @@ export default function TaylorDashboard() {
     handleSendMessage(suggestion.answer);
   };
 
-  const handleExhibitDetection = () => {
-    navigate('/machine-vision-exhibit');
-  };
-
   const handleKeyDown = (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -173,30 +211,10 @@ export default function TaylorDashboard() {
     }
   };
 
-  const handleIntroduceYourself = () => {
-    const introText = 'Hello! I am TAYLOR, your AI hologram guide. I can help you explore Bulacan State University and ARICC. How may I assist you today?';
-    setMessages((prev) => [
-      ...prev,
-      { speaker: 'user', text: 'Introduce yourself' },
-      { speaker: 'guide', text: introText }
-    ]);
-    speakWithPreferredVoice(introText);
-  };
-
-  const handleNavigation = () => {
-    setMessages((prev) => [
-      ...prev,
-      { speaker: 'user', text: 'Navigation' },
-      { speaker: 'guide', text: 'I can help you reach ARICC Offices, the Library, the Registrar, Colleges, and Student Services.' }
-    ]);
-  };
-
-  const handleVoiceConversation = () => {
-    setMessages((prev) => [
-      ...prev,
-      { speaker: 'user', text: 'Start Voice Conversation' },
-      { speaker: 'guide', text: 'Voice conversation is ready. Ask me about BulSU, ARICC, programs, scholarships, or campus facilities.' }
-    ]);
+  const handleTestVoice = () => {
+    const testText = 'This is a mobile voice test. If you can hear this, speech is working on your device.';
+    setSpeechWarning('');
+    speakWithPreferredVoice(testText);
   };
 
   return (
@@ -212,9 +230,16 @@ export default function TaylorDashboard() {
             <h3>TAYLOR READY</h3>
             <p>Age Detected: {sessionContext?.age ?? '—'}</p>
             <p>Initial Emotion: {sessionContext?.emotion ?? '—'}</p>
-            <p>Status: Connected</p>
+            <p>Status: {speechStatus?.available ? 'Voice ready' : 'Voice unavailable'}</p>
+            <button className="chat-send" onClick={handleTestVoice} style={{ marginTop: '0.75rem' }}>Test Voice</button>
           </div>
         </section>
+
+        {speechWarning && (
+          <section className="typing-pill" style={{ marginBottom: '0.75rem', display: 'block' }}>
+            {speechWarning}
+          </section>
+        )}
 
         <section className="guide-section">
           <div className="avatar-card">

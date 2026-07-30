@@ -3,6 +3,35 @@ const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY || '';
 
 let isAvatarSpeaking = false;
 let _elevenLabsUnavailable = false;
+let _speechInteractionEnabled = false;
+let _pendingSpeechRequest = null;
+let _cachedVoices = [];
+let _voiceLoadPromise = null;
+let _speechSupportState = { supported: false, available: false, isMobile: false, isPwa: false, warning: '' };
+let _onSpeechStart = null;
+let _currentElevenLabsAudio = null;
+
+function updateSpeechSupportState() {
+  if (typeof window === 'undefined') {
+    _speechSupportState = { supported: false, available: false, isMobile: false, isPwa: false, warning: 'Speech synthesis is unavailable outside the browser.' };
+    return _speechSupportState;
+  }
+
+  const speechSynthesis = window.speechSynthesis;
+  const supported = Boolean(speechSynthesis && typeof SpeechSynthesisUtterance !== 'undefined');
+  const userAgent = window.navigator?.userAgent || '';
+  const isMobile = /Android|iPhone|iPad|iPod|SamsungBrowser|CriOS|FxiOS|Mobile/i.test(userAgent);
+  const isPwa = Boolean(window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone);
+  const warning = supported
+    ? ''
+    : 'Speech synthesis is unavailable in this browser. Please try Chrome, Samsung Internet, Safari, or the installed PWA.';
+
+  _speechSupportState = { supported, available: supported, isMobile, isPwa, warning };
+  return _speechSupportState;
+}
+
+updateSpeechSupportState();
+
 export function setAvatarSpeaking(v) {
   isAvatarSpeaking = v;
 }
@@ -11,36 +40,77 @@ export function getAvatarSpeaking() {
   return isAvatarSpeaking;
 }
 
-let _currentElevenLabsAudio = null;
+export function getSpeechSupportState() {
+  return { ..._speechSupportState, hasUserInteraction: _speechInteractionEnabled };
+}
+
+export function handleSpeechInteraction() {
+  if (_speechInteractionEnabled) {
+    return Promise.resolve(true);
+  }
+
+  _speechInteractionEnabled = true;
+
+  if (_pendingSpeechRequest) {
+    const request = _pendingSpeechRequest;
+    _pendingSpeechRequest = null;
+    if (request.timeoutId) {
+      clearTimeout(request.timeoutId);
+    }
+
+    return _playSpeech(request.text, request.avatarName, request.lang)
+      .then((result) => {
+        request.resolve(result);
+        return result;
+      })
+      .catch((error) => {
+        console.error('[TTS] speech error', error);
+        request.resolve(false);
+        return false;
+      });
+  }
+
+  return Promise.resolve(true);
+}
+
 export function stopCurrentAudio() {
   if (_currentElevenLabsAudio) {
     try {
       _currentElevenLabsAudio.pause();
       _currentElevenLabsAudio.currentTime = 0;
-    } catch (e) {}
+    } catch (error) {}
     _currentElevenLabsAudio = null;
   }
 
-  if (window.speechSynthesis) {
-    window.speechSynthesis.cancel();
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (error) {}
   }
 
-  if (typeof responsiveVoice !== 'undefined') {
+  const responsiveVoiceLib = typeof window !== 'undefined' ? window.responsiveVoice : undefined;
+  if (responsiveVoiceLib) {
     try {
-      responsiveVoice.cancel();
-    } catch (e) {}
+      responsiveVoiceLib.cancel();
+    } catch (error) {}
   }
 
   isAvatarSpeaking = false;
 }
 
-let _onSpeechStart = null;
 export function onSpeechStarted(cb) {
   _onSpeechStart = cb;
+  return () => {
+    if (_onSpeechStart === cb) {
+      _onSpeechStart = null;
+    }
+  };
 }
 
 function fireSpeechStart() {
-  if (_onSpeechStart) _onSpeechStart();
+  if (_onSpeechStart) {
+    _onSpeechStart();
+  }
 }
 
 const LANG_LOCALES = {
@@ -132,21 +202,52 @@ const VOICE_CONFIG = {
   },
 };
 
-let _cachedVoices = [];
+function logVoices(voices) {
+  if (!voices?.length) {
+    console.warn('[TTS] available voices', []);
+    return;
+  }
+
+  console.info('[TTS] available voices', voices.map((voice) => ({ name: voice.name, lang: voice.lang, default: voice.default })));
+}
+
 export function loadVoices() {
-  return new Promise((resolve) => {
-    const voices = window.speechSynthesis.getVoices();
+  if (_voiceLoadPromise) {
+    return _voiceLoadPromise;
+  }
+
+  _voiceLoadPromise = new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      updateSpeechSupportState();
+      resolve([]);
+      return;
+    }
+
+    const finish = () => {
+      const voices = window.speechSynthesis.getVoices() || [];
+      _cachedVoices = voices;
+      logVoices(voices);
+      resolve(voices);
+    };
+
+    const voices = window.speechSynthesis.getVoices() || [];
     if (voices.length) {
       _cachedVoices = voices;
+      logVoices(voices);
       resolve(voices);
       return;
     }
 
     window.speechSynthesis.onvoiceschanged = () => {
-      _cachedVoices = window.speechSynthesis.getVoices();
-      resolve(_cachedVoices);
+      finish();
     };
+
+    window.setTimeout(() => {
+      finish();
+    }, 2200);
   });
+
+  return _voiceLoadPromise;
 }
 
 export async function speechToText(audioBlob) {
@@ -178,39 +279,133 @@ function _shouldTryElevenLabs() {
   return false;
 }
 
-export async function textToSpeech(text, _unused = false, avatarName = 'taylor', lang = 'en') {
-  if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
-    window.speechSynthesis.cancel();
-  }
-  if (typeof responsiveVoice !== 'undefined') {
+function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
+  return new Promise((resolve) => {
+    const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
+    if (!synth) {
+      updateSpeechSupportState();
+      console.warn('[TTS] speech synthesis unavailable');
+      resolve(false);
+      return;
+    }
+
     try {
-      responsiveVoice.cancel();
+      synth.cancel();
     } catch (e) {}
+
+    const isFilipino = lang === 'tl';
+    const hasKey = _shouldTryElevenLabs();
+    const skipForFiller = _isShortFiller(text);
+    const isJohn = avatarName === 'john';
+
+    const finish = (result) => {
+      setAvatarSpeaking(false);
+      resolve(result);
+    };
+
+    const attemptBrowserTTS = async () => {
+      const voices = await loadVoices();
+      const cfg = VOICE_CONFIG[avatarName] || VOICE_CONFIG.taylor;
+      const lCfg = cfg[lang] || cfg.en;
+      const locales = LANG_LOCALES[lang] || ['en-US'];
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = locales[0];
+      utt.pitch = lCfg.pitch;
+      utt.rate = lCfg.rate;
+      utt.volume = 1.0;
+
+      const voice = pickVoice(avatarName, lang, voices);
+      if (voice) {
+        utt.voice = voice;
+        console.info('[TTS] selected voice', { name: voice.name, lang: voice.lang });
+      } else {
+        console.warn('[TTS] selected voice', { name: 'none', lang: locales[0] });
+      }
+
+      utt.onstart = () => {
+        console.info('[TTS] speech start', { text: text.slice(0, 120) });
+        setAvatarSpeaking(true);
+        fireSpeechStart();
+      };
+      utt.onend = () => {
+        console.info('[TTS] speech end', { text: text.slice(0, 120) });
+        finish(true);
+      };
+      utt.onerror = (event) => {
+        console.error('[TTS] speech error', { error: event?.error || 'unknown', message: event?.message || 'speech synthesis failed' });
+        finish(false);
+      };
+
+      if (synth.resume) {
+        try {
+          synth.resume();
+        } catch (e) {}
+      }
+
+      try {
+        synth.speak(utt);
+      } catch (error) {
+        console.error('[TTS] speech error', error);
+        finish(false);
+      }
+    };
+
+    (async () => {
+      if (hasKey && !skipForFiller) {
+        const ok = await _tryElevenLabs(text, avatarName, lang);
+        if (ok) {
+          resolve(ok);
+          return;
+        }
+      }
+
+      if (skipForFiller) {
+        console.log('[TTS] Short filler — skipping ElevenLabs to save credits');
+      }
+
+      if (isFilipino && !isJohn) {
+        const ok = await _responsiveVoiceFilipino(text, avatarName);
+        if (ok) {
+          resolve(ok);
+          return;
+        }
+      }
+
+      attemptBrowserTTS().catch((error) => {
+        console.error('[TTS] speech error', error);
+        finish(false);
+      });
+    })();
+  });
+}
+
+export async function textToSpeech(text, _unused = false, avatarName = 'taylor', lang = 'en') {
+  if (typeof window === 'undefined' || !window.speechSynthesis) {
+    updateSpeechSupportState();
+    console.warn('[TTS] speech synthesis unavailable');
+    return false;
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 80));
-  setAvatarSpeaking(true);
-
-  const isFilipino = lang === 'tl';
-  const hasKey = _shouldTryElevenLabs();
-  const skipForFiller = _isShortFiller(text);
-  const isJohn = avatarName === 'john';
-
-  if (hasKey && !skipForFiller) {
-    const ok = await _tryElevenLabs(text, avatarName, lang);
-    if (ok) return ok;
+  if (!_speechInteractionEnabled) {
+    return new Promise((resolve) => {
+      const request = {
+        text,
+        avatarName,
+        lang,
+        resolve,
+        timeoutId: window.setTimeout(() => {
+          if (_pendingSpeechRequest === request) {
+            _pendingSpeechRequest = null;
+            resolve(false);
+          }
+        }, 5000),
+      };
+      _pendingSpeechRequest = request;
+      console.info('[TTS] queued until user interaction', { text: text.slice(0, 80) });
+    });
   }
 
-  if (skipForFiller) {
-    console.log('[TTS] Short filler — skipping ElevenLabs to save credits');
-  }
-
-  if (isFilipino && !isJohn) {
-    const ok = await _responsiveVoiceFilipino(text, avatarName);
-    if (ok) return ok;
-  }
-
-  return _browserTTS(text, avatarName, lang);
+  return _playSpeech(text, avatarName, lang);
 }
 
 async function _tryElevenLabs(text, avatarName, lang) {
@@ -291,7 +486,8 @@ async function _tryElevenLabs(text, avatarName, lang) {
 
 function _responsiveVoiceFilipino(text, avatarName) {
   return new Promise((resolve) => {
-    if (typeof responsiveVoice === 'undefined') {
+    const responsiveVoiceLib = typeof window !== 'undefined' ? window.responsiveVoice : undefined;
+    if (!responsiveVoiceLib) {
       resolve(null);
       return;
     }
@@ -300,20 +496,33 @@ function _responsiveVoiceFilipino(text, avatarName) {
     const params = RV_PARAMS[avatarName] || RV_PARAMS.taylor;
     let started = false;
 
-    responsiveVoice.speak(text, voiceName, {
+    responsiveVoiceLib.speak(text, voiceName, {
       pitch: params.pitch,
       rate: params.rate,
       volume: params.volume,
-      onstart: () => { started = true; fireSpeechStart(); },
-      onend: () => { setAvatarSpeaking(false); resolve(true); },
-      onerror: () => { setAvatarSpeaking(false); resolve(null); },
+      onstart: () => {
+        started = true;
+        console.info('[TTS] speech start', { text: text.slice(0, 120) });
+        setAvatarSpeaking(true);
+        fireSpeechStart();
+      },
+      onend: () => {
+        console.info('[TTS] speech end', { text: text.slice(0, 120) });
+        setAvatarSpeaking(false);
+        resolve(true);
+      },
+      onerror: () => {
+        console.error('[TTS] speech error', { error: 'responsiveVoice', message: 'responsiveVoice failed' });
+        setAvatarSpeaking(false);
+        resolve(null);
+      },
     });
 
     setTimeout(() => {
       if (!started) {
         try {
-          responsiveVoice.cancel();
-        } catch (e) {}
+          responsiveVoiceLib.cancel();
+        } catch (error) {}
         setAvatarSpeaking(false);
         resolve(null);
       }
@@ -321,16 +530,18 @@ function _responsiveVoiceFilipino(text, avatarName) {
   });
 }
 
-function pickVoice(avatarName, lang) {
+function pickVoice(avatarName, lang, voices = _cachedVoices) {
   const cfg = VOICE_CONFIG[avatarName] || VOICE_CONFIG.taylor;
   const lCfg = cfg[lang] || cfg.en;
   const locales = LANG_LOCALES[lang] || ['en-US'];
-  const voices = _cachedVoices.length ? _cachedVoices : window.speechSynthesis.getVoices();
+  const voiceList = voices?.length ? voices : _cachedVoices;
   const isFemale = cfg.gender === 'female';
   const isJohn = avatarName === 'john';
 
+  const englishVoices = voiceList.filter((voice) => (voice.lang || '').toLowerCase().startsWith('en'));
+
   for (const name of (lCfg.prefer || [])) {
-    for (const voice of voices) {
+    for (const voice of englishVoices.length ? englishVoices : voiceList) {
       const vname = voice.name.toLowerCase();
       if (isJohn && (vname.includes('female') || vname.includes('woman') || vname.includes('girl'))) continue;
       if (vname.includes(name.toLowerCase())) return voice;
@@ -339,7 +550,7 @@ function pickVoice(avatarName, lang) {
 
   if (isJohn) {
     for (const locale of locales) {
-      const localeVoices = voices.filter((v) => v.lang.startsWith(locale.split('-')[0]));
+      const localeVoices = voiceList.filter((v) => (v.lang || '').toLowerCase().startsWith(locale.split('-')[0].toLowerCase()));
       const maleVoices = localeVoices.filter((v) => {
         const name = v.name.toLowerCase();
         return !name.includes('female') && !name.includes('woman') && !name.includes('girl');
@@ -350,7 +561,7 @@ function pickVoice(avatarName, lang) {
 
   if (isFemale) {
     for (const locale of locales) {
-      const localeVoices = voices.filter((v) => v.lang.startsWith(locale.split('-')[0]));
+      const localeVoices = voiceList.filter((v) => (v.lang || '').toLowerCase().startsWith(locale.split('-')[0].toLowerCase()));
       const femaleKw = ['female', 'woman', 'girl', 'samantha', 'victoria', 'hazel', 'kate', 'kyoko', 'yuna', 'ting', 'zira'];
       for (const kw of femaleKw) {
         const v = localeVoices.find((voice) => voice.name.toLowerCase().includes(kw));
@@ -360,49 +571,7 @@ function pickVoice(avatarName, lang) {
     }
   }
 
-  return voices[0] || null;
-}
-
-function _browserTTS(text, avatarName, lang) {
-  return new Promise((resolve) => {
-    const doSpeak = () => {
-      const cfg = VOICE_CONFIG[avatarName] || VOICE_CONFIG.taylor;
-      const lCfg = cfg[lang] || cfg.en;
-      const locales = LANG_LOCALES[lang] || ['en-US'];
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = locales[0];
-      utt.pitch = lCfg.pitch;
-      utt.rate = lCfg.rate;
-      utt.volume = 1.0;
-
-      const voice = pickVoice(avatarName, lang);
-      if (voice) {
-        utt.voice = voice;
-      }
-
-      utt.onstart = () => fireSpeechStart();
-      utt.onend = () => {
-        setAvatarSpeaking(false);
-        resolve(true);
-      };
-      utt.onerror = () => {
-        setAvatarSpeaking(false);
-        resolve(false);
-      };
-
-      setTimeout(() => {
-        try {
-          window.speechSynthesis.speak(utt);
-        } catch (e) {
-          setAvatarSpeaking(false);
-          resolve(false);
-        }
-      }, 60);
-    };
-
-    if (_cachedVoices.length) doSpeak();
-    else loadVoices().then(doSpeak);
-  });
+  return voiceList[0] || null;
 }
 
 export function getPhonemeData(text) {
