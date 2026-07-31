@@ -211,12 +211,6 @@ export default function TaylorDashboard() {
     }
   };
 
-  const handleTestVoice = () => {
-    const testText = 'This is a mobile voice test. If you can hear this, speech is working on your device.';
-    setSpeechWarning('');
-    speakWithPreferredVoice(testText);
-  };
-
   return (
     <div className="homepage-shell taylor-shell">
       <div className="homepage-panel taylor-panel">
@@ -231,7 +225,6 @@ export default function TaylorDashboard() {
             <p>Age Detected: {sessionContext?.age ?? '—'}</p>
             <p>Initial Emotion: {sessionContext?.emotion ?? '—'}</p>
             <p>Status: {speechStatus?.available ? 'Voice ready' : 'Voice unavailable'}</p>
-            <button className="chat-send" onClick={handleTestVoice} style={{ marginTop: '0.75rem' }}>Test Voice</button>
           </div>
         </section>
 
