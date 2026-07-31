@@ -10,6 +10,7 @@ let _voiceLoadPromise = null;
 let _speechSupportState = { supported: false, available: false, isMobile: false, isPwa: false, warning: '' };
 let _onSpeechStart = null;
 let _currentElevenLabsAudio = null;
+let _speechInteractionListenersAttached = false;
 
 function updateSpeechSupportState() {
   if (typeof window === 'undefined') {
@@ -32,6 +33,50 @@ function updateSpeechSupportState() {
 
 updateSpeechSupportState();
 
+function ensureSpeechInteractionHandling() {
+  if (typeof window === 'undefined' || _speechInteractionListenersAttached) {
+    return;
+  }
+
+  const activateSpeechInteraction = () => {
+    _speechInteractionEnabled = true;
+
+    try {
+      window.speechSynthesis?.resume?.();
+    } catch (error) {
+      console.warn('[TTS] could not resume speech synthesis', error);
+    }
+
+    if (!_pendingSpeechRequest) {
+      return;
+    }
+
+    const request = _pendingSpeechRequest;
+    _pendingSpeechRequest = null;
+    if (request.timeoutId) {
+      clearTimeout(request.timeoutId);
+    }
+
+    _playSpeech(request.text, request.avatarName, request.lang)
+      .then((result) => {
+        request.resolve(result);
+      })
+      .catch((error) => {
+        console.error('[TTS] speech error', error);
+        request.resolve(false);
+      });
+  };
+
+  const events = ['pointerdown', 'touchstart', 'keydown', 'mousedown', 'click'];
+  events.forEach((eventName) => {
+    window.addEventListener(eventName, activateSpeechInteraction, { passive: true });
+  });
+  window.addEventListener('pageshow', activateSpeechInteraction, { passive: true });
+  _speechInteractionListenersAttached = true;
+}
+
+ensureSpeechInteractionHandling();
+
 export function setAvatarSpeaking(v) {
   isAvatarSpeaking = v;
 }
@@ -45,11 +90,19 @@ export function getSpeechSupportState() {
 }
 
 export function handleSpeechInteraction() {
-  if (_speechInteractionEnabled) {
+  ensureSpeechInteractionHandling();
+
+  if (_speechInteractionEnabled && !_pendingSpeechRequest) {
     return Promise.resolve(true);
   }
 
   _speechInteractionEnabled = true;
+
+  try {
+    window.speechSynthesis?.resume?.();
+  } catch (error) {
+    console.warn('[TTS] could not resume speech synthesis', error);
+  }
 
   if (_pendingSpeechRequest) {
     const request = _pendingSpeechRequest;
@@ -380,6 +433,8 @@ function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
 }
 
 export async function textToSpeech(text, _unused = false, avatarName = 'taylor', lang = 'en') {
+  ensureSpeechInteractionHandling();
+
   if (typeof window === 'undefined' || !window.speechSynthesis) {
     updateSpeechSupportState();
     console.warn('[TTS] speech synthesis unavailable');

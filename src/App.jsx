@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
-import { textToSpeech } from './services/speechAPI.js';
+import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
 import AiText from './ai-text.jsx';
 import AIVision from './components/AIVision.jsx'; // New web-compatible AI Vision component
 import AiExhibit from './ai-exhibit.jsx';
@@ -29,6 +29,7 @@ function LandingPage() {
         const parsed = JSON.parse(storedProfile);
         setGuestProfile(parsed);
 
+        handleSpeechInteraction();
         textToSpeech(`Welcome to the exhibition. I detected a ${parsed.emotion || 'friendly'} mood. Let us begin the experience.`, false, 'taylor', 'en');
       }
     } catch (error) {

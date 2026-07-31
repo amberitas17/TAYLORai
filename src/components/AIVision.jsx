@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Shield, User, Smile, Upload, Eye, Zap, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clientSideFaceAnalysisService from '../services/clientSideFaceAnalysis.js';
-import { textToSpeech } from '../services/speechAPI.js';
+import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
 import './AIVision.css';
 import Hologram from '../../src/hologram'
 
@@ -119,6 +119,7 @@ export default function AIVision() {
     };
 
     const text = 'Welcome to Bulacan State University.';
+    handleSpeechInteraction();
     textToSpeech(text, false, 'taylor', 'en').then(() => fallbackComplete()).catch(() => fallbackComplete());
   };
 

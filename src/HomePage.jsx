@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import clientSideFaceAnalysisService from './services/clientSideFaceAnalysis.js';
-import { textToSpeech } from './services/speechAPI.js';
+import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
 import Hologram from './hologram.jsx';
 import './HomePage.css';
 
@@ -102,6 +102,7 @@ export default function HomePage() {
 
   const speak = (text) => {
     setIsAvatarSpeaking(true);
+    handleSpeechInteraction();
     textToSpeech(text, false, 'taylor', 'en').finally(() => setIsAvatarSpeaking(false));
   };
 
