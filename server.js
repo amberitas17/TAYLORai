@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { Groq } from 'groq-sdk';
+import OpenAI from 'openai';
+import { getFacebookPageContextHint, indexFacebookKnowledgeBase, searchFacebookKnowledgeBase, shouldUseFacebookContext } from './scripts/facebookKnowledgeBase.mjs';
 
 dotenv.config();
 
@@ -11,12 +12,12 @@ const port = process.env.PORT || 3033;
 app.use(cors());
 app.use(express.json());
 
-function classifyGroqError(error) {
+function classifyOpenRouterError(error) {
   const status = error?.status || error?.response?.status;
   const code = error?.code || error?.response?.data?.error?.code;
   const message = error?.message || '';
 
-  if (!process.env.GROQ_API_KEY || /api key|invalid_api_key/i.test(message) || code === 'invalid_api_key') {
+  if (!process.env.OPENROUTER_API_KEY || /api key|invalid_api_key/i.test(message) || code === 'invalid_api_key') {
     return { status: 401, errorType: 'invalid-api-key', message: 'The AI service key is invalid or missing.' };
   }
 
@@ -45,36 +46,92 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ success: false, errorType: 'backend-unavailable', message: 'messages array is required' });
     }
 
-    if (!process.env.GROQ_API_KEY) {
-      console.error('[server] missing GROQ_API_KEY');
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error('[server] missing OPENROUTER_API_KEY');
       return res.status(401).json({ success: false, errorType: 'invalid-api-key', message: 'The AI service key is not configured.' });
     }
 
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const openrouter = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' });
     const systemPrompt = {
       role: 'system',
-      content: 'You are TAYLOR, the official AI Hologram Guide of Bulacan State University (BulSU) and ARICC. You assist visitors with BulSU information, ARICC information, academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.'
+      content: 'You are TAYLOR, the official AI Hologram Guide of Bulacan State University (BulSU) and the Advanced Robotics and Intelligent Control Center (ARICC). You assist visitors with BulSU information, ARICC information, academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.'
     };
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [systemPrompt, ...messages],
+    const lastUserMessage = [...messages].reverse().find((message) => message?.role === 'user')?.content || '';
+    const useFacebookContext = shouldUseFacebookContext(lastUserMessage);
+    const pageContextHint = getFacebookPageContextHint(lastUserMessage);
+
+    let facebookContext = '';
+    if (useFacebookContext) {
+      const results = await searchFacebookKnowledgeBase(lastUserMessage, { topK: 3 });
+      if (results.length > 0) {
+        facebookContext = results
+          .map((item) => `Source: Facebook announcement from ${item.page_name || 'Unknown page'} on ${item.post_date || 'unknown date'}\nContent: ${item.post_text}\nURL: ${item.post_url || 'N/A'}`)
+          .join('\n\n');
+      } else if (pageContextHint) {
+        facebookContext = `Source: ${pageContextHint.sourceHint} (${pageContextHint.pageUrl})\nContent: Advanced Robotics and Intelligent Control Center (ARICC) is the Academic Research Innovation and Commercialization Center of Bulacan State University. It supports research, innovation, commercialization, and partnerships.\nURL: ${pageContextHint.pageUrl}`;
+      }
+    }
+
+    const completion = await openrouter.chat.completions.create({
+      model: 'meta-llama/llama-3.3-70b-instruct',
+      messages: [
+        systemPrompt,
+        ...(facebookContext
+          ? [{ role: 'system', content: `Use the following Facebook-derived knowledge when relevant. If the answer is based on this content, clearly say it came from a Facebook announcement.\n\n${facebookContext}` }]
+          : []),
+        ...messages,
+      ],
       temperature: 0.7,
       max_tokens: 300,
     });
 
     const reply = completion.choices?.[0]?.message?.content?.trim() || 'I am TAYLOR and I am here to assist you.';
-    console.info('[server] success', { replyLength: reply.length });
-    res.json({ success: true, reply });
+    console.info('[server] success', { replyLength: reply.length, usedFacebookContext: Boolean(facebookContext) });
+    res.json({ success: true, reply, usedFacebookContext: Boolean(facebookContext) });
   } catch (error) {
-    const errorInfo = classifyGroqError(error);
-    console.error('[server] groq error', {
+    const errorInfo = classifyOpenRouterError(error);
+    console.error('[server] openrouter error', {
       message: error?.message,
       status: error?.status || error?.response?.status,
       code: error?.code || error?.response?.data?.error?.code,
       detail: error?.response?.data || error,
     });
     res.status(errorInfo.status).json({ success: false, errorType: errorInfo.errorType, message: errorInfo.message, details: error?.message || '' });
+  }
+});
+
+app.post('/api/facebook/index', async (req, res) => {
+  try {
+    const { posts, rawFilePath } = req.body || {};
+    if (!Array.isArray(posts) || posts.length === 0) {
+      return res.status(400).json({ success: false, message: 'posts array is required' });
+    }
+
+    const result = await indexFacebookKnowledgeBase(posts || rawFilePath || './data/facebook-posts.raw.json', {
+      kbPath: './data/facebook-knowledge.json',
+      collectionName: process.env.QDRANT_COLLECTION || 'facebook_posts',
+    });
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('[server] facebook index error', error);
+    res.status(500).json({ success: false, message: error?.message || 'Failed to index Facebook posts' });
+  }
+});
+
+app.post('/api/facebook/query', async (req, res) => {
+  try {
+    const { query } = req.body || {};
+    if (!query) {
+      return res.status(400).json({ success: false, message: 'query is required' });
+    }
+
+    const results = await searchFacebookKnowledgeBase(query, { topK: 3 });
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('[server] facebook query error', error);
+    res.status(500).json({ success: false, message: error?.message || 'Failed to query Facebook knowledge base' });
   }
 });
 

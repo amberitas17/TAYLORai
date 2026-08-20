@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { Groq } from 'groq-sdk';
+import OpenAI from 'openai';
 
 dotenv.config();
 
@@ -26,12 +26,12 @@ async function parseRequestBody(req) {
   return {};
 }
 
-function classifyGroqError(error) {
+function classifyOpenRouterError(error) {
   const status = error?.status || error?.response?.status;
   const code = error?.code || error?.response?.data?.error?.code;
   const message = error?.message || '';
 
-  if (!process.env.GROQ_API_KEY || /api key|invalid_api_key/i.test(message) || code === 'invalid_api_key') {
+  if (!process.env.OPENROUTER_API_KEY || /api key|invalid_api_key/i.test(message) || code === 'invalid_api_key') {
     return { status: 401, errorType: 'invalid-api-key', message: 'The AI service key is invalid or missing.' };
   }
 
@@ -80,16 +80,16 @@ export default async function handler(req, res) {
       return;
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
-      console.error('[chat] missing GROQ_API_KEY');
+      console.error('[chat] missing OPENROUTER_API_KEY');
       res.status(401).json({ success: false, errorType: 'invalid-api-key', message: 'The AI service key is not configured.' });
       return;
     }
 
-    const groq = new Groq({ apiKey });
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const openrouter = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+    const completion = await openrouter.chat.completions.create({
+      model: 'meta-llama/llama-3.3-70b-instruct',
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       temperature: 0.7,
       max_tokens: 300,
@@ -99,8 +99,8 @@ export default async function handler(req, res) {
     console.info('[chat] success', { replyLength: reply.length });
     res.status(200).json({ success: true, reply });
   } catch (error) {
-    const errorInfo = classifyGroqError(error);
-    console.error('[chat] groq error', {
+    const errorInfo = classifyOpenRouterError(error);
+    console.error('[chat] openrouter error', {
       message: error?.message,
       status: error?.status || error?.response?.status,
       code: error?.code || error?.response?.data?.error?.code,
