@@ -7,6 +7,8 @@ import * as tf from '@tensorflow/tfjs';
 import * as ort from 'onnxruntime-web';
 import * as faceapi from 'face-api.js';
 
+const MODEL_ASSET_VERSION = '20260925-gate-v2';
+
 // Configure ORT-Web to use matching WASM files (OpenAI solution)
 console.log('🔧 Configuring ORT-Web with matching WASM files...');
 
@@ -241,20 +243,49 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     async createCachedONNXSession(modelPath, sessionOptions) {
         const createSession = (source) => ort.InferenceSession.create(source, sessionOptions);
-        if (typeof caches === 'undefined') {
-            return createSession(modelPath);
-        }
-
-        const cache = await caches.open('taylor-onnx-models-v1');
-        let response = await cache.match(modelPath);
-        if (!response) {
-            response = await fetch(modelPath, { cache: 'default' });
+        const versionedPath = `${modelPath}${modelPath.includes('?') ? '&' : '?'}v=${MODEL_ASSET_VERSION}`;
+        const logResponse = async (response, source) => {
+            const buffer = await response.arrayBuffer();
+            const contentType = response.headers.get('content-type') || '(missing)';
+            const declaredLength = response.headers.get('content-length');
+            const prefix = new TextDecoder().decode(buffer.slice(0, 128)).trimStart();
+            console.log('ONNX model response:', {
+                modelPath,
+                source,
+                url: response.url || versionedPath,
+                status: response.status,
+                contentType,
+                declaredLength,
+                actualByteLength: buffer.byteLength
+            });
             if (!response.ok) {
                 throw new Error(`Model request failed: ${response.status} ${modelPath}`);
             }
-            await cache.put(modelPath, response.clone());
+            if (buffer.byteLength < 1024 || prefix.startsWith('<!DOCTYPE') || prefix.startsWith('<html') || prefix.startsWith('{') || prefix.startsWith('version https://git-lfs.github.com/spec')) {
+                throw new Error(`Invalid ONNX response for ${modelPath}: received ${contentType}, ${buffer.byteLength} bytes`);
+            }
+            if (declaredLength && Number(declaredLength) !== buffer.byteLength) {
+                throw new Error(`Truncated ONNX response for ${modelPath}: declared ${declaredLength} bytes, received ${buffer.byteLength}`);
+            }
+            return buffer;
+        };
+        if (typeof caches === 'undefined') {
+            const response = await fetch(versionedPath, { cache: 'no-store' });
+            return createSession(await logResponse(response, 'network'));
         }
-        return createSession(await response.arrayBuffer());
+
+        const cache = await caches.open(`taylor-onnx-models-${MODEL_ASSET_VERSION}`);
+        let response = await cache.match(versionedPath);
+        if (!response) {
+            response = await fetch(versionedPath, { cache: 'no-store' });
+            const buffer = await logResponse(response, 'network');
+            await cache.put(versionedPath, new Response(buffer, {
+                status: response.status,
+                headers: response.headers
+            }));
+            return createSession(buffer);
+        }
+        return createSession(await logResponse(response, 'cache'));
     }
 
     async loadReconModel() {
