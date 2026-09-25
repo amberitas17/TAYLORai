@@ -78,6 +78,24 @@ router.post('/detect-exhibit', upload.single('image'), async (req, res) => {
         logger.info(`🎯 REAL model inference completed in ${processingTime}ms`);
 
         // Return successful result
+        if (result.rejectedAsBackground) {
+            return res.json({
+                success: true,
+                exhibit: null,
+                predicted_class: 'background',
+                confidence: result.confidence,
+                class_idx: result.classId,
+                allDetections: [],
+                rejectedAsBackground: true,
+                metadata: {
+                    ...result.metadata,
+                    processingTime,
+                    apiVersion: '1.0.0',
+                    realModel: true
+                }
+            });
+        }
+
         res.json({
             success: true,
             exhibit: result.exhibit,

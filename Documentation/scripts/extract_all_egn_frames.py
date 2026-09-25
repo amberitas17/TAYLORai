@@ -5,16 +5,16 @@ from pathlib import Path
 
 def extract_all_egn_frames():
     """
-    Extract ALL frames from ALL EGN videos in subdirectories
+    Extract ALL frames from ALL ARICC videos in subdirectories
     This will give you the full dataset to manually clean up
     """
 
     print("=" * 80)
-    print("EXTRACTING ALL EGN FRAMES - COMPLETE DATASET")
+    print("EXTRACTING ALL ARICC FRAMES - COMPLETE DATASET")
     print("You will manually delete bad frames after extraction")
     print("=" * 80)
 
-    video_base_dir = "extracted_dataset/EGN"
+    video_base_dir = "../datasets/ARICC"
     output_dir = video_base_dir  # Extract directly to EGN folder
 
     # Create output directory if it doesn't exist
@@ -73,7 +73,7 @@ def extract_all_egn_frames():
                     break
 
                 # Extract every frame (no skipping)
-                frame_filename = f"EGN_{folder_name}_{video_name}_{frame_count:06d}.jpg"
+                frame_filename = f"ARICC_{folder_name}_{video_name}_{frame_count:06d}.jpg"
                 frame_path = os.path.join(output_dir, frame_filename)
 
                 # Resize to 224x224 to match other classes
@@ -118,8 +118,8 @@ def extract_all_egn_frames():
     return total_frames_extracted > 0
 
 if __name__ == "__main__":
-    print("EGN Complete Frame Extraction Tool")
-    print("This will extract EVERY frame from EVERY EGN video")
+    print("ARICC Complete Frame Extraction Tool")
+    print("This will extract EVERY frame from EVERY ARICC video")
     print("You can then manually select the best frames for training")
     print()
 
@@ -127,8 +127,8 @@ if __name__ == "__main__":
 
     if success:
         print("\nSUCCESS! All frames extracted.")
-        print("Navigate to extracted_dataset/EGN/ to review and clean up images")
+        print("Navigate to extracted_dataset/ARICC/ to review and clean up images")
         print("Delete blurry, dark, or irrelevant frames manually")
-        print("Keep clear images showing EGN exhibits")
+        print("Keep clear images showing ARICC exhibits")
     else:
         print("\nFAILED! Could not extract frames.")

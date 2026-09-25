@@ -8,24 +8,19 @@ import torch
 import torch.nn as nn
 import json
 import os
-from yolo_tiny_model import YOLOv5Tiny
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from train_yolo_tiny import YOLOv5Tiny
 
 class BalancedEGNFixedONNXModel(nn.Module):
     """Balanced EGN Model with EXACT weight mapping for ONNX export"""
     def __init__(self, original_model, num_classes):
         super(BalancedEGNFixedONNXModel, self).__init__()
 
-        # Copy backbone layers except the adaptive pooling
-        backbone_layers = []
-        for layer in original_model.backbone:
-            if not isinstance(layer, nn.AdaptiveAvgPool2d):
-                backbone_layers.append(layer)
-
-        self.backbone_conv = nn.Sequential(*backbone_layers)
-
-        # Manual pooling to get exactly 4x4 output from 14x14 input
-        # Based on analysis: 14x14 -> 4x4 using kernel_size=7, stride=3, padding=1
-        self.fixed_pool = nn.AvgPool2d(kernel_size=7, stride=3, padding=1)
+        # Preserve the exact backbone and adaptive pooling used during training.
+        self.backbone = nn.Sequential(*list(original_model.backbone))
 
         # EGN classifier architecture matching EXACT original structure
         # Based on analysis: classifier.2 and classifier.5 are the linear layers
@@ -39,11 +34,8 @@ class BalancedEGNFixedONNXModel(nn.Module):
         )
 
     def forward(self, x):
-        # Run through backbone convolutions
-        x = self.backbone_conv(x)
-
-        # Apply fixed pooling (14x14 -> approximately 4x4)
-        x = self.fixed_pool(x)
+        # Run through the same backbone and pooling used during training.
+        x = self.backbone(x)
 
         # Apply classifier
         x = self.classifier(x)
@@ -52,7 +44,7 @@ class BalancedEGNFixedONNXModel(nn.Module):
 
 def create_balanced_fixed_onnx_model(model_path, classes_json_path):
     """Create balanced EGN model with CORRECTED weight mapping for ONNX export"""
-    print(f"Creating CORRECTED manual-pool balanced EGN model...")
+    print(f"Creating exact balanced EGN model export...")
 
     # Load class info
     with open(classes_json_path, 'r') as f:
@@ -84,31 +76,15 @@ def create_balanced_fixed_onnx_model(model_path, classes_json_path):
         backbone_out = original_model.backbone(test_input)
         print(f"Original backbone output shape: {backbone_out.shape}")
 
-        # Get feature map size before adaptive pooling
-        conv_layers = []
-        for layer in original_model.backbone:
-            if not isinstance(layer, nn.AdaptiveAvgPool2d):
-                conv_layers.append(layer)
-        conv_backbone = nn.Sequential(*conv_layers)
-        conv_out = conv_backbone(test_input)
-        print(f"Conv output before pooling: {conv_out.shape}")
-
-        # Calculate exact pooling needed
-        _, channels, h, w = conv_out.shape
-        target_h, target_w = 4, 4
-
-        print(f"Need to pool from {channels}x{h}x{w} to {channels}x{target_h}x{target_w}")
-
-    # Create fixed model
+    # Create export model with the original adaptive pooling operation.
     fixed_model = BalancedEGNFixedONNXModel(original_model, num_classes)
 
-    # Test the manual pooling dimensions
+    # Test the exported model dimensions.
     with torch.no_grad():
-        manual_conv_out = fixed_model.backbone_conv(test_input)
-        pooled_out = fixed_model.fixed_pool(manual_conv_out)
-        print(f"Manual pooled output shape: {pooled_out.shape}")
+        export_backbone_out = fixed_model.backbone(test_input)
+        print(f"Export backbone output shape: {export_backbone_out.shape}")
 
-        expected_features = pooled_out.numel() // pooled_out.shape[0]
+        expected_features = export_backbone_out.numel() // export_backbone_out.shape[0]
         print(f"Expected linear input features: {expected_features}")
 
     # Update classifier first layer if needed
@@ -126,8 +102,8 @@ def create_balanced_fixed_onnx_model(model_path, classes_json_path):
     print("Transferring backbone weights...")
     backbone_transferred = 0
     for key in fixed_state_dict.keys():
-        if key.startswith('backbone_conv.'):
-            original_key = key.replace('backbone_conv.', 'backbone.')
+        if key.startswith('backbone.'):
+            original_key = key
             if original_key in original_state_dict:
                 fixed_state_dict[key] = original_state_dict[original_key].clone()
                 backbone_transferred += 1

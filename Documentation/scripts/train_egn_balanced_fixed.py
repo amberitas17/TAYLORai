@@ -31,8 +31,8 @@ class EGNBalancedDataset(Dataset):
         self.samples = []
         self.classes = []
 
-        # Get all EGN subdirectories
-        egn_dirs = [d for d in os.listdir(data_dir) if d.startswith('EGN-') and os.path.isdir(os.path.join(data_dir, d))]
+        # Get all ARICC subdirectories
+        egn_dirs = [d for d in os.listdir(data_dir) if d.startswith('ARICC-') and os.path.isdir(os.path.join(data_dir, d))]
         egn_dirs.sort()
 
         print(f"Found {len(egn_dirs)} EGN directories")
@@ -154,7 +154,7 @@ def train_balanced_model():
     print(f"Using device: {device}")
 
     # Dataset path
-    data_dir = 'hierarchical_dataset/EGN'
+    data_dir = 'hierarchical_dataset/ARICC'
     if not os.path.exists(data_dir):
         print(f"Error: {data_dir} not found!")
         return

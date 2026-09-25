@@ -27,5 +27,15 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    // Prevent the file watcher from descending into the Python venv / backend folders
+    watch: {
+      ignored: ['**/Documentation/venv/**', '**/backend/**', '**/backend_faceapi/**'],
+    },
+  },
+  // Without this, Vite's dependency scanner crawls every *.html in the project,
+  // including Documentation/venv/Lib/site-packages (torch/matplotlib/ultralytics),
+  // which makes the dev server hang on the first request.
+  optimizeDeps: {
+    entries: ['index.html'],
   },
 })

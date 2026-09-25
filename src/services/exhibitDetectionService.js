@@ -5,6 +5,7 @@
 
 import * as tf from '@tensorflow/tfjs';
 import * as ort from 'onnxruntime-web';
+import * as faceapi from 'face-api.js';
 
 // Configure ORT-Web to use matching WASM files (OpenAI solution)
 console.log('🔧 Configuring ORT-Web with matching WASM files...');
@@ -35,6 +36,8 @@ class ExhibitDetectionService {
         this.dwtModel = null;  // Dialogue with Time classifier
         this.eapModel = null;  // Earth Alive Planet classifier
         this.egnModel = null;  // Energy Story classifier
+        this.ariccModel = null; // ARICC exhibit classifier
+        this.reconModel = null; // RECON Center exhibit classifier
         this.macModel = null;  // Mechanics Alive classifier
         this.mepModel = null;  // Mind Eye classifier
         this.qsModel = null;   // Quanta School classifier
@@ -62,6 +65,8 @@ class ExhibitDetectionService {
         this.dwtMetadata = null;
         this.eapMetadata = null;
         this.egnMetadata = null;
+        this.ariccMetadata = null;
+        this.reconMetadata = null;
         this.macMetadata = null;
         this.mepMetadata = null;
         this.qsMetadata = null;
@@ -83,7 +88,7 @@ class ExhibitDetectionService {
         this.isInitialized = false;
         this.backendUrl = 'http://localhost:5000';
         this.realMetadataPath = '/models/exhibit_metadata.json';
-        this.useSimilarityGate = false;
+        this.useSimilarityGate = true;
         this.gateConfig = {
             inputSize: 224,
             threshold: 0.5,
@@ -92,6 +97,10 @@ class ExhibitDetectionService {
         };
         this.rejectedFrameLogKey = 'scienceCentreRejectedFrames';
         this.rejectedFrameLogLimit = 50;
+        this.classifierMode = 'aricc';
+        this.initializedMode = null;
+        this.faceDetectorReady = false;
+        this.faceDetectorLoad = null;
 
         // Model configuration (will be updated from real metadata)
         this.config = {
@@ -152,25 +161,45 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     ctx.restore();
 }
 
-    async initialize() {
+    async initialize(options = {}) {
+        const requestedMode = options.classifier || 'aricc';
+        if (this.isInitialized && this.initializedMode === requestedMode) {
+            return;
+        }
+        this.classifierMode = requestedMode;
         try {
             console.log('🎯 Initializing exhibit detection service with ONNX model...');
 
             // Load the binary gate, main exhibit classifier, and legacy specialists.
             console.log('🔄 Loading exhibit gate and main classifier');
 
-            await this.loadExhibitGateModel();
+            if (!this.gateModel) {
+                await this.loadExhibitGateModel();
+            }
 
-            try {
-                await this.loadMainModel();
+            await this.loadFaceDetector();
+
+            if (requestedMode === 'recon') {
+                await this.loadReconModel();
+                this.gateOnlyMode = false;
+            } else if (requestedMode === 'aricc') {
                 this.gateOnlyMode = false;
                 await this.loadSpecialistModels();
-            } catch (mainModelError) {
-                console.warn('Main exhibit classifier failed to load; continuing in gate-only mode:', mainModelError.message);
-                this.gateOnlyMode = true;
+            } else {
+                try {
+                    if (!this.model) {
+                        await this.loadMainModel();
+                    }
+                    this.gateOnlyMode = false;
+                    await this.loadSpecialistModels();
+                } catch (mainModelError) {
+                    console.warn('Main exhibit classifier failed to load; continuing in gate-only mode:', mainModelError.message);
+                    this.gateOnlyMode = true;
+                }
             }
 
             this.isInitialized = true;
+            this.initializedMode = requestedMode;
             console.log('✅ Exhibit detection service initialized with ONNX model');
 
         } catch (error) {
@@ -178,6 +207,75 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             console.error('🚫 ONNX model must work - no fallbacks!');
             throw error;
         }
+    }
+
+    async loadFaceDetector() {
+        if (this.faceDetectorReady) return;
+        if (!this.faceDetectorLoad) {
+            this.faceDetectorLoad = faceapi.nets.tinyFaceDetector.loadFromUri('/models')
+                .then(() => {
+                    this.faceDetectorReady = true;
+                    console.log('✅ Tiny face detector loaded for UNKNOWN person rejection');
+                })
+                .catch(error => {
+                    this.faceDetectorLoad = null;
+                        console.warn('⚠️ Tiny face detector unavailable; person rejection is disabled:', error.message);
+                });
+        }
+        await this.faceDetectorLoad;
+    }
+
+    async detectPersonOnlyFrame(imageElement) {
+        if (!this.faceDetectorReady) return false;
+        try {
+            const detections = await faceapi.detectAllFaces(
+                imageElement,
+                new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.6 })
+            );
+            return detections.length > 0;
+        } catch (error) {
+            console.warn('⚠️ Person frame check failed; continuing with exhibit gate:', error.message);
+            return false;
+        }
+    }
+
+    async createCachedONNXSession(modelPath, sessionOptions) {
+        const createSession = (source) => ort.InferenceSession.create(source, sessionOptions);
+        if (typeof caches === 'undefined') {
+            return createSession(modelPath);
+        }
+
+        const cache = await caches.open('taylor-onnx-models-v1');
+        let response = await cache.match(modelPath);
+        if (!response) {
+            response = await fetch(modelPath, { cache: 'default' });
+            if (!response.ok) {
+                throw new Error(`Model request failed: ${response.status} ${modelPath}`);
+            }
+            await cache.put(modelPath, response.clone());
+        }
+        return createSession(await response.arrayBuffer());
+    }
+
+    async loadReconModel() {
+        if (this.reconModel && this.reconMetadata) {
+            return;
+        }
+        const sessionOptions = {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all',
+            logSeverityLevel: 0
+        };
+        const modelPath = '/models/recon/recon_classifier.onnx';
+        const metadataPath = '/models/recon/recon_classifier_metadata.json';
+        console.log('Loading cached RECON Center classifier...');
+        this.reconModel = await this.createCachedONNXSession(modelPath, sessionOptions);
+        const metadataResponse = await fetch(metadataPath, { cache: 'default' });
+        if (!metadataResponse.ok) {
+            throw new Error(`RECON metadata request failed: ${metadataResponse.status}`);
+        }
+        this.reconMetadata = await metadataResponse.json();
+        console.log('RECON classifier loaded:', this.reconMetadata.displayNames);
     }
 
     async loadExhibitGateModel() {
@@ -190,7 +288,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 logSeverityLevel: 0
             };
 
-            this.gateModel = await ort.InferenceSession.create('/models/exhibit_gate/exhibit_gate.onnx', sessionOptions);
+            this.gateModel = await this.createCachedONNXSession('/models/exhibit_gate/exhibit_gate.onnx', sessionOptions);
 
             try {
                 const metadataResponse = await fetch('/models/exhibit_gate/exhibit_gate_metadata.json');
@@ -285,7 +383,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             console.log('🏆 Using regenerated YOLOv8s for 28-class exhibit/background prediction');
             const t0 = performance.now();
             console.log('⏳ Creating ONNX inference session...');
-            this.model = await ort.InferenceSession.create(onnxModelPath, sessionOptions);
+                this.model = await this.createCachedONNXSession(onnxModelPath, sessionOptions);
             console.log(`✅ Main model loaded in ${(performance.now() - t0).toFixed(1)}ms`);
             console.log('✅ YOLOv8s main model loaded successfully!');
             console.log('🔧 Session execution providers:', this.model.executionProviders);
@@ -474,25 +572,40 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 assignMetadata: (metadata) => { this.eapMetadata = metadata; }
             },
             {
-                label: 'EGN',
-                modelPath: '/models/egn_balanced_model_corrected.onnx',
-                metadataPath: '/models/egn_exact_weights_metadata.json',
-                assignModel: (model) => { this.egnModel = model; },
-                assignMetadata: (metadata) => { this.egnMetadata = metadata; }
+                label: 'ARICC',
+                modelPath: '/models/aricc/aricc_classifier.onnx',
+                metadataPath: '/models/aricc/aricc_classifier_metadata.json',
+                assignModel: (model) => { this.ariccModel = model; },
+                assignMetadata: (metadata) => { this.ariccMetadata = metadata; }
             }
         ];
 
         for (const specialist of specialists) {
             try {
                 console.log(`Loading ${specialist.label} specialist classifier...`);
-                const model = await ort.InferenceSession.create(specialist.modelPath, sessionOptions);
+                const model = await this.createCachedONNXSession(specialist.modelPath, sessionOptions);
                 specialist.assignModel(model);
+                console.log(`${specialist.label} ONNX input metadata:`, {
+                    inputNames: model.inputNames,
+                    inputMetadata: model.inputNames.map(inputName => model.inputMetadata?.[inputName] || null),
+                    outputNames: model.outputNames
+                });
 
                 try {
                     const metadataResponse = await fetch(specialist.metadataPath);
                     if (metadataResponse.ok) {
                         specialist.assignMetadata(await metadataResponse.json());
                         console.log(`✅ ${specialist.label} specialist metadata loaded`);
+                        if (specialist.label === 'ARICC') {
+                            console.log('🧾 ARICC runtime configuration:', {
+                                modelPath: specialist.modelPath,
+                                modelOutput: model.outputNames,
+                                classes: specialist.metadata?.displayNames,
+                                mean: specialist.metadata?.mean,
+                                std: specialist.metadata?.std,
+                                outputType: specialist.metadata?.output_type
+                            });
+                        }
                     }
                 } catch (metadataError) {
                     console.warn(`⚠️ ${specialist.label} metadata not loaded:`, metadataError.message);
@@ -684,7 +797,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             // numerical safety
             variance = Math.max(0, variance);
             const contrast = Math.sqrt(variance);
-            const brightness = mean;
+            let brightness = mean;
 
             // If we read a totally black frame (likely camera warmup or placeholder), retry once quickly
             if (variance === 0 && brightness === 0) {
@@ -702,7 +815,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     const m = s / pxCount;
                     variance = Math.max(0, (ss / pxCount) - (m * m));
                     brightness = m;
-                } catch (err) {
+                } catch {
                     // ignore and fall through to treat as poor-quality
                 }
             }
@@ -785,6 +898,22 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.log('⏭️ Skipping clarity gate - proceeding to confidence filter');
             }
 
+            const personDetected = await this.detectPersonOnlyFrame(imageElement);
+            if (personDetected) {
+                await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                    classifier: this.classifierMode,
+                    reason: 'person_detected'
+                });
+                return {
+                    success: false,
+                    reason: 'unknown_exhibit',
+                    zone: this.classifierMode === 'aricc' ? 'ARICC' : 'RECON',
+                    exhibit: 'Unknown / Unrecognized Exhibit',
+                    message: 'No exhibit detected',
+                    classifier: this.classifierMode
+                };
+            }
+
             // Stage 1: Binary exhibit/background gate
             console.log('Stage 1: Running binary exhibit/background gate...');
             const gateResult = await this.detectExhibitGate(imageElement);
@@ -816,7 +945,12 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
             console.log(`Gate accepted frame (${(gateResult.exhibitConfidence * 100).toFixed(1)}% exhibit confidence)`);
 
-            if (this.gateOnlyMode || !this.model) {
+            const hasRequestedClassifier = this.classifierMode === 'recon'
+                ? Boolean(this.reconModel && this.reconMetadata)
+                : this.classifierMode === 'aricc'
+                    ? Boolean(this.ariccModel && this.ariccMetadata)
+                    : Boolean(this.model);
+            if (!hasRequestedClassifier || (this.gateOnlyMode && !hasRequestedClassifier)) {
                 await this.logRejectedFrame(imageElement, 'main_classifier_unavailable', {
                     exhibitConfidence: gateResult.exhibitConfidence
                 });
@@ -827,6 +961,132 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     exhibitConfidence: gateResult.exhibitConfidence,
                     message: 'Gate accepted the frame, but no label classifier is available',
                     gate: gateResult
+                };
+            }
+
+            // RECON and ARICC are mutually exclusive: only the model matching the
+            // active classifierMode may produce a result. A model left over from a
+            // different mode on this singleton service must never be used here.
+            const SPECIALIST_MIN_CONFIDENCE = 0.60;
+            const isUnknownSpecialistResult = result =>
+                result.confidence < SPECIALIST_MIN_CONFIDENCE || result.isLikelyBackground;
+
+            if (this.classifierMode === 'recon') {
+                if (!this.reconModel || !this.reconMetadata) {
+                    await this.logRejectedFrame(imageElement, 'main_classifier_unavailable', {
+                        exhibitConfidence: gateResult.exhibitConfidence
+                    });
+                    return {
+                        success: false,
+                        gateOnly: true,
+                        reason: 'main_classifier_unavailable',
+                        exhibitConfidence: gateResult.exhibitConfidence,
+                        message: 'Gate accepted the frame, but the RECON classifier is not available',
+                        gate: gateResult
+                    };
+                }
+                const reconResult = await this.runZoneSpecificInference(imageElement, 'RECON');
+                const displayName = reconResult.displayName || reconResult.exhibit;
+                const code = reconResult.classCode || 'RECON-1';
+                if (isUnknownSpecialistResult(reconResult)) {
+                    await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                        classifier: 'recon',
+                        predictedClass: displayName,
+                        confidence: reconResult.confidence,
+                        confidenceGap: reconResult.confidenceGap,
+                        requiredConfidence: SPECIALIST_MIN_CONFIDENCE
+                    });
+                    return {
+                        success: false,
+                        reason: 'unknown_exhibit',
+                        zone: 'RECON',
+                        exhibit: 'Unknown / Unrecognized Exhibit',
+                        exhibitConfidence: reconResult.confidence,
+                        specificConfidenceGap: reconResult.confidenceGap,
+                        message: 'Exhibit is outside the confident RECON classes',
+                        gate: gateResult,
+                        classifier: 'recon'
+                    };
+                }
+                return {
+                    success: true,
+                    zone: 'RECON',
+                    zoneConfidence: reconResult.confidence,
+                    exhibit: reconResult.exhibit,
+                    exhibitConfidence: reconResult.confidence,
+                    combinedConfidence: reconResult.confidence,
+                    exhibitInfo: { displayName, code, number: code.replace('RECON-', '') },
+                    coordinates: this.getExhibitCoordinates(code, 'default'),
+                    detectionTime: new Date().toISOString(),
+                    isLikelyBackground: reconResult.isLikelyBackground,
+                    mainConfidenceGap: reconResult.confidenceGap,
+                    specificConfidenceGap: reconResult.confidenceGap,
+                    gate: gateResult,
+                    classifier: 'recon'
+                };
+            }
+
+            // ARICC is the trained exhibit classifier for the ARICC webcam workflow.
+            // Run it directly after the noise gate so the legacy 28-class model
+            // cannot replace an ARICC result with labels such as Phobia.
+            if (this.classifierMode === 'aricc' && this.ariccModel && this.ariccMetadata) {
+                const ariccResult = await this.runZoneSpecificInference(imageElement, 'ARICC');
+                const ariccDisplayName = ariccResult.displayName || ariccResult.exhibit;
+                if (isUnknownSpecialistResult(ariccResult)) {
+                    await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                        classifier: 'aricc',
+                        predictedClass: ariccDisplayName,
+                        confidence: ariccResult.confidence,
+                        confidenceGap: ariccResult.confidenceGap,
+                        requiredConfidence: SPECIALIST_MIN_CONFIDENCE
+                    });
+                    return {
+                        success: false,
+                        reason: 'unknown_exhibit',
+                        zone: 'ARICC',
+                        exhibit: 'Unknown / Unrecognized Exhibit',
+                        exhibitConfidence: ariccResult.confidence,
+                        specificConfidenceGap: ariccResult.confidenceGap,
+                        message: 'Exhibit is outside the confident ARICC classes',
+                        gate: gateResult,
+                        classifier: 'aricc'
+                    };
+                }
+                return {
+                    success: true,
+                    zone: 'ARICC',
+                    zoneConfidence: ariccResult.confidence,
+                    exhibit: ariccResult.exhibit,
+                    exhibitConfidence: ariccResult.confidence,
+                    combinedConfidence: ariccResult.confidence,
+                    exhibitInfo: {
+                        displayName: ariccDisplayName,
+                        code: ariccResult.exhibit,
+                        number: ariccResult.exhibit.replace('ARICC-', '')
+                    },
+                    coordinates: this.getExhibitCoordinates(ariccResult.exhibit, 'default'),
+                    detectionTime: new Date().toISOString(),
+                    isLikelyBackground: ariccResult.isLikelyBackground,
+                    mainConfidenceGap: ariccResult.confidenceGap,
+                    specificConfidenceGap: ariccResult.confidenceGap,
+                    gate: gateResult,
+                    classifier: 'aricc'
+                };
+            }
+
+            if (this.classifierMode === 'aricc') {
+                await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                    classifier: 'aricc',
+                    reason: 'ARICC classifier unavailable'
+                });
+                return {
+                    success: false,
+                    reason: 'unknown_exhibit',
+                    zone: 'ARICC',
+                    exhibit: 'Unknown / Unrecognized Exhibit',
+                    message: 'No exhibit detected',
+                    gate: gateResult,
+                    classifier: 'aricc'
                 };
             }
 
@@ -917,29 +1177,6 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     gate: gateResult
                 };
             }
-
-            const labelDisplayName = this.config.exhibitMapping[detectedZone] || this.parseExhibitInfo(detectedZone).displayName;
-
-            // The current browser build uses the 28-class classifier as the final label source.
-            // The original DWT/EAP/EGN specialist block below is retained for compatibility.
-            return {
-                success: true,
-                zone: detectedZone,
-                zoneConfidence: mainResult.confidence,
-                exhibit: detectedZone,
-                exhibitConfidence: mainResult.confidence,
-                combinedConfidence: mainResult.confidence,
-                exhibitInfo: {
-                    displayName: labelDisplayName,
-                    code: detectedZone,
-                    number: '00'
-                },
-                coordinates: this.getExhibitCoordinates(detectedZone, 'default'),
-                detectionTime: new Date().toISOString(),
-                isLikelyBackground: false,
-                mainConfidenceGap: mainResult.confidenceGap,
-                gate: gateResult
-            };
 
             // Step 2: Zone-specific exhibit classification (DWT / EAP / EGN specialists)
             console.log(`🎯 Step 2: Running ${detectedZone}-specific detection...`);
@@ -1148,7 +1385,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const backgroundNearest = this.findNearestFeature(vector, this.gateSimilarityIndex.background || []);
         const baseMaxDistance = this.gateSimilarityIndex.maxNearestExhibitDistance || 0.22;
         const maxDistance = Math.min(baseMaxDistance, 0.24);
-        const distanceMargin = 1.0;
+        const distanceMargin = 1.15;
         const isSimilarToExhibit =
             exhibitNearest.distance <= maxDistance &&
             exhibitNearest.distance <= backgroundNearest.distance * distanceMargin;
@@ -1376,7 +1613,6 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 logitsTensor?.dispose();
                 probabilitiesTensor?.dispose();
 
-                const probData = await finalPredictions.data();
                 // Log top 3 predictions for 10-class model
                 const topPredictions = Array.from(probabilities)
                     .map((prob, idx) => ({ class: this.config.classes[idx], confidence: prob, idx }))
@@ -1518,7 +1754,57 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     }
 
 
-    async preprocessImage(imageElement) {
+    getModelInputSpec(model, metadata, modelName) {
+        const inputName = model?.inputNames?.[0];
+        const runtimeInput = inputName && model?.inputMetadata
+            ? model.inputMetadata[inputName]
+            : null;
+        const rawShape = runtimeInput?.dimensions || runtimeInput?.shape ||
+            metadata?.input_shape || metadata?.inputShape;
+        const shape = Array.isArray(rawShape)
+            ? rawShape.map(dimension => Number.isFinite(Number(dimension)) ? Number(dimension) : null)
+            : null;
+        const isNCHW = shape?.length === 4 && shape[1] === 3 && shape[3] !== 3;
+        const isNHWC = shape?.length === 4 && shape[3] === 3 && shape[1] !== 3;
+
+        if (!shape || (!isNCHW && !isNHWC)) {
+            throw new Error(`${modelName} input shape/layout is unavailable or unsupported: ${JSON.stringify(rawShape)}`);
+        }
+
+        return {
+            inputName,
+            shape,
+            layout: isNCHW ? 'NCHW' : 'NHWC',
+            inputSize: isNCHW ? shape[2] : shape[1]
+        };
+    }
+
+    createValidatedONNXTensor(input, model, modelName, inputSpec, preprocessingConfig) {
+        const actualShape = Array.from(input.shape, Number);
+        const actualLength = input.size;
+        const expectedLength = inputSpec.shape.reduce((total, dimension) =>
+            dimension && dimension > 0 ? total * dimension : total, 1);
+        const shapeMatches = actualShape.length === inputSpec.shape.length &&
+            inputSpec.shape.every((dimension, index) => !dimension || dimension === actualShape[index]);
+
+        console.log(`${modelName} preprocessing:`, {
+            inputName: inputSpec.inputName,
+            expectedShape: inputSpec.shape,
+            actualShape,
+            layout: inputSpec.layout,
+            dataLength: actualLength,
+            expectedDataLength: expectedLength,
+            preprocessing: preprocessingConfig
+        });
+
+        if (!shapeMatches || actualLength !== expectedLength) {
+            throw new Error(`${modelName} input validation failed: expected ${JSON.stringify(inputSpec.shape)} with ${expectedLength} values, got ${JSON.stringify(actualShape)} with ${actualLength} values`);
+        }
+
+        return new ort.Tensor('float32', new Float32Array(input.dataSync()), actualShape);
+    }
+
+    async preprocessImage(imageElement, preprocessing = null, layout = null, inputSize = 224) {
         try {
             console.log('🔄 Starting preprocessing pipeline (EXACT match to Python webcam_record.py)...');
 
@@ -1536,40 +1822,24 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             ctx.drawImage(imageElement, 0, 0);
 
             // Step 2: Get image data and convert to RGB (matching Python: cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            const imageData = ctx.getImageData(0, 0, originalWidth, originalHeight);
-            const rgbData = new Uint8ClampedArray(imageData.data);
             // Note: HTML5 canvas already gives RGB, no conversion needed
 
-            // Step 3: Resize to 224x224 (required for EfficientNet B5 model)
+            // Step 3: Match Ultralytics classify_transforms: resize the shortest
+            // edge to 224, then take a centered 224x224 crop.
             const resizeCanvas = document.createElement('canvas');
             const resizeCtx = resizeCanvas.getContext('2d');
-            resizeCanvas.width = 224;
-            resizeCanvas.height = 224;
-            resizeCtx.drawImage(canvas, 0, 0, 224, 224);
-            console.log('📐 Resized to 224x224 for EfficientNet B3');
+            resizeCanvas.width = inputSize;
+            resizeCanvas.height = inputSize;
+            const scale = inputSize / Math.min(originalWidth, originalHeight);
+            const resizedWidth = Math.round(originalWidth * scale);
+            const resizedHeight = Math.round(originalHeight * scale);
+            const offsetX = (resizedWidth - 224) / 2;
+            const offsetY = (resizedHeight - 224) / 2;
+            resizeCtx.drawImage(canvas, -offsetX, -offsetY, resizedWidth, resizedHeight);
+            console.log(`📐 Resized shortest edge to ${inputSize} and center-cropped to ${inputSize}x${inputSize}`);
 
-            // Step 4: Apply JPEG compression at 95% quality (matching Python JPEG compression)
-            console.log('📦 Applying JPEG compression at 95% quality...');
-            const jpegDataUrl = resizeCanvas.toDataURL('image/jpeg', 0.95);
-
-            // Step 5: Load compressed image back (matching Python: cv2.imdecode)
-            const compressedImage = new Image();
-            await new Promise((resolve, reject) => {
-                compressedImage.onload = resolve;
-                compressedImage.onerror = reject;
-                compressedImage.src = jpegDataUrl;
-            });
-
-            // Step 6: Draw compressed image to final canvas (now we have the exact same data as Python)
-            const finalCanvas = document.createElement('canvas');
-            const finalCtx = finalCanvas.getContext('2d');
-            finalCanvas.width = 224;
-            finalCanvas.height = 224;
-            finalCtx.drawImage(compressedImage, 0, 0, 224, 224);
-            console.log('✅ JPEG compression applied');
-
-            // Step 7: Convert to tensor in RGB format (matching Python: Image.fromarray)
-            let imageTensor = tf.browser.fromPixels(finalCanvas);
+            // Step 4: Convert to tensor in RGB format.
+            let imageTensor = tf.browser.fromPixels(resizeCanvas);
 
             // Ensure 3 channels (RGB)
             if (imageTensor.shape[2] === 4) {
@@ -1585,13 +1855,11 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const rawSample = await float32.slice([0, 0, 0], [1, 1, 3]).data();
             console.log(`🔍 Raw pixel values [0-1]: [${Array.from(rawSample).map(v => v.toFixed(3)).join(', ')}]`);
 
-            // Step 9: Apply ImageNet normalization (EXACT match to Python transforms.Normalize)
-            // Python: transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            console.log('🎯 Applying ImageNet normalization (matching Python transforms.Normalize)...');
+            // Step 9: Apply the normalization declared by the deployed model metadata.
+            console.log('🎯 Applying model-declared normalization...');
 
-            // Use the EXACT values from your Python code
-            const meanValues = [0.485, 0.456, 0.406];
-            const stdValues = [0.229, 0.224, 0.225];
+            const meanValues = preprocessing?.preprocessing?.mean || preprocessing?.mean || [0, 0, 0];
+            const stdValues = preprocessing?.preprocessing?.std || preprocessing?.std || [1, 1, 1];
 
             console.log(`📊 Using normalization: mean=[${meanValues.join(', ')}], std=[${stdValues.join(', ')}]`);
 
@@ -1617,7 +1885,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
             // Step 10: Add batch dimension and handle format based on model type
             let batched;
-            if (this.model && this.model.isONNX) {
+            if (layout === 'NCHW' || (!layout && this.model && this.model.isONNX)) {
                 // For ONNX models, we need NCHW format [1, 3, 224, 224]
                 const transposed = normalized.transpose([2, 0, 1]); // HWC -> CHW
                 batched = transposed.expandDims(0); // Add batch dimension -> NCHW
@@ -1742,15 +2010,6 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     async runZoneSpecificInference(imageElement, zone) {
         console.log(`🎯 Running zone-specific inference for ${zone}...`);
-        const input = await this.preprocessImage(imageElement);
-        console.log('🔍 Preprocessed input shape:', input.shape);
-        console.log('🔍 Input tensor format check:', input.shape.length === 4 ? 'NCHW format detected' : 'Unexpected format');
-
-        // The main model preprocessing already returns NCHW format [1, 3, 224, 224]
-        // Zone-specific models also expect NCHW, so we can use the tensor directly
-        const inputTensor = new ort.Tensor('float32', await input.data(), input.shape);
-        console.log('🔍 Zone-specific input tensor shape:', inputTensor.dims);
-
         // Get zone-specific model and metadata
         const zoneMap = {
             'AT': { model: this.atModel, metadata: this.atMetadata, name: 'Atrium', emoji: '🏛️' },
@@ -1759,6 +2018,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             'DWT': { model: this.dwtModel, metadata: this.dwtMetadata, name: 'Dialogue with Time', emoji: '🧠' },
             'EAP': { model: this.eapModel, metadata: this.eapMetadata, name: 'Earth Alive Planet', emoji: '🌍' },
             'EGN': { model: this.egnModel, metadata: this.egnMetadata, name: 'Energy Story', emoji: '⚙️' },
+            'ARICC': { model: this.ariccModel, metadata: this.ariccMetadata, name: 'ARICC', emoji: '🏭' },
+            'RECON': { model: this.reconModel, metadata: this.reconMetadata, name: 'RECON Center', emoji: '🔬' },
             'MAC': { model: this.macModel, metadata: this.macMetadata, name: 'Mechanics Alive', emoji: '🔧' },
             'MEP': { model: this.mepModel, metadata: this.mepMetadata, name: 'Mind Eye', emoji: '👁️' },
             'QS': { model: this.qsModel, metadata: this.qsMetadata, name: 'Quanta School', emoji: '🎓' },
@@ -1774,19 +2035,60 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const metadata = zoneInfo.metadata;
         console.log(`${zoneInfo.emoji} Using ${zoneInfo.name} model with ${metadata?.num_classes || metadata?.classes?.length || 'unknown'} classes`);
 
+        const inputSpec = this.getModelInputSpec(model, metadata, zoneInfo.name);
+        const input = await this.preprocessImage(
+            imageElement,
+            metadata,
+            inputSpec.layout,
+            inputSpec.inputSize || 224
+        );
+        console.log('🔍 Preprocessed input shape:', input.shape);
+        const actualFormat = input.shape.length === 4 && input.shape[1] === 3 && input.shape[3] !== 3
+            ? 'NCHW'
+            : input.shape.length === 4 && input.shape[3] === 3 && input.shape[1] !== 3
+                ? 'NHWC'
+                : 'UNKNOWN';
+        console.log('🔍 Input tensor format check:', actualFormat);
+        const inputTensor = this.createValidatedONNXTensor(
+            input,
+            model,
+            zoneInfo.name,
+            inputSpec,
+            {
+                layout: inputSpec.layout,
+                inputSize: inputSpec.inputSize,
+                mean: metadata?.preprocessing?.mean || metadata?.mean || [0, 0, 0],
+                std: metadata?.preprocessing?.std || metadata?.std || [1, 1, 1]
+            }
+        );
+        console.log('🔍 Zone-specific input tensor shape:', inputTensor.dims);
+
         // Run inference
         console.log(`⚡ Running ${zone} model inference...`);
         const results = await model.run({ [model.inputNames[0]]: inputTensor });
-        const logits = Array.from(results[model.outputNames[0]].data);
-        console.log(`📊 ${zone} model raw logits:`, logits.slice(0, 5), '...'); // Show first 5 logits
+        const rawOutput = results[model.outputNames[0]]?.data;
+        const outputValues = rawOutput ? Array.from(rawOutput, Number) : [];
+        const expectedClassCount = metadata?.displayNames?.length || metadata?.classes?.length;
+        if (!expectedClassCount || outputValues.length !== expectedClassCount || outputValues.some(value => !Number.isFinite(value))) {
+            throw new Error(`${zone} model returned invalid output values: expected ${expectedClassCount || 'known'} finite values, received ${outputValues.length}`);
+        }
+        console.log(`📊 ${zone} model raw output:`, outputValues.slice(0, 5), '...'); // Show first 5 values
 
-        // Apply softmax and get prediction
-        const probabilities = this.softmax(logits);
+        // Classifier exports may return logits or probabilities. Preserve probabilities
+        // that already sum to one; only apply softmax to finite logits.
+        const outputSum = outputValues.reduce((sum, value) => sum + value, 0);
+        const looksLikeProbabilities = outputValues.every(value => value >= 0 && value <= 1) &&
+            Math.abs(outputSum - 1) < 0.01;
+        const probabilities = looksLikeProbabilities ? outputValues : this.softmax(outputValues);
+        if (probabilities.some(value => !Number.isFinite(value))) {
+            throw new Error(`${zone} model produced non-finite probabilities`);
+        }
         const predictedIdx = probabilities.indexOf(Math.max(...probabilities));
         const confidence = probabilities[predictedIdx];
         // Handle different metadata formats (classes vs class_names)
         const classNames = metadata.class_names || metadata.classes || [];
-        const exhibit = classNames[predictedIdx];
+        const displayNames = metadata.displayNames || metadata.display_names || [];
+        const exhibit = displayNames[predictedIdx] || classNames[predictedIdx];
 
         if (!exhibit) {
             console.error(`❌ No class name found for index ${predictedIdx} in ${zone} metadata`);
@@ -1797,7 +2099,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         // Add confidence validation for zone-specific models too
         const sortedProbs = [...probabilities].sort((a, b) => b - a);
         const secondHighest = sortedProbs[1];
-        const confidenceGap = confidence - secondHighest;
+        const confidenceGap = Number.isFinite(secondHighest) && Number.isFinite(confidence)
+            ? Math.max(0, confidence - secondHighest)
+            : 0;
         const isLikelyBackground = confidenceGap < 0.12;
 
         console.log(`✅ ${zone} model result: ${exhibit} (${(confidence * 100).toFixed(1)}% confidence)`);
@@ -1810,10 +2114,17 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         );
 
         if (isLikelyBackground) {
-            console.log(`⚠️ ${zone} model: Low confidence gap (${(confidenceGap * 100).toFixed(1)}%) - likely background/noise`);
+            console.log(`⚠️ ${zone} model: Low or unavailable confidence gap - likely background/noise`);
         }
 
-        return { exhibit, confidence, isLikelyBackground, confidenceGap };
+        return {
+            exhibit,
+            displayName: displayNames[predictedIdx] || exhibit,
+            classCode: zone === 'RECON' ? `RECON-${predictedIdx + 1}` : classNames[predictedIdx],
+            confidence,
+            isLikelyBackground,
+            confidenceGap
+        };
     }
 
     convertToONNXTensor(tensorflowTensor) {

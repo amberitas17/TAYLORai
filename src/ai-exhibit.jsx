@@ -609,7 +609,7 @@ const exhibitPath = [
   },
 ];
 
-export default function CameraToNavigationScreenPWA() {
+export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [showCamera, setShowCamera] = useState(true);
@@ -624,10 +624,24 @@ export default function CameraToNavigationScreenPWA() {
   const [showNavigation, setShowNavigation] = useState(false);
   const detectionIntervalRef = useRef(null);
   const detectionInFlightRef = useRef(false);
+  const cameraStreamRef = useRef(null);
+  const uploadedVideoRef = useRef(null);
   const acceptStreakRef = useRef(0);
   const rejectStreakRef = useRef(0);
   const pendingLabelRef = useRef("");
   const pendingLabelCountRef = useRef(0);
+  const lastAcceptedAtRef = useRef(0);
+
+  const stopCameraStream = () => {
+    const stream = cameraStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      cameraStreamRef.current = null;
+    }
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject = null;
+    }
+  };
 
   // Live tracking state
   const [stepCount, setStepCount] = useState(0);
@@ -682,7 +696,7 @@ export default function CameraToNavigationScreenPWA() {
       try {
         setIsLoading(true);
         setLoadingMessage('Initializing exhibit detection service...');
-        await exhibitDetectionService.initialize();
+        await exhibitDetectionService.initialize({ classifier: classifierMode });
         setDetectionService(exhibitDetectionService);
         window.exhibitDetectionService = exhibitDetectionService;
         setIsLoading(false);
@@ -693,7 +707,13 @@ export default function CameraToNavigationScreenPWA() {
     };
 
     initService();
-  }, []);
+  }, [classifierMode]);
+
+  useEffect(() => {
+    if (detectionService && uploadedVideoRef.current && !detectionIntervalRef.current) {
+      startRealTimeDetection();
+    }
+  }, [detectionService]);
 
   // Point-based navigation state (removed drawing system)
   const [currentPathway, setCurrentPathway] = useState('DWT_to_EAP');
@@ -843,40 +863,68 @@ export default function CameraToNavigationScreenPWA() {
     };
   }, []);
 
-  // Request camera access and start real-time detection
+  // Request camera access for live recognition. Uploaded files take precedence.
   useEffect(() => {
-    if (!showCamera || !videoRef.current) return;
+    if (!showCamera || !detectionService || uploadedVideoRef.current || !videoRef.current) return undefined;
 
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+    let cancelled = false;
+    const startCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError('Camera access is not supported in this browser. Upload a video instead.');
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false
+        });
+        if (cancelled || !videoRef.current) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
         }
-      })
-      .then((stream) => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            startRealTimeDetection();
-          };
-        }
-      })
-      .catch((err) => {
-        console.error("Camera error:", err);
-        setError("Camera not accessible");
-      });
-
-    return () => {
-      stopRealTimeDetection();
-      // Clean up camera stream on unmount
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = videoRef.current.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
+        cameraStreamRef.current = stream;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        startRealTimeDetection();
+      } catch (cameraError) {
+        console.error('Camera error:', cameraError);
+        const message = cameraError.name === 'NotAllowedError'
+          ? 'Camera permission was denied. Allow camera access or upload a video.'
+          : 'Camera could not be started. Upload a video instead.';
+        setError(message);
       }
     };
+
+    startCamera();
+    return () => {
+      cancelled = true;
+      stopRealTimeDetection();
+      stopCameraStream();
+    };
   }, [showCamera, detectionService]);
+
+  // Upload a video file for testing instead of using the live camera
+  const handleVideoUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !videoRef.current) return;
+
+    stopRealTimeDetection();
+    const video = videoRef.current;
+    uploadedVideoRef.current = file;
+    stopCameraStream();
+    setError("");
+    video.src = URL.createObjectURL(file);
+    video.loop = true;
+    video.muted = true;
+    video.onloadedmetadata = () => {
+      video.play().then(() => {
+        startRealTimeDetection();
+      }).catch((playError) => {
+        setError(`Video playback failed: ${playError.message}`);
+      });
+    };
+    video.onerror = () => setError('The selected video could not be loaded.');
+  };
 
   // Start real-time detection
   const startRealTimeDetection = () => {
@@ -968,6 +1016,11 @@ export default function CameraToNavigationScreenPWA() {
     if (!detection.success) {
       acceptStreakRef.current = 0;
       rejectStreakRef.current += 1;
+      if (detection.classifier === 'aricc' || detection.zone === 'ARICC') {
+        setCurrentExhibit(null);
+        setStableExhibitDetected(false);
+        setLocationDetected(false);
+      }
       if (rejectStreakRef.current >= 2 && !currentExhibit) {
         setStableExhibitDetected(false);
         setLocationDetected(false);
@@ -993,6 +1046,12 @@ export default function CameraToNavigationScreenPWA() {
       } else if (detection.reason === 'low_specific_confidence') {
         setStatusMessage(`Exhibit uncertain (${((detection.specificConfidence || 0) * 100).toFixed(1)}% match)`);
         console.log("🚫 Specialist confidence too low.");
+      } else if (detection.reason === 'unknown_exhibit') {
+        setCurrentExhibit(null);
+        setStableExhibitDetected(false);
+        setLocationDetected(false);
+        setStatusMessage('No exhibit detected');
+        console.log("🚫 Unknown exhibit: no confident ARICC/RECON class match.");
       } else if (detection.reason === 'no_exhibit_detected') {
         setStatusMessage(`No exhibit detected (${((detection.maxConfidence || 0) * 100).toFixed(1)}% max confidence)`);
         console.log("🚫 Confidence filter: Low confidence background detected in frame — hiding exhibit.");
@@ -1000,8 +1059,12 @@ export default function CameraToNavigationScreenPWA() {
       } else if (detection.isLikelyBackground) {
         setStatusMessage("Background/noise detected");
         console.log("🚫 Background/noise detected — hiding exhibit.");
-        console.log(`   Main confidence gap: ${(detection.mainConfidenceGap * 100).toFixed(1)}%`);
-        console.log(`   Specific confidence gap: ${(detection.specificConfidenceGap * 100).toFixed(1)}%`);
+        const mainGap = Number.isFinite(detection.mainConfidenceGap) ? detection.mainConfidenceGap : 0;
+        const specificGap = Number.isFinite(detection.specificConfidenceGap)
+          ? detection.specificConfidenceGap
+          : mainGap;
+        console.log(`   Main confidence gap: ${(mainGap * 100).toFixed(1)}%`);
+        console.log(`   Specific confidence gap: ${(specificGap * 100).toFixed(1)}%`);
       } else {
         setStatusMessage("Detection not successful");
         console.log("⚠️ Detection not successful — hiding exhibit.");
@@ -1029,6 +1092,9 @@ export default function CameraToNavigationScreenPWA() {
     );
 
     if (!hasRealLabel || combinedConfidence < SHOW_THRESHOLD) {
+      setCurrentExhibit(null);
+      setStableExhibitDetected(false);
+      setLocationDetected(false);
       console.log("Ignoring detection because it is generic or below the display threshold.");
       return;
     }
@@ -1043,8 +1109,10 @@ export default function CameraToNavigationScreenPWA() {
 
     const isSwitchingLabel = Boolean(currentExhibit?.name && currentExhibit.name !== detectedName);
     const requiredHits = isSwitchingLabel ? 3 : 2;
+    const switchCooldownActive = isSwitchingLabel &&
+      Date.now() - lastAcceptedAtRef.current < 4000;
 
-    if (pendingLabelCountRef.current >= requiredHits) {
+    if (!switchCooldownActive && pendingLabelCountRef.current >= requiredHits) {
       const exhibit = {
         id: detection.exhibitInfo?.number || '00',
         name: detectedName,
@@ -1058,6 +1126,7 @@ export default function CameraToNavigationScreenPWA() {
       setCurrentExhibit(exhibit);
       setLocationDetected(true);
       setStableExhibitDetected(true);
+      lastAcceptedAtRef.current = Date.now();
       acceptStreakRef.current += 1;
       rejectStreakRef.current = 0;
 
@@ -1089,7 +1158,7 @@ export default function CameraToNavigationScreenPWA() {
       // Initialize the service if not already done
       if (!window.exhibitDetectionService) {
         const { default: exhibitDetectionService } = await import(/* @vite-ignore */ './services/exhibitDetectionService.js?v=' + Date.now());
-        await exhibitDetectionService.initialize();
+        await exhibitDetectionService.initialize({ classifier: classifierMode });
         window.exhibitDetectionService = exhibitDetectionService;
       }
 
@@ -1450,7 +1519,33 @@ export default function CameraToNavigationScreenPWA() {
     </div>
   </div>
 )}
-      {/* Always-on Camera */}
+      {/* Upload video for testing (replaces the live camera feed) */}
+      <div style={{
+        position: "absolute",
+        top: 12,
+        right: 12,
+        zIndex: 1300,
+      }}>
+        <label style={{
+          background: "rgba(0,0,0,0.72)",
+          color: "#fff",
+          borderRadius: 8,
+          padding: "8px 14px",
+          fontSize: 13,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}>
+          Upload test video
+          <input
+            type="file"
+            accept="video/*"
+            onChange={handleVideoUpload}
+            style={{ display: "none" }}
+          />
+        </label>
+      </div>
+
+      {/* Video element now driven by an uploaded file instead of the live camera */}
       <video
         ref={videoRef}
         autoPlay

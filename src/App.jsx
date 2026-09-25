@@ -191,7 +191,10 @@ export default function App() {
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/ai-text" element={<AiText />} />
       <Route path="/machine-vision" element={<AIVision />} />
-      <Route path="/machine-vision-exhibit" element={<AiExhibit />} />
+      <Route path="/machine-vision-exhibit" element={<AiExhibit classifierMode="recon" />} />
+      <Route path="/machine-vision-recon" element={<AiExhibit classifierMode="recon" />} />
+      <Route path="/machine-vision-exhibit-aricc" element={<AiExhibit classifierMode="aricc" />} />
+      <Route path="/machine-vision-aricc" element={<AiExhibit classifierMode="aricc" />} />
       <Route path="/test" element={<AiVisionTest />} />
       <Route path="/client-ai" element={<ClientSideAIInterface />} />
       <Route path="/face-api" element={<FaceApiInterface />} />
