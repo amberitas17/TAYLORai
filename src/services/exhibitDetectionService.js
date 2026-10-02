@@ -40,6 +40,7 @@ class ExhibitDetectionService {
         this.egnModel = null;  // Energy Story classifier
         this.ariccModel = null; // ARICC exhibit classifier
         this.reconModel = null; // RECON Center exhibit classifier
+        this.fablabModel = null; // FABLAB equipment classifier
         this.macModel = null;  // Mechanics Alive classifier
         this.mepModel = null;  // Mind Eye classifier
         this.qsModel = null;   // Quanta School classifier
@@ -69,6 +70,7 @@ class ExhibitDetectionService {
         this.egnMetadata = null;
         this.ariccMetadata = null;
         this.reconMetadata = null;
+        this.fablabMetadata = null;
         this.macMetadata = null;
         this.mepMetadata = null;
         this.qsMetadata = null;
@@ -187,6 +189,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             } else if (requestedMode === 'aricc') {
                 this.gateOnlyMode = false;
                 await this.loadSpecialistModels();
+            } else if (requestedMode === 'fablab') {
+                this.gateOnlyMode = false;
+                await this.loadFablabModel();
             } else {
                 try {
                     if (!this.model) {
@@ -307,6 +312,27 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         }
         this.reconMetadata = await metadataResponse.json();
         console.log('RECON classifier loaded:', this.reconMetadata.displayNames);
+    }
+
+    async loadFablabModel() {
+        if (this.fablabModel && this.fablabMetadata) {
+            return;
+        }
+        const sessionOptions = {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all',
+            logSeverityLevel: 0
+        };
+        const modelPath = '/models/fablab/fablab_classifier.onnx';
+        const metadataPath = '/models/fablab/fablab_classifier_metadata.json';
+        console.log('Loading FABLAB equipment classifier...');
+        this.fablabModel = await this.createCachedONNXSession(modelPath, sessionOptions);
+        const metadataResponse = await fetch(metadataPath, { cache: 'default' });
+        if (!metadataResponse.ok) {
+            throw new Error(`FABLAB metadata request failed: ${metadataResponse.status}`);
+        }
+        this.fablabMetadata = await metadataResponse.json();
+        console.log('FABLAB classifier loaded:', this.fablabMetadata.displayNames);
     }
 
     async loadExhibitGateModel() {
@@ -938,7 +964,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 return {
                     success: false,
                     reason: 'unknown_exhibit',
-                    zone: this.classifierMode === 'aricc' ? 'ARICC' : 'RECON',
+                    zone: this.classifierMode === 'aricc'
+                        ? 'ARICC'
+                        : this.classifierMode === 'fablab' ? 'FABLAB' : 'RECON',
                     exhibit: 'Unknown / Unrecognized Exhibit',
                     message: 'No exhibit detected',
                     classifier: this.classifierMode
@@ -980,7 +1008,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 ? Boolean(this.reconModel && this.reconMetadata)
                 : this.classifierMode === 'aricc'
                     ? Boolean(this.ariccModel && this.ariccMetadata)
-                    : Boolean(this.model);
+                    : this.classifierMode === 'fablab'
+                        ? Boolean(this.fablabModel && this.fablabMetadata)
+                        : Boolean(this.model);
             if (!hasRequestedClassifier || (this.gateOnlyMode && !hasRequestedClassifier)) {
                 await this.logRejectedFrame(imageElement, 'main_classifier_unavailable', {
                     exhibitConfidence: gateResult.exhibitConfidence
@@ -1102,6 +1132,51 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     specificConfidenceGap: ariccResult.confidenceGap,
                     gate: gateResult,
                     classifier: 'aricc'
+                };
+            }
+
+            if (this.classifierMode === 'fablab' && this.fablabModel && this.fablabMetadata) {
+                const fablabResult = await this.runZoneSpecificInference(imageElement, 'FABLAB');
+                const fablabDisplayName = fablabResult.displayName || fablabResult.exhibit;
+                if (isUnknownSpecialistResult(fablabResult)) {
+                    await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                        classifier: 'fablab',
+                        predictedClass: fablabDisplayName,
+                        confidence: fablabResult.confidence,
+                        confidenceGap: fablabResult.confidenceGap,
+                        requiredConfidence: SPECIALIST_MIN_CONFIDENCE
+                    });
+                    return {
+                        success: false,
+                        reason: 'unknown_exhibit',
+                        zone: 'FABLAB',
+                        exhibit: 'Unknown / Unrecognized Equipment',
+                        exhibitConfidence: fablabResult.confidence,
+                        specificConfidenceGap: fablabResult.confidenceGap,
+                        message: 'Frame is outside the confident FABLAB classes',
+                        gate: gateResult,
+                        classifier: 'fablab'
+                    };
+                }
+                return {
+                    success: true,
+                    zone: 'FABLAB',
+                    zoneConfidence: fablabResult.confidence,
+                    exhibit: fablabResult.exhibit,
+                    exhibitConfidence: fablabResult.confidence,
+                    combinedConfidence: fablabResult.confidence,
+                    exhibitInfo: {
+                        displayName: fablabDisplayName,
+                        code: fablabResult.exhibit,
+                        number: fablabResult.exhibit
+                    },
+                    coordinates: this.getExhibitCoordinates('default', 'default'),
+                    detectionTime: new Date().toISOString(),
+                    isLikelyBackground: fablabResult.isLikelyBackground,
+                    mainConfidenceGap: fablabResult.confidenceGap,
+                    specificConfidenceGap: fablabResult.confidenceGap,
+                    gate: gateResult,
+                    classifier: 'fablab'
                 };
             }
 
@@ -2051,6 +2126,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             'EGN': { model: this.egnModel, metadata: this.egnMetadata, name: 'Energy Story', emoji: '⚙️' },
             'ARICC': { model: this.ariccModel, metadata: this.ariccMetadata, name: 'ARICC', emoji: '🏭' },
             'RECON': { model: this.reconModel, metadata: this.reconMetadata, name: 'RECON Center', emoji: '🔬' },
+            'FABLAB': { model: this.fablabModel, metadata: this.fablabMetadata, name: 'FABLAB', emoji: '🛠️' },
             'MAC': { model: this.macModel, metadata: this.macMetadata, name: 'Mechanics Alive', emoji: '🔧' },
             'MEP': { model: this.mepModel, metadata: this.mepMetadata, name: 'Mind Eye', emoji: '👁️' },
             'QS': { model: this.qsModel, metadata: this.qsMetadata, name: 'Quanta School', emoji: '🎓' },

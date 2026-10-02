@@ -1016,7 +1016,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     if (!detection.success) {
       acceptStreakRef.current = 0;
       rejectStreakRef.current += 1;
-      if (detection.classifier === 'aricc' || detection.zone === 'ARICC') {
+      if (['aricc', 'fablab'].includes(detection.classifier) || ['ARICC', 'FABLAB'].includes(detection.zone)) {
         setCurrentExhibit(null);
         setStableExhibitDetected(false);
         setLocationDetected(false);
@@ -1051,7 +1051,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         setStableExhibitDetected(false);
         setLocationDetected(false);
         setStatusMessage('No exhibit detected');
-        console.log("🚫 Unknown exhibit: no confident ARICC/RECON class match.");
+        console.log("🚫 Unknown exhibit: no confident classifier match.");
       } else if (detection.reason === 'no_exhibit_detected') {
         setStatusMessage(`No exhibit detected (${((detection.maxConfidence || 0) * 100).toFixed(1)}% max confidence)`);
         console.log("🚫 Confidence filter: Low confidence background detected in frame — hiding exhibit.");

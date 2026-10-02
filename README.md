@@ -11,33 +11,55 @@ This is a **completely client-side** React.js application that provides real-tim
 - **Complete Client-Side Processing** - no data sent to servers
 - **Professional UI** with Singapore Science Centre branding
 
-## 🚀 Quick Start
+## 🚀 Run Locally
 
 ### Prerequisites
-- Node.js (version 14 or higher)
-- npm or yarn
+- Node.js 18 or higher
+- npm
 - Web browser with camera access
 
-### Installation & Setup
+### Frontend Setup
 
-1. **Clone and navigate to the project:**
-   ```bash
-   cd singaporesciencecenterpwa
+1. **Open PowerShell in the project folder:**
+   ```powershell
+   cd E:\TAYLORai
    ```
 
 2. **Install dependencies:**
-   ```bash
+   ```powershell
    npm install
    ```
 
-3. **Start the development server:**
-   ```bash
-   npm run dev
+3. **Start the Vite development server:**
+   ```powershell
+   npm run dev -- --host 127.0.0.1 --port 5173
    ```
 
-4. **Open your browser:**
-   - Navigate to `http://localhost:5173` (or the port shown in terminal)
-   - Allow camera permissions when prompted
+4. **Open `http://127.0.0.1:5173/`** and allow camera access when prompted.
+
+The main client-side emotion detection flow works without a backend. Use `/face-api` for the face-api.js interface or `/` for the main app.
+
+### Optional Backend
+
+Only start the backend when testing features that explicitly use it. Open a second PowerShell window:
+
+```powershell
+cd E:\TAYLORai\backend
+npm install
+npm run dev
+```
+
+The backend normally listens on the port configured by `backend/src/server-minimal.js`. Keep the Vite terminal running at the same time.
+
+### Create a Production Build
+
+```powershell
+cd E:\TAYLORai
+npm run build
+npm run preview
+```
+
+Open the preview URL printed by Vite. To check code quality, run `npm run lint`.
 
 ### How TAYLOR Runs
 
@@ -403,6 +425,49 @@ src/
 ### White Screen or Blank TAYLOR Page
 
 Use these steps when `http://localhost:5173` shows only a white page.
+
+#### Quick Debug for `127.0.0.1:5174`
+
+If the browser opens `http://127.0.0.1:5174/` and stays white or shows
+`Loading`, that port is usually owned by a stale or duplicate Vite process.
+Stop the old Node processes and start one clean server on the documented port:
+
+```powershell
+Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force
+cd E:\TAYLORai
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+Then open exactly:
+
+```text
+http://127.0.0.1:5173/
+```
+
+Confirm that the server responds before debugging React:
+
+```powershell
+(Invoke-WebRequest -Uri http://127.0.0.1:5173/ -UseBasicParsing).StatusCode
+```
+
+The expected result is `200`. If the page is still blank, open browser
+developer tools with `F12`, check the **Console** for the first red error, and
+check the **Network** tab for failed requests to `/src/main.jsx` or
+`/@vite/client`.
+
+If Vite reports that it is ready but the request still hangs, use the built
+frontend to confirm the application itself works:
+
+```powershell
+cd E:\TAYLORai
+npm run build
+npm run preview -- --host 127.0.0.1 --port 5173
+```
+
+Open `http://127.0.0.1:5173/` again. If preview works but `npm run dev` does
+not, the problem is the development server or dependency scanner, not the
+React page. Stop any old Node processes before switching between the two
+commands.
 
 1. **Check whether React mounted**
    - Open browser developer tools with `F12` and select the **Console** tab.
