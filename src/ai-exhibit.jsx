@@ -632,6 +632,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const pendingLabelRef = useRef("");
   const pendingLabelCountRef = useRef(0);
   const lastAcceptedAtRef = useRef(0);
+  const [recognitionDebug, setRecognitionDebug] = useState(null);
 
   const stopCameraStream = () => {
     const stream = cameraStreamRef.current;
@@ -1052,17 +1053,19 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     console.log("✅ Hierarchical detection completed:", detection);
 
     if (!detection.success) {
+      pendingLabelRef.current = "";
+      pendingLabelCountRef.current = 0;
+      setCurrentExhibit(null);
+      setStableExhibitDetected(false);
+      setLocationDetected(false);
       acceptStreakRef.current = 0;
       rejectStreakRef.current += 1;
-      if (['aricc', 'fablab'].includes(detection.classifier) || ['ARICC', 'FABLAB'].includes(detection.zone)) {
-        setCurrentExhibit(null);
-        setStableExhibitDetected(false);
-        setLocationDetected(false);
-      }
-      if (rejectStreakRef.current >= 2 && !currentExhibit) {
-        setStableExhibitDetected(false);
-        setLocationDetected(false);
-      }
+      setRecognitionDebug({
+        top1: detection.top1 || { class: 'UNKNOWN', confidence: detection.mainConfidence || 0 },
+        top2: detection.top2 || { class: 'UNKNOWN', confidence: 0 },
+        inferenceTime: detection.detectionTime || detection.processingTime || 0,
+        confirmationCount: 0
+      });
 
       if (detection.reason === 'noise_rejected') {
         setStatusMessage(`No exhibit detected (${((detection.exhibitConfidence || 0) * 100).toFixed(1)}% exhibit)`);
@@ -1108,13 +1111,10 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         console.log("⚠️ Detection not successful — hiding exhibit.");
       }
       setTimeout(() => setStatusMessage(""), 1500);
-      // Keep the last confirmed exhibit visible, matching the reference behavior.
-      // Noise/floor frames should not erase the label at the top of the camera.
       return;
     }
 
     const combinedConfidence = detection.combinedConfidence || detection.zoneConfidence || 0;
-    const SHOW_THRESHOLD = 0.6;
     const detectedName = detection.exhibitInfo?.displayName || detection.exhibit || "";
     const detectedZone = detection.zone || "";
     const hasRealLabel = Boolean(
@@ -1129,7 +1129,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       `🔍 Combined confidence: ${(combinedConfidence * 100).toFixed(1)}% (${detection.zone} / ${detection.exhibitInfo?.displayName || detection.exhibit})`
     );
 
-    if (!hasRealLabel || combinedConfidence < SHOW_THRESHOLD) {
+    if (!hasRealLabel || !detection.isRecognized || combinedConfidence < 0.80 || (detection.specificConfidenceGap || detection.mainConfidenceGap || 0) < 0.15) {
+      pendingLabelRef.current = "";
+      pendingLabelCountRef.current = 0;
       setCurrentExhibit(null);
       setStableExhibitDetected(false);
       setLocationDetected(false);
@@ -1145,12 +1147,14 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       pendingLabelCountRef.current = 1;
     }
 
-    const isSwitchingLabel = Boolean(currentExhibit?.name && currentExhibit.name !== detectedName);
-    const requiredHits = isSwitchingLabel ? 3 : 2;
-    const switchCooldownActive = isSwitchingLabel &&
-      Date.now() - lastAcceptedAtRef.current < 4000;
+    setRecognitionDebug({
+      top1: detection.top1 || { class: detectedName, confidence: combinedConfidence },
+      top2: detection.top2 || { class: 'UNKNOWN', confidence: 0 },
+      inferenceTime: detection.processingTime || 0,
+      confirmationCount: pendingLabelCountRef.current
+    });
 
-    if (!switchCooldownActive && pendingLabelCountRef.current >= requiredHits) {
+    if (pendingLabelCountRef.current >= 3) {
       const exhibit = {
         id: detection.exhibitInfo?.number || '00',
         name: detectedName,
@@ -1216,7 +1220,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         console.log('🏛️ Detection result:', detection);
 
         // Handle hierarchical detection results
-        if (detection.success && detection.combinedConfidence > 0.1) {
+        if (detection.success && detection.isRecognized && detection.combinedConfidence >= 0.8 &&
+          (detection.specificConfidenceGap || detection.mainConfidenceGap || 0) >= 0.15) {
           // Create hierarchical exhibit object for manual detection
           const hierarchicalExhibit = {
             id: detection.exhibitInfo.number,
@@ -1233,13 +1238,10 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           setCurrentExhibit(hierarchicalExhibit);
           console.log(`✅ Manual detection: ${detection.zone} → ${detection.exhibitInfo.displayName} (${(detection.combinedConfidence * 100).toFixed(1)}%)`);
         } else {
-          // If confidence is low, show the best guess but with a warning
-          const bestGuess = exhibitPath[0]; // Default fallback
-
-          setLocationDetected(true);
-          setShowCamera(false);
-          setCurrentExhibit(bestGuess);
-          setError(`Low confidence detection (${(detection.combinedConfidence * 100).toFixed(1)}%). Result may be inaccurate.`);
+          setLocationDetected(false);
+          setCurrentExhibit(null);
+          setStableExhibitDetected(false);
+          setError('No exhibit detected. The classifier was not confident enough.');
         }
       }
 
@@ -1557,6 +1559,26 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     </div>
   </div>
 )}
+    {import.meta.env.DEV && recognitionDebug && (
+      <div style={{
+        position: "absolute",
+        left: 12,
+        bottom: 12,
+        zIndex: 1300,
+        background: "rgba(0,0,0,0.72)",
+        color: "#fff",
+        borderRadius: 6,
+        padding: "8px 10px",
+        fontSize: 11,
+        lineHeight: 1.45,
+        fontFamily: "monospace"
+      }}>
+        <div>Top 1: {recognitionDebug.top1.class} {(recognitionDebug.top1.confidence * 100).toFixed(1)}%</div>
+        <div>Top 2: {recognitionDebug.top2.class} {(recognitionDebug.top2.confidence * 100).toFixed(1)}%</div>
+        <div>Inference: {Number(recognitionDebug.inferenceTime || 0).toFixed(0)} ms</div>
+        <div>Confirmation: {recognitionDebug.confirmationCount}/3</div>
+      </div>
+    )}
       {/* Upload video for testing (replaces the live camera feed) */}
       <div style={{
         position: "absolute",

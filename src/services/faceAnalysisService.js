@@ -138,6 +138,55 @@ class FaceAnalysisService {
       };
     }
   }
+
+  async postPrediction(path, base64Image) {
+    const response = await fetch(`${this.faceAnalysisUrl}/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: `data:image/jpeg;base64,${base64Image}` })
+    });
+
+    if (!response.ok) {
+      throw new Error(`TensorFlow.js ${path} request failed with status: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async detectFacesFromBase64(base64Image) {
+    const data = await this.postPrediction('detect-faces', base64Image);
+    return {
+      success: data.success === true,
+      faces: data.faces || [],
+      count: data.count || 0
+    };
+  }
+
+  async detectEmotionFromBase64(base64Image) {
+    const data = await this.postPrediction('emotion', base64Image);
+    const emotion = data.result?.emotion || {};
+    return {
+      success: data.success !== false,
+      emotion: emotion.predicted || 'Unknown',
+      emotionConfidence: emotion.confidence || 0,
+      allEmotions: emotion.probabilities || {}
+    };
+  }
+
+  async detectAgeGenderFromBase64(base64Image) {
+    const data = await this.postPrediction('age-gender', base64Image);
+    const result = data.result || {};
+    const age = result.age || {};
+    const gender = result.gender || {};
+    return {
+      success: data.success !== false,
+      age: age.estimated,
+      ageGroup: age.group || 'Unknown',
+      ageConfidence: age.confidence || 0,
+      gender: gender.label || 'Unknown',
+      genderConfidence: gender.confidence || 0
+    };
+  }
 }
 
 // Export service instance and type definition

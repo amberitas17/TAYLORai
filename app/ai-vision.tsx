@@ -15,7 +15,6 @@ import Animated, {
 import { Camera, Shield, CheckCircle, User, Settings, Smile, Upload, Eye, Zap } from 'lucide-react-native';
 import { faceAnalysisService, FaceAnalysisResult } from '../src/services/faceAnalysisService.js';
 import { useFaceVerification } from '../src/contexts/FaceVerificationContext.jsx';
-import { personDetectionService } from '../src/services/personDetectionService.js';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,9 +29,18 @@ export default function FaceVerification() {
   const [selectedMode, setSelectedMode] = useState<'camera' | 'upload' | null>(null);
   const [personDetected, setPersonDetected] = useState(false);
   const [detectionActive, setDetectionActive] = useState(true);
+  const [avatarReady, setAvatarReady] = useState(false);
   const [entertainmentPhase, setEntertainmentPhase] = useState<'detecting' | 'greeting' | 'analyzing' | 'complete'>('detecting');
   const cameraRef = useRef<CameraView>(null);
   const detectionInterval = useRef<any>(null);
+  const faceDetectionLock = useRef(false);
+  const emotionInferenceLock = useRef(false);
+  const ageInferenceLock = useRef(false);
+  const captureLock = useRef(false);
+  const recognitionStarted = useRef(false);
+  const mountedRef = useRef(true);
+  const avatarFirstRendered = useRef(false);
+  const pageOpenedAt = useRef(performance.now());
 
   const fadeValue = useSharedValue(0);
   const pulseValue = useSharedValue(1);
@@ -52,21 +60,40 @@ export default function FaceVerification() {
 
     checkBackendHealth();
 
-    console.log('🚀 Skipping person detection, starting entertainment sequence in 2 seconds...');
-    setTimeout(() => {
-      startEntertainmentSequence();
-    }, 2000);
+    void preloadAvatar();
 
     return () => {
-      if (detectionInterval.current) {
-        clearInterval(detectionInterval.current);
+      mountedRef.current = false;
+      stopFaceDetection();
+      const timers = (globalThis as any).__sscRecognitionTimers;
+      if (timers) {
+        clearInterval(timers.emotionTimer);
+        clearInterval(timers.ageTimer);
       }
     };
   }, []);
 
+  const preloadAvatar = async () => {
+    const startedAt = performance.now();
+    if ((globalThis as any).__sscAvatarPreloaded) {
+      setAvatarReady(true);
+      console.log(`[AI PERF] avatarPreloadTime: ${(performance.now() - startedAt).toFixed(0)}ms (cached)`);
+      return;
+    }
+
+    // The first avatar surface is bundled with this screen. Resolve it in the
+    // background so it never blocks camera startup or face detection.
+    await Promise.resolve();
+    (globalThis as any).__sscAvatarPreloaded = true;
+    if (mountedRef.current) setAvatarReady(true);
+    console.log(`[AI PERF] avatarPreloadTime: ${(performance.now() - startedAt).toFixed(0)}ms`);
+  };
+
   const checkBackendHealth = async () => {
+    const startedAt = performance.now();
     const isHealthy = await faceAnalysisService.checkHealth();
     setBackendStatus(isHealthy);
+    console.log(`[AI PERF] faceModelLoadTime: ${(performance.now() - startedAt).toFixed(0)}ms`);
 
     if (!isHealthy) {
       console.warn('Flask backend not available. Please check connection.');
@@ -75,10 +102,105 @@ export default function FaceVerification() {
     }
   };
 
-  const startEntertainmentSequence = async () => {
-    console.log('🎭 Starting face analysis directly...');
-    setEntertainmentPhase('analyzing');
-    handleStartVerification();
+  
+  const stopFaceDetection = () => {
+    if (detectionInterval.current) {
+      clearTimeout(detectionInterval.current);
+      detectionInterval.current = null;
+    }
+  };
+
+  const captureFrame = async (quality: number) => {
+    if (captureLock.current || !cameraRef.current) return null;
+    captureLock.current = true;
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality });
+      return photo.base64 || null;
+    } finally {
+      captureLock.current = false;
+    }
+  };
+
+  const startFaceDetection = () => {
+    stopFaceDetection();
+    const poll = async () => {
+      if (!mountedRef.current || !detectionActive || personDetected) return;
+      if (!faceDetectionLock.current) {
+        faceDetectionLock.current = true;
+        const startedAt = performance.now();
+        try {
+          const base64 = await captureFrame(0.25);
+          if (base64) {
+            const result = await faceAnalysisService.detectFacesFromBase64(base64);
+            console.log(`[AI PERF] faceDetectionTime: ${(performance.now() - startedAt).toFixed(0)}ms`);
+            if (result.count > 0 && mountedRef.current) {
+              setPersonDetected(true);
+              setDetectionActive(false);
+              setEntertainmentPhase('analyzing');
+              console.log(`[AI PERF] firstFaceDetectedTime: ${(performance.now() - pageOpenedAt.current).toFixed(0)}ms after page open`);
+              stopFaceDetection();
+              startAsyncRecognition();
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn('Face detection poll failed:', error);
+        } finally {
+          faceDetectionLock.current = false;
+        }
+      }
+      if (mountedRef.current && detectionActive && !personDetected) {
+        detectionInterval.current = setTimeout(poll, 250);
+      }
+    };
+    poll();
+  };
+
+  const startAsyncRecognition = async () => {
+    if (recognitionStarted.current) return;
+    recognitionStarted.current = true;
+
+    const runEmotion = async () => {
+      if (emotionInferenceLock.current || !mountedRef.current) return;
+      emotionInferenceLock.current = true;
+      const startedAt = performance.now();
+      try {
+        const base64 = await captureFrame(0.6);
+        if (base64) {
+          const result = await faceAnalysisService.detectEmotionFromBase64(base64);
+          setDetectedProfile(previous => ({ ...(previous || {}), ...result } as FaceAnalysisResult));
+        }
+      } catch (error) {
+        console.warn('Emotion inference failed; avatar remains active:', error);
+      } finally {
+        emotionInferenceLock.current = false;
+        console.log(`[AI PERF] emotionInferenceTime: ${(performance.now() - startedAt).toFixed(0)}ms`);
+      }
+    };
+
+    const runAge = async () => {
+      if (ageInferenceLock.current || !mountedRef.current) return;
+      ageInferenceLock.current = true;
+      const startedAt = performance.now();
+      try {
+        const base64 = await captureFrame(0.6);
+        if (base64) {
+          const result = await faceAnalysisService.detectAgeGenderFromBase64(base64);
+          setDetectedProfile(previous => ({ ...(previous || {}), ...result } as FaceAnalysisResult));
+        }
+      } catch (error) {
+        console.warn('Age inference failed; avatar remains active:', error);
+      } finally {
+        ageInferenceLock.current = false;
+        console.log(`[AI PERF] ageInferenceTime: ${(performance.now() - startedAt).toFixed(0)}ms`);
+      }
+    };
+
+    void runEmotion();
+    void runAge();
+    const emotionTimer = setInterval(runEmotion, 400);
+    const ageTimer = setInterval(runAge, 1500);
+    (globalThis as any).__sscRecognitionTimers = { emotionTimer, ageTimer };
   };
 
   useEffect(() => {
@@ -87,6 +209,13 @@ export default function FaceVerification() {
       scanLineValue.value = withRepeat(withTiming(1, { duration: 2000 }), -1, false);
     }
   }, [isVerifying]);
+
+  useEffect(() => {
+    if (personDetected && avatarReady && !avatarFirstRendered.current) {
+      avatarFirstRendered.current = true;
+      console.log(`[AI PERF] avatarFirstRenderTime: ${performance.now().toFixed(0)}ms`);
+    }
+  }, [personDetected, avatarReady]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: fadeValue.value,
@@ -261,28 +390,6 @@ export default function FaceVerification() {
     );
   }
 
-  if (entertainmentPhase === 'greeting') {
-    return (
-      <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.container}>
-        <Animated.View style={[styles.content, animatedStyle, greetingStyle]}>
-          <View style={styles.aiGreetingContainer}>
-            <Animated.View style={[styles.aiEye, eyeStyle]}>
-              <Eye color="white" size={60} />
-            </Animated.View>
-            <Text style={styles.aiGreetingTitle}>Hello there! 👋</Text>
-            <Text style={styles.aiGreetingSubtitle}>I can see you! Let me analyze who you are...</Text>
-
-            <View style={styles.pulsingDots}>
-              <View style={styles.dot} />
-              <View style={styles.dot} />
-              <View style={styles.dot} />
-            </View>
-          </View>
-        </Animated.View>
-      </LinearGradient>
-    );
-  }
-
   return (
     <LinearGradient colors={['#FF6B35', '#FF8C42']} style={styles.container}>
       <Animated.View style={[styles.content, animatedStyle]}>
@@ -319,7 +426,10 @@ export default function FaceVerification() {
               ref={cameraRef}
               style={styles.camera}
               facing={facing}
-              onCameraReady={() => console.log('🎥 AI Camera ready')}
+              onCameraReady={() => {
+                console.log(`[AI PERF] cameraReadyTime: ${(performance.now() - pageOpenedAt.current).toFixed(0)}ms after page open`);
+                startFaceDetection();
+              }}
             />
           </View>
         </View>
@@ -328,7 +438,7 @@ export default function FaceVerification() {
           <View style={styles.statusRow}>
             <View style={[styles.statusDot, { backgroundColor: personDetected ? '#4CAF50' : '#FFC107' }]} />
             <Text style={styles.statusText}>
-              {personDetected ? 'Person Detected' : 'Waiting for visitor...'}
+              {personDetected ? 'Visitor detected' : 'Waiting for visitor...'}
             </Text>
           </View>
 
@@ -338,6 +448,12 @@ export default function FaceVerification() {
               {backendStatus ? 'AI Models Ready' : 'Loading AI...'}
             </Text>
           </View>
+          {detectedProfile?.emotion && detectedProfile.emotion !== 'Unknown' && (
+            <Text style={styles.statusText}>Emotion: {detectedProfile.emotion}</Text>
+          )}
+          {detectedProfile?.ageGroup && detectedProfile.ageGroup !== 'Unknown' && (
+            <Text style={styles.statusText}>Age group: {detectedProfile.ageGroup}</Text>
+          )}
         </View>
 
         <View style={styles.infoSection}>

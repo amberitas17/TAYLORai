@@ -11,6 +11,8 @@ const MODEL_ASSET_VERSION = '20260925-gate-v2';
 const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
 const MODEL_REQUEST_TIMEOUT_MS = 8000;
 const MODEL_RETRY_DELAYS_MS = [500, 1500, 3500];
+const RECOGNITION_MIN_CONFIDENCE = 0.80;
+const RECOGNITION_MIN_MARGIN = 0.15;
 
 // Configure ORT-Web to use matching WASM files (OpenAI solution)
 console.log('🔧 Configuring ORT-Web with matching WASM files...');
@@ -1261,21 +1263,26 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 return mainResult;
             }
 
-            const MAIN_MODEL_MIN_CONFIDENCE = 0.5;
-            if (mainResult.confidence < MAIN_MODEL_MIN_CONFIDENCE) {
-                console.log(`🚫 Main model confidence too low: ${(mainResult.confidence * 100).toFixed(1)}% (required: ${(MAIN_MODEL_MIN_CONFIDENCE * 100).toFixed(0)}%)`);
+            if (!mainResult.isRecognized) {
+                console.log(`🚫 Main model rejected: ${(mainResult.confidence * 100).toFixed(1)}% top confidence, ${(mainResult.confidenceGap * 100).toFixed(1)}% margin`);
                 await this.logRejectedFrame(imageElement, 'low_main_confidence', {
                     predictedClass: mainResult.class,
                     mainConfidence: mainResult.confidence,
-                    requiredConfidence: MAIN_MODEL_MIN_CONFIDENCE,
+                    requiredConfidence: RECOGNITION_MIN_CONFIDENCE,
                     confidenceGap: mainResult.confidenceGap
                 });
                 return {
                     success: false,
-                    reason: 'low_main_confidence',
+                    reason: mainResult.confidence < RECOGNITION_MIN_CONFIDENCE ? 'low_main_confidence' : 'low_main_confidence_gap',
+                    class: 'UNKNOWN',
+                    exhibit: 'UNKNOWN',
                     mainConfidence: mainResult.confidence,
-                    requiredConfidence: MAIN_MODEL_MIN_CONFIDENCE,
-                    message: `Zone confidence too low: ${(mainResult.confidence * 100).toFixed(1)}%`,
+                    mainConfidenceGap: mainResult.confidenceGap,
+                    requiredConfidence: RECOGNITION_MIN_CONFIDENCE,
+                    requiredConfidenceGap: RECOGNITION_MIN_MARGIN,
+                    top1: mainResult.top1,
+                    top2: mainResult.top2,
+                    message: 'UNKNOWN: classifier confidence or margin was insufficient',
                     gate: gateResult
                 };
             }
@@ -1298,25 +1305,6 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 };
             }
 
-            const MAIN_MODEL_MIN_CONFIDENCE_GAP = 0.18;
-            if ((mainResult.confidenceGap || 0) < MAIN_MODEL_MIN_CONFIDENCE_GAP) {
-                await this.logRejectedFrame(imageElement, 'low_main_confidence_gap', {
-                    predictedClass: mainResult.class,
-                    mainConfidence: mainResult.confidence,
-                    confidenceGap: mainResult.confidenceGap,
-                    requiredGap: MAIN_MODEL_MIN_CONFIDENCE_GAP
-                });
-                return {
-                    success: false,
-                    reason: 'low_main_confidence_gap',
-                    mainConfidence: mainResult.confidence,
-                    mainConfidenceGap: mainResult.confidenceGap,
-                    requiredConfidenceGap: MAIN_MODEL_MIN_CONFIDENCE_GAP,
-                    message: `Classifier margin too low: ${(((mainResult.confidenceGap || 0) * 100)).toFixed(1)}%`,
-                    gate: gateResult
-                };
-            }
-
             // Step 2: Zone-specific exhibit classification (DWT / EAP / EGN specialists)
             console.log(`🎯 Step 2: Running ${detectedZone}-specific detection...`);
 
@@ -1334,7 +1322,11 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 specificResult = {
                     exhibit: mainResult.exhibit,
                     confidence: mainResult.confidence,
-                    isLikelyBackground: mainResult.isLikelyBackground
+                    confidenceGap: mainResult.confidenceGap,
+                    isLikelyBackground: mainResult.isLikelyBackground,
+                    isRecognized: mainResult.isRecognized,
+                    top1: mainResult.top1,
+                    top2: mainResult.top2
                 };
             } else {
                 console.log(`${zoneInfo.emoji} Running ${zoneInfo.name} specialist...`);
@@ -1342,23 +1334,23 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.log(`✅ Step 2 completed: ${specificResult.exhibit} (${(specificResult.confidence * 100).toFixed(1)}%)`);
             }
 
-            const SPECIFIC_MIN_CONFIDENCE = 0.45;
+            const SPECIFIC_MIN_CONFIDENCE = RECOGNITION_MIN_CONFIDENCE;
             const zoneDisplayName = zoneInfo?.name || this.config.exhibitMapping[detectedZone] || detectedZone;
-            if (specificResult.confidence < SPECIFIC_MIN_CONFIDENCE) {
+            if (!specificResult.isRecognized || specificResult.confidence < SPECIFIC_MIN_CONFIDENCE) {
                 return {
-                    success: true,
-                    specialistSkipped: true,
+                    success: false,
+                    reason: specificResult.confidence < SPECIFIC_MIN_CONFIDENCE ? 'low_specific_confidence' : 'low_specific_confidence_gap',
+                    class: 'UNKNOWN',
+                    exhibit: 'UNKNOWN',
                     zone: detectedZone,
                     zoneConfidence: mainResult.confidence,
-                    exhibit: detectedZone,
-                    exhibitConfidence: mainResult.confidence,
-                    combinedConfidence: mainResult.confidence,
-                    exhibitInfo: {
-                        displayName: zoneDisplayName,
-                        code: detectedZone,
-                        number: '00'
-                    },
-                    coordinates: this.getExhibitCoordinates(detectedZone, 'default'),
+                    exhibitConfidence: specificResult.confidence,
+                    specificConfidenceGap: specificResult.confidenceGap,
+                    top1: specificResult.top1,
+                    top2: specificResult.top2,
+                    requiredConfidence: SPECIFIC_MIN_CONFIDENCE,
+                    requiredConfidenceGap: RECOGNITION_MIN_MARGIN,
+                    message: 'UNKNOWN: exhibit classifier confidence or margin was insufficient',
                     gate: gateResult
                 };
             }
@@ -1368,7 +1360,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const isBackground = mainResult.isLikelyBackground || specificResult.isLikelyBackground;
 
             return {
-                success: !isBackground,
+                success: !isBackground && specificResult.isRecognized,
                 zone: detectedZone,
                 zoneConfidence: mainResult.confidence,
                 exhibit: specificResult.exhibit,
@@ -1380,6 +1372,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 isLikelyBackground: isBackground,
                 mainConfidenceGap: mainResult.confidenceGap,
                 specificConfidenceGap: specificResult.confidenceGap,
+                isRecognized: mainResult.isRecognized && specificResult.isRecognized,
+                top1: specificResult.top1 || mainResult.top1,
+                top2: specificResult.top2 || mainResult.top2,
+                processingTime: (mainResult.processingTime || 0) + (specificResult.processingTime || 0),
                 gate: gateResult
             };
 
@@ -2070,8 +2066,27 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const sortedProbs = [...probabilities].sort((a, b) => b - a);
             const secondHighest = sortedProbs[1] || 0;
             const confidenceGap = confidence - secondHighest;
-            const MIN_CONFIDENCE_GAP = 0.12;
-            const isLikelyBackground = confidenceGap < MIN_CONFIDENCE_GAP;
+            const isLikelyBackground = confidenceGap < RECOGNITION_MIN_MARGIN;
+            const isRecognized = confidence >= RECOGNITION_MIN_CONFIDENCE &&
+                confidenceGap >= RECOGNITION_MIN_MARGIN &&
+                predictedClass !== this.config.backgroundClass &&
+                predictedClass !== 'UNKNOWN' &&
+                predictedClass !== 'OTHER';
+            const rankedIndices = probabilities
+                .map((probability, index) => ({ probability, index }))
+                .sort((first, second) => second.probability - first.probability);
+            const secondIndex = rankedIndices[1]?.index;
+            const top1 = {
+                class: predictedClass,
+                exhibit: this.config.exhibitMapping[predictedClass] || predictedClass,
+                confidence
+            };
+            const top2Class = this.config.classes[secondIndex] || 'UNKNOWN';
+            const top2 = {
+                class: top2Class,
+                exhibit: this.config.exhibitMapping[top2Class] || 'UNKNOWN',
+                confidence: secondHighest
+            };
 
             console.log(`🔍 Confidence analysis: Top: ${(confidence * 100).toFixed(1)}%, Second: ${(secondHighest * 100).toFixed(1)}%, Gap: ${(confidenceGap * 100).toFixed(1)}%`);
 
@@ -2091,12 +2106,15 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             })).sort((a, b) => b.confidence - a.confidence);
 
             return {
-                exhibit: exhibitKey,
-                class: predictedClass,
+                exhibit: isRecognized ? exhibitKey : 'UNKNOWN',
+                class: isRecognized ? predictedClass : 'UNKNOWN',
                 confidence,
                 classId: maxProbIndex,
                 allDetections,
                 isLikelyBackground,
+                isRecognized,
+                top1,
+                top2,
                 confidenceGap,
                 metadata: {
                     model: this.model.isONNX ?
@@ -2155,6 +2173,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     async runZoneSpecificInference(imageElement, zone) {
         console.log(`🎯 Running zone-specific inference for ${zone}...`);
+        const inferenceStartedAt = performance.now();
         // Get zone-specific model and metadata
         const zoneMap = {
             'AT': { model: this.atModel, metadata: this.atMetadata, name: 'Atrium', emoji: '🏛️' },
@@ -2248,7 +2267,17 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const confidenceGap = Number.isFinite(secondHighest) && Number.isFinite(confidence)
             ? Math.max(0, confidence - secondHighest)
             : 0;
-        const isLikelyBackground = confidenceGap < 0.12;
+        const isLikelyBackground = confidenceGap < RECOGNITION_MIN_MARGIN;
+        const isRecognized = confidence >= RECOGNITION_MIN_CONFIDENCE &&
+            confidenceGap >= RECOGNITION_MIN_MARGIN &&
+            exhibit !== 'UNKNOWN' && exhibit !== 'OTHER';
+        const rankedPredictions = probabilities
+            .map((probability, index) => ({
+                class: classNames[index] || `Unknown_${index}`,
+                exhibit: displayNames[index] || classNames[index] || 'UNKNOWN',
+                confidence: probability
+            }))
+            .sort((first, second) => second.confidence - first.confidence);
 
         console.log(`✅ ${zone} model result: ${exhibit} (${(confidence * 100).toFixed(1)}% confidence)`);
         console.log(`🔍 ${zone} confidence gap: ${(confidenceGap * 100).toFixed(1)}%`);
@@ -2265,11 +2294,15 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
         return {
             exhibit,
-            displayName: displayNames[predictedIdx] || exhibit,
+            displayName: isRecognized ? (displayNames[predictedIdx] || exhibit) : 'UNKNOWN',
             classCode: zone === 'RECON' ? `RECON-${predictedIdx + 1}` : classNames[predictedIdx],
             confidence,
             isLikelyBackground,
-            confidenceGap
+            confidenceGap,
+            isRecognized,
+            top1: rankedPredictions[0],
+            top2: rankedPredictions[1] || { class: 'UNKNOWN', exhibit: 'UNKNOWN', confidence: 0 },
+            processingTime: performance.now() - inferenceStartedAt
         };
     }
 

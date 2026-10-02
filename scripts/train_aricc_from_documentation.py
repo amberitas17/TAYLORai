@@ -33,6 +33,7 @@ CLASS_NAMES = [
     "Robotic Arm",
     "Smart Systems",
     "Speech Home Automation",
+    "OTHER / UNKNOWN",
 ]
 
 
@@ -43,6 +44,8 @@ def remove_readonly(func, path, _exc_info):
 
 def canonical_class_name(stem: str) -> str | None:
     normalized = stem.lower().strip()
+    if normalized.startswith(("other", "unknown", "background", "hard_negative")):
+        return "OTHER / UNKNOWN"
     for class_name in CLASS_NAMES:
         if normalized == class_name.lower() or normalized.startswith(class_name.lower() + " "):
             return class_name
@@ -51,7 +54,11 @@ def canonical_class_name(stem: str) -> str | None:
 
 def collect_videos() -> dict[str, list[Path]]:
     videos: dict[str, list[Path]] = {name: [] for name in CLASS_NAMES}
-    for path in sorted(SOURCE_DIR.iterdir()):
+    source_paths = list(SOURCE_DIR.iterdir())
+    unknown_dir = SOURCE_DIR / "OTHER_UNKNOWN"
+    if unknown_dir.is_dir():
+        source_paths.extend(unknown_dir.iterdir())
+    for path in sorted(source_paths):
         if not path.is_file() or path.suffix.lower() not in {".mov", ".mp4", ".avi", ".mkv"}:
             continue
         class_name = canonical_class_name(path.stem)
@@ -219,7 +226,7 @@ def train(args: argparse.Namespace) -> dict:
     onnx_path = Path(trained.export(format="onnx", imgsz=args.imgsz, simplify=True, opset=12))
     metadata = {
         "model_name": args.run_name,
-        "classes": ["ARICC-1", "ARICC-2", "ARICC-3", "ARICC-4", "ARICC-5", "ARICC-6", "ARICC-7", "ARICC-8"],
+        "classes": [f"ARICC-{index + 1}" for index in range(len(CLASS_NAMES))],
         "displayNames": CLASS_NAMES,
         "trained_at": __import__("datetime").datetime.now().isoformat(),
         "source_dataset": str(SOURCE_DIR),
