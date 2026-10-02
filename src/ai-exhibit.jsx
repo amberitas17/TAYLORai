@@ -618,6 +618,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [locationDetected, setLocationDetected] = useState(false);
   const [currentExhibit, setCurrentExhibit] = useState(null);
   const [detectionService, setDetectionService] = useState(null);
+  const detectionServiceRef = useRef(null);
   const [lastDetection, setLastDetection] = useState(null);
   const [stableExhibitDetected, setStableExhibitDetected] = useState(false);
   const [stayOnCamera, setStayOnCamera] = useState(true); // Keep camera active by default
@@ -690,27 +691,60 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     return "";
   };
 
-  // Update your initialization effect:
   useEffect(() => {
+    let cancelled = false;
+    const initializationTimeoutMs = 12000;
     const initService = async () => {
+      const startedAt = performance.now();
       try {
         setIsLoading(true);
-        setLoadingMessage('Initializing exhibit detection service...');
-        await exhibitDetectionService.initialize({ classifier: classifierMode });
-        setDetectionService(exhibitDetectionService);
-        window.exhibitDetectionService = exhibitDetectionService;
-        setIsLoading(false);
+        setLoadingMessage('Recognition loading...');
+
+        const initializePromise = exhibitDetectionService.initialize({ classifier: classifierMode });
+        initializePromise.then(() => {
+          if (cancelled) return;
+          console.log(`⏱️ Recognition service ready in ${(performance.now() - startedAt).toFixed(0)}ms`);
+          detectionServiceRef.current = exhibitDetectionService;
+          setDetectionService(exhibitDetectionService);
+          window.exhibitDetectionService = exhibitDetectionService;
+          setIsLoading(false);
+          setLoadingMessage('');
+          setStatusMessage('Recognition ready');
+          window.setTimeout(() => setStatusMessage(''), 1200);
+        }).catch((error) => {
+          if (cancelled) return;
+          console.error('❌ Background recognition initialization failed:', error);
+          setIsLoading(false);
+          setLoadingMessage('');
+          setStatusMessage('Limited connection - preparing offline recognition.');
+        });
+
+        await Promise.race([
+          initializePromise,
+          new Promise((resolve) => window.setTimeout(resolve, initializationTimeoutMs))
+        ]);
+        if (!cancelled && !exhibitDetectionService.isInitialized) {
+          console.warn(`⏱️ Recognition initialization exceeded ${initializationTimeoutMs}ms; camera remains available`);
+          setIsLoading(false);
+          setLoadingMessage('');
+          setStatusMessage('Limited connection - preparing offline recognition.');
+        }
       } catch (error) {
+        if (cancelled) return;
         setIsLoading(false);
-        setError(`Detection service initialization failed: ${error.message}`);
+        setLoadingMessage('');
+        setStatusMessage('Recognition unavailable - camera remains active.');
+        console.error(`❌ Recognition initialization failed after ${(performance.now() - startedAt).toFixed(0)}ms:`, error);
       }
     };
 
     initService();
+    return () => { cancelled = true; };
   }, [classifierMode]);
 
   useEffect(() => {
-    if (detectionService && uploadedVideoRef.current && !detectionIntervalRef.current) {
+    if (detectionService && videoRef.current && !detectionIntervalRef.current &&
+        (uploadedVideoRef.current || videoRef.current.srcObject)) {
       startRealTimeDetection();
     }
   }, [detectionService]);
@@ -865,7 +899,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   // Request camera access for live recognition. Uploaded files take precedence.
   useEffect(() => {
-    if (!showCamera || !detectionService || uploadedVideoRef.current || !videoRef.current) return undefined;
+    if (!showCamera || uploadedVideoRef.current || !videoRef.current) return undefined;
 
     let cancelled = false;
     const startCamera = async () => {
@@ -874,6 +908,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         return;
       }
       try {
+        const cameraStartedAt = performance.now();
+        console.time('camera initialization');
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: false
@@ -885,7 +921,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         cameraStreamRef.current = stream;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        startRealTimeDetection();
+        console.timeEnd('camera initialization');
+        console.log(`⏱️ Camera initialized in ${(performance.now() - cameraStartedAt).toFixed(0)}ms`);
+        if (detectionServiceRef.current) startRealTimeDetection();
       } catch (cameraError) {
         console.error('Camera error:', cameraError);
         const message = cameraError.name === 'NotAllowedError'
@@ -901,7 +939,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       stopRealTimeDetection();
       stopCameraStream();
     };
-  }, [showCamera, detectionService]);
+  }, [showCamera]);
 
   // Upload a video file for testing instead of using the live camera
   const handleVideoUpload = (event) => {
@@ -1466,18 +1504,18 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           {loadingMessage}
         </div>
     )}
-    {false && statusMessage && (
+    {statusMessage && (
   <div style={{
     position: "absolute",
-    top: isLoading ? 72 : 32,
+    top: isLoading ? 76 : 32,
     left: "50%",
     transform: "translateX(-50%)",
     background: "rgba(255,255,200,0.95)",
     borderRadius: 8,
     zIndex: 1200,
     padding: "12px 26px",
-    fontWeight: "bold",
-    fontSize: 16,
+    fontWeight: 600,
+    fontSize: 13,
     color: "#444",
     boxShadow: "0 2px 12px rgba(0,0,0,0.10)"
   }}>

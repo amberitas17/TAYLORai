@@ -12,6 +12,26 @@ export default defineConfig({
       manifest: false,
       workbox: {
         maximumFileSizeToCacheInBytes: 100 * 1024 * 1024,
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => (
+              url.pathname.startsWith('/models/') ||
+              url.pathname.includes('/ort/') ||
+              url.pathname.endsWith('.wasm')
+            ),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'taylor-model-assets-v1',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          }
+        ]
       },
       devOptions: {
         enabled: false,

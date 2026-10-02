@@ -26,6 +26,16 @@ class ClientSideFaceAnalysisService {
         faceapi.nets.ageGenderNet.loadFromUri(this.modelPath)
       ]);
 
+      const warmupCanvas = document.createElement('canvas');
+      warmupCanvas.width = 224;
+      warmupCanvas.height = 224;
+      const warmupStartedAt = performance.now();
+      await faceapi
+        .detectSingleFace(warmupCanvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.2 }))
+        .withFaceExpressions()
+        .withAgeAndGender();
+      console.log(`🔥 Face-api warmup completed in ${(performance.now() - warmupStartedAt).toFixed(0)}ms`);
+
       this.isLoaded = true;
       console.log('✅ All face-api.js models loaded successfully in browser!');
       console.log('🏷️ Emotion classes:', this.emotionLabels.join(', '));
@@ -43,7 +53,7 @@ class ClientSideFaceAnalysisService {
    * @param {HTMLImageElement|HTMLCanvasElement|HTMLVideoElement} imageElement - Image element to analyze
    * @returns {Promise<Object>} Analysis result
    */
-  async analyzeFaceFromImage(imageElement) {
+  async analyzeFaceFromImage(imageElement, options = {}) {
     if (!this.isLoaded) {
       throw new Error('Face-api.js models not loaded yet. Please wait for initialization.');
     }
@@ -51,33 +61,33 @@ class ClientSideFaceAnalysisService {
     console.log('🧠 Starting client-side face analysis...');
     const startTime = Date.now();
 
+    const {
+      includeAge = true,
+      retryOnMiss = true,
+      inputSize = 224,
+      scoreThreshold = 0.25
+    } = options;
+
     try {
-      // Use more sensitive detection options
       const detectionOptions = new faceapi.TinyFaceDetectorOptions({
-        inputSize: 512,
-        scoreThreshold: 0.2
+        inputSize,
+        scoreThreshold
       });
 
-      // Perform face detection with all features
-      const detections = await faceapi
-        .detectAllFaces(imageElement, detectionOptions)
-        .withFaceLandmarks()
-        .withFaceExpressions()
-        .withAgeAndGender();
+      let detectionTask = faceapi.detectAllFaces(imageElement, detectionOptions).withFaceExpressions();
+      if (includeAge) detectionTask = detectionTask.withAgeAndGender();
+      const detections = await detectionTask;
 
-      // Retry with even more sensitive settings if no faces found
-      if (detections.length === 0) {
+      if (detections.length === 0 && retryOnMiss) {
         console.log('⚠️  No faces detected, retrying with ultra-sensitive settings...');
         const ultraSensitiveOptions = new faceapi.TinyFaceDetectorOptions({
-          inputSize: 320,
+          inputSize: 224,
           scoreThreshold: 0.1
         });
 
-        const retryDetections = await faceapi
-          .detectAllFaces(imageElement, ultraSensitiveOptions)
-          .withFaceLandmarks()
-          .withFaceExpressions()
-          .withAgeAndGender();
+        let retryTask = faceapi.detectAllFaces(imageElement, ultraSensitiveOptions).withFaceExpressions();
+        if (includeAge) retryTask = retryTask.withAgeAndGender();
+        const retryDetections = await retryTask;
 
         return this.formatResults(retryDetections, startTime);
       }
@@ -174,6 +184,7 @@ class ClientSideFaceAnalysisService {
     const detection = detections[0];
     const expressions = detection.expressions;
     const { age, gender, genderProbability } = detection;
+    const safeGender = gender || 'Unknown';
 
     // Find dominant emotion
     const dominantEmotion = Object.keys(expressions).reduce((a, b) =>
@@ -187,13 +198,16 @@ class ClientSideFaceAnalysisService {
     });
 
     console.log(`✅ Client-side face analysis complete in ${processingTime}ms`);
-    console.log(`👤 Detected: ${Math.round(age)} years old ${gender} (${Math.round(genderProbability * 100)}% confidence)`);
+    if (age !== undefined) {
+      console.log(`👤 Detected: ${Math.round(age)} years old ${gender} (${Math.round((genderProbability || 0) * 100)}% confidence)`);
+    }
     console.log(`😊 Emotion: ${this.capitalizeFirst(dominantEmotion)} (${Math.round(expressions[dominantEmotion] * 100)}% confidence)`);
 
     // Determine age group
-    const ageValue = Math.round(age);
+    const ageValue = age === undefined ? 0 : Math.round(age);
     let ageGroup = 'Adult';
-    if (ageValue < 18) ageGroup = 'Child';
+    if (age === undefined) ageGroup = 'Unknown';
+    else if (ageValue < 18) ageGroup = 'Child';
     else if (ageValue < 65) ageGroup = 'Adult';
     else ageGroup = 'Senior';
 
@@ -203,13 +217,13 @@ class ClientSideFaceAnalysisService {
         age: {
           value: ageValue,
           group: ageGroup,
-          confidence: Math.round(genderProbability * 100)
+          confidence: Math.round((genderProbability || 0) * 100)
         },
         gender: {
-          label: this.capitalizeFirst(gender),
-          confidence: Math.round(genderProbability * 100),
-          Male: gender === 'male' ? genderProbability : 1 - genderProbability,
-          Female: gender === 'female' ? genderProbability : 1 - genderProbability
+          label: this.capitalizeFirst(safeGender),
+          confidence: Math.round((genderProbability || 0) * 100),
+          Male: genderProbability === undefined ? 0 : safeGender === 'male' ? genderProbability : 1 - genderProbability,
+          Female: genderProbability === undefined ? 0 : safeGender === 'female' ? genderProbability : 1 - genderProbability
         },
         emotion: {
           label: this.capitalizeFirst(dominantEmotion),

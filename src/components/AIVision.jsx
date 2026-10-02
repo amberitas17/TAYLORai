@@ -23,6 +23,16 @@ export default function AIVision() {
   const canvasRef = useRef(null);
   const detectionInterval = useRef(null);
   const hasWelcomedRef = useRef(false);
+  const streamRef = useRef(null);
+  const isProcessingRef = useRef(false);
+  const inferenceCancelledRef = useRef(false);
+  const lastAgeAtRef = useRef(0);
+  const ageHistoryRef = useRef([]);
+  const emotionCandidateRef = useRef({ label: '', count: 0 });
+  const latestProfileRef = useRef(null);
+  const faceCropCanvasRef = useRef(null);
+  const inferenceCountRef = useRef(0);
+  const inferenceWindowStartedRef = useRef(performance.now());
 
   useEffect(() => {
     initializeModels();
@@ -30,7 +40,8 @@ export default function AIVision() {
 
     return () => {
       if (detectionInterval.current) clearInterval(detectionInterval.current);
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      inferenceCancelledRef.current = true;
+      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -85,6 +96,7 @@ export default function AIVision() {
       });
 
       setStream(mediaStream);
+      streamRef.current = mediaStream;
       setCameraPermission('granted');
       setFlowError('');
 
@@ -123,97 +135,160 @@ export default function AIVision() {
     textToSpeech(text, false, 'taylor', 'en').then(() => fallbackComplete()).catch(() => fallbackComplete());
   };
 
+  const createFaceCrop = (sourceCanvas, box) => {
+    if (!box) return null;
+    const cropCanvas = faceCropCanvasRef.current || document.createElement('canvas');
+    faceCropCanvasRef.current = cropCanvas;
+    const padding = Math.max(box.width, box.height) * 0.2;
+    const x = Math.max(0, box.x - padding);
+    const y = Math.max(0, box.y - padding);
+    const width = Math.min(sourceCanvas.width - x, box.width + padding * 2);
+    const height = Math.min(sourceCanvas.height - y, box.height + padding * 2);
+    cropCanvas.width = 128;
+    cropCanvas.height = 128;
+    cropCanvas.getContext('2d').drawImage(sourceCanvas, x, y, width, height, 0, 0, 128, 128);
+    return cropCanvas;
+  };
+
+  const applySmoothedResult = (result, ageValue) => {
+    const emotion = result.emotion;
+    const candidate = emotionCandidateRef.current;
+    if (candidate.label === emotion) candidate.count += 1;
+    else emotionCandidateRef.current = { label: emotion, count: 1 };
+
+    const stableEmotion = emotionCandidateRef.current.count >= 2
+      ? emotion
+      : latestProfileRef.current?.emotion || emotion;
+    const profile = {
+      emotion: stableEmotion,
+      emotionConfidence: result.emotionConfidence,
+      allEmotions: result.allEmotions,
+      ageGroup: ageValue === undefined ? (latestProfileRef.current?.ageGroup || 'Unknown') : ageValue < 18 ? 'Child' : ageValue < 65 ? 'Adult' : 'Senior',
+      age: ageValue === undefined ? latestProfileRef.current?.age : ageValue,
+      timestamp: new Date().toISOString()
+    };
+    latestProfileRef.current = { ...latestProfileRef.current, ...profile };
+    setDetectedProfile(prev => ({ ...prev, ...profile }));
+    setPersonDetected(true);
+    localStorage.setItem('latestDetectedEmotionAge', JSON.stringify(profile));
+    return profile;
+  };
+
+  const analyzeFrame = async (canvas) => {
+    const totalStartedAt = performance.now();
+    const result = await clientSideFaceAnalysisService.analyzeFaceFromImage(canvas, {
+      includeAge: false,
+      retryOnMiss: false,
+      inputSize: 224,
+      scoreThreshold: 0.3
+    });
+    const faceDetectionTime = performance.now() - totalStartedAt;
+    let ageValue;
+    let ageInferenceTime = 0;
+
+    if (result?.success && performance.now() - lastAgeAtRef.current >= 1500) {
+      const faceCrop = createFaceCrop(canvas, result.predictions.face_analysis.box);
+      if (faceCrop) {
+        const ageStartedAt = performance.now();
+        const ageResult = await clientSideFaceAnalysisService.analyzeFaceFromImage(faceCrop, {
+          includeAge: true,
+          retryOnMiss: false,
+          inputSize: 128,
+          scoreThreshold: 0.25
+        });
+        ageInferenceTime = performance.now() - ageStartedAt;
+        lastAgeAtRef.current = performance.now();
+        if (ageResult?.success && Number.isFinite(ageResult.predictions.age.value)) {
+          ageHistoryRef.current = [...ageHistoryRef.current, ageResult.predictions.age.value].slice(-3);
+          const sortedAges = [...ageHistoryRef.current].sort((a, b) => a - b);
+          ageValue = sortedAges[Math.floor(sortedAges.length / 2)];
+        }
+      }
+    }
+
+    const totalInferenceTime = performance.now() - totalStartedAt;
+    inferenceCountRef.current += 1;
+    const elapsed = performance.now() - inferenceWindowStartedRef.current;
+    const inferenceFPS = elapsed >= 1000 ? (inferenceCountRef.current * 1000) / elapsed : 0;
+    console.log({
+      faceDetectionTime: Math.round(faceDetectionTime),
+      emotionInferenceTime: Math.round(faceDetectionTime),
+      ageInferenceTime: Math.round(ageInferenceTime),
+      totalInferenceTime: Math.round(totalInferenceTime),
+      inferenceFPS: Number(inferenceFPS.toFixed(2))
+    });
+    if (elapsed >= 1000) {
+      inferenceCountRef.current = 0;
+      inferenceWindowStartedRef.current = performance.now();
+    }
+    return { result, ageValue };
+  };
+
   // Live continuous emotion + age group detection
   useEffect(() => {
-    if (stream && modelStatus === 'ready') {
+    inferenceCancelledRef.current = false;
+    let runInference;
+    if (stream && modelStatus === 'ready' && !document.hidden) {
       if (!isGreeting) {
         setEntertainmentPhase('analyzing');
       }
 
-      detectionInterval.current = setInterval(async () => {
-        if (!videoRef.current || !canvasRef.current) return;
-
+      runInference = async () => {
+        if (inferenceCancelledRef.current || document.hidden || isProcessingRef.current || !videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-
         if (video.videoWidth === 0 || video.videoHeight === 0) return;
+        isProcessingRef.current = true;
+        try {
+          const canvas = canvasRef.current;
+          canvas.width = 224;
+          canvas.height = 224;
+          canvas.getContext('2d').drawImage(video, 0, 0, 224, 224);
+          const { result, ageValue } = await analyzeFrame(canvas);
+          if (!inferenceCancelledRef.current && result?.success) {
+            const profile = applySmoothedResult({
+              emotion: result.predictions.emotion.label,
+              emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
+              allEmotions: result.predictions.all_emotions || {}
+            }, ageValue);
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-
-        const result = await analyzeFrame(canvas);
-
-        if (result && result.success) {
-          setPersonDetected(true);
-          const profile = {
-            emotion: result.emotion,
-            emotionConfidence: result.emotionConfidence,
-            allEmotions: result.allEmotions,
-            ageGroup: result.ageGroup, // adult/child
-            timestamp: result.timestamp
-          };
-
-          setDetectedProfile(profile);
-          localStorage.setItem('latestDetectedEmotionAge', JSON.stringify(profile));
-
-          if (!hasWelcomedRef.current) {
-            const profileWithAge = {
-              ...profile,
-              age: result.age,
-              emotion: result.emotion
-            };
-
-            localStorage.setItem('firstDetectedEmotionAge', JSON.stringify(profileWithAge));
-            navigate('/taylor', { replace: true, state: { detectedProfile: profileWithAge } });
-            speakWelcomeOnce();
+            if (!hasWelcomedRef.current) {
+              localStorage.setItem('firstDetectedEmotionAge', JSON.stringify(profile));
+              navigate('/taylor', { replace: true, state: { detectedProfile: profile } });
+              speakWelcomeOnce();
+            }
           }
-        } else {
-          setPersonDetected(false);
-          setDetectedProfile({
-            emotion: 'No face',
-            emotionConfidence: 0,
-            allEmotions: {},
-            ageGroup: 'Unknown',
-            timestamp: new Date().toISOString()
-          });
+        } catch (error) {
+          if (!inferenceCancelledRef.current) console.error('Analysis error:', error);
+        } finally {
+          isProcessingRef.current = false;
         }
-      }, 1000);
+      };
+
+      detectionInterval.current = setInterval(runInference, 400);
+      runInference();
     }
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        inferenceCancelledRef.current = true;
+        if (detectionInterval.current) clearInterval(detectionInterval.current);
+        detectionInterval.current = null;
+      } else if (stream && modelStatus === 'ready') {
+        inferenceCancelledRef.current = false;
+        if (runInference && !detectionInterval.current) {
+          detectionInterval.current = setInterval(runInference, 400);
+          runInference();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      inferenceCancelledRef.current = true;
       if (detectionInterval.current) clearInterval(detectionInterval.current);
+      detectionInterval.current = null;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [stream, modelStatus, isGreeting]);
-
-  const analyzeFrame = async (canvas) => {
-    try {
-      if (modelStatus !== 'ready') throw new Error('Models not ready');
-
-      const result = await clientSideFaceAnalysisService.analyzeFaceFromImage(canvas);
-
-      if (result && result.success && result.predictions?.face_analysis?.detections_count > 0) {
-        const ageValue = result.predictions.age.value;
-        const ageGroup = ageValue < 18 ? 'Child' : 'Adult';
-
-        return {
-          success: true,
-          age: ageValue,
-          emotion: result.predictions.emotion.label,
-          emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
-          allEmotions: Object.fromEntries(Object.entries(result.predictions.all_emotions || {}).map(([k, v]) => [k, v])),
-          ageGroup: ageGroup,
-          timestamp: new Date().toISOString()
-        };
-      }
-
-      return { success: false };
-    } catch (err) {
-      console.error('Analysis error:', err);
-      return { success: false };
-    }
-  };
 
   const startEntertainmentSequence = async () => {
     console.log('🎭 Starting entertainment sequence...');
@@ -244,14 +319,19 @@ export default function AIVision() {
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
 
-        const result = await analyzeFrame(canvas);
-        if (result && result.success) {
+        const result = await clientSideFaceAnalysisService.analyzeFaceFromImage(canvas, {
+          includeAge: true,
+          retryOnMiss: true,
+          inputSize: 224,
+          scoreThreshold: 0.25
+        });
+        if (result && result.success && result.predictions?.face_analysis?.detections_count > 0) {
           setDetectedProfile({
-            emotion: result.emotion,
-            emotionConfidence: result.emotionConfidence,
-            allEmotions: result.allEmotions,
-            ageGroup: result.ageGroup,
-            timestamp: result.timestamp
+            emotion: result.predictions.emotion.label,
+            emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
+            allEmotions: result.predictions.all_emotions,
+            ageGroup: result.predictions.age.group,
+            timestamp: new Date().toISOString()
           });
           setPersonDetected(true);
         }

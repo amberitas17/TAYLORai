@@ -8,6 +8,9 @@ import * as ort from 'onnxruntime-web';
 import * as faceapi from 'face-api.js';
 
 const MODEL_ASSET_VERSION = '20260925-gate-v2';
+const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
+const MODEL_REQUEST_TIMEOUT_MS = 8000;
+const MODEL_RETRY_DELAYS_MS = [500, 1500, 3500];
 
 // Configure ORT-Web to use matching WASM files (OpenAI solution)
 console.log('🔧 Configuring ORT-Web with matching WASM files...');
@@ -105,6 +108,7 @@ class ExhibitDetectionService {
         this.initializedMode = null;
         this.faceDetectorReady = false;
         this.faceDetectorLoad = null;
+        this.firstInferenceLogged = false;
 
         // Model configuration (will be updated from real metadata)
         this.config = {
@@ -171,6 +175,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             return;
         }
         this.classifierMode = requestedMode;
+        const initializationStartedAt = performance.now();
         try {
             console.log('🎯 Initializing exhibit detection service with ONNX model...');
 
@@ -207,7 +212,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
             this.isInitialized = true;
             this.initializedMode = requestedMode;
-            console.log('✅ Exhibit detection service initialized with ONNX model');
+            console.log(`✅ Exhibit detection service initialized with ONNX model in ${(performance.now() - initializationStartedAt).toFixed(0)}ms`);
 
         } catch (error) {
             console.error('❌ ONNX model initialization failed:', error);
@@ -274,23 +279,60 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             }
             return buffer;
         };
-        if (typeof caches === 'undefined') {
-            const response = await fetch(versionedPath, { cache: 'no-store' });
-            return createSession(await logResponse(response, 'network'));
+        const response = await this.fetchModelResource(versionedPath);
+        const source = response.headers.get('x-taylor-cache-hit') === '1' ? 'cache' : 'network';
+        return createSession(await logResponse(response, source));
+    }
+
+    async fetchModelResource(url, options = {}) {
+        const cacheKey = options.cacheKey || url;
+        const requestOptions = { ...options };
+        delete requestOptions.cacheKey;
+
+        if (typeof caches !== 'undefined') {
+            const cache = await caches.open(MODEL_CACHE_NAME);
+            const cached = await cache.match(cacheKey);
+            if (cached) {
+                console.log(`📦 Model resource cache hit: ${url}`);
+                return cached;
+            }
         }
 
-        const cache = await caches.open(`taylor-onnx-models-${MODEL_ASSET_VERSION}`);
-        let response = await cache.match(versionedPath);
-        if (!response) {
-            response = await fetch(versionedPath, { cache: 'no-store' });
-            const buffer = await logResponse(response, 'network');
-            await cache.put(versionedPath, new Response(buffer, {
-                status: response.status,
-                headers: response.headers
-            }));
-            return createSession(buffer);
+        let lastError;
+        for (let attempt = 0; attempt <= MODEL_RETRY_DELAYS_MS.length; attempt += 1) {
+            const controller = new AbortController();
+            const timeout = window.setTimeout(() => controller.abort(), MODEL_REQUEST_TIMEOUT_MS);
+            const startedAt = performance.now();
+            try {
+                const response = await fetch(url, {
+                    ...requestOptions,
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(`Model resource request failed: ${response.status} ${url}`);
+                if (typeof caches !== 'undefined') {
+                    const cache = await caches.open(MODEL_CACHE_NAME);
+                    await cache.put(cacheKey, response.clone());
+                }
+                console.log(`📥 Model resource downloaded in ${(performance.now() - startedAt).toFixed(0)}ms: ${url}`);
+                return response;
+            } catch (error) {
+                lastError = error;
+                if (attempt === MODEL_RETRY_DELAYS_MS.length) break;
+                const delay = MODEL_RETRY_DELAYS_MS[attempt];
+                console.warn(`⚠️ Model resource attempt ${attempt + 1} failed; retrying in ${delay}ms: ${url}`, error.message);
+                await new Promise((resolve) => window.setTimeout(resolve, delay));
+            } finally {
+                window.clearTimeout(timeout);
+            }
         }
-        return createSession(await logResponse(response, 'cache'));
+        throw lastError;
+    }
+
+    async fetchModelJson(url) {
+        const response = await this.fetchModelResource(url);
+        const data = await response.json();
+        return data;
     }
 
     async loadReconModel() {
@@ -306,11 +348,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const metadataPath = '/models/recon/recon_classifier_metadata.json';
         console.log('Loading cached RECON Center classifier...');
         this.reconModel = await this.createCachedONNXSession(modelPath, sessionOptions);
-        const metadataResponse = await fetch(metadataPath, { cache: 'default' });
-        if (!metadataResponse.ok) {
-            throw new Error(`RECON metadata request failed: ${metadataResponse.status}`);
-        }
-        this.reconMetadata = await metadataResponse.json();
+        this.reconMetadata = await this.fetchModelJson(metadataPath);
         console.log('RECON classifier loaded:', this.reconMetadata.displayNames);
     }
 
@@ -327,11 +365,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const metadataPath = '/models/fablab/fablab_classifier_metadata.json';
         console.log('Loading FABLAB equipment classifier...');
         this.fablabModel = await this.createCachedONNXSession(modelPath, sessionOptions);
-        const metadataResponse = await fetch(metadataPath, { cache: 'default' });
-        if (!metadataResponse.ok) {
-            throw new Error(`FABLAB metadata request failed: ${metadataResponse.status}`);
-        }
-        this.fablabMetadata = await metadataResponse.json();
+        this.fablabMetadata = await this.fetchModelJson(metadataPath);
         console.log('FABLAB classifier loaded:', this.fablabMetadata.displayNames);
     }
 
@@ -348,28 +382,22 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             this.gateModel = await this.createCachedONNXSession('/models/exhibit_gate/exhibit_gate.onnx', sessionOptions);
 
             try {
-                const metadataResponse = await fetch('/models/exhibit_gate/exhibit_gate_metadata.json');
-                if (metadataResponse.ok) {
-                    this.gateMetadata = await metadataResponse.json();
-                    this.gateConfig = {
-                        ...this.gateConfig,
-                        inputSize: this.gateMetadata.inputSize || this.gateConfig.inputSize,
-                        threshold: this.gateMetadata.threshold || this.gateConfig.threshold,
-                        classes: this.gateMetadata.classes || this.gateConfig.classes,
-                        exhibitClassIndex: this.gateMetadata.classToIdx?.exhibit ?? this.gateConfig.exhibitClassIndex
-                    };
-                }
+                this.gateMetadata = await this.fetchModelJson('/models/exhibit_gate/exhibit_gate_metadata.json');
+                this.gateConfig = {
+                    ...this.gateConfig,
+                    inputSize: this.gateMetadata.inputSize || this.gateConfig.inputSize,
+                    threshold: this.gateMetadata.threshold || this.gateConfig.threshold,
+                    classes: this.gateMetadata.classes || this.gateConfig.classes,
+                    exhibitClassIndex: this.gateMetadata.classToIdx?.exhibit ?? this.gateConfig.exhibitClassIndex
+                };
             } catch (metadataError) {
                 console.warn('Gate metadata load failed, using defaults:', metadataError.message);
             }
 
             if (this.useSimilarityGate) {
                 try {
-                    const similarityResponse = await fetch('/models/exhibit_gate/gate_similarity_index.json');
-                    if (similarityResponse.ok) {
-                        this.gateSimilarityIndex = await similarityResponse.json();
-                        console.log('Gate similarity index loaded:', this.gateSimilarityIndex.stats);
-                    }
+                    this.gateSimilarityIndex = await this.fetchModelJson('/models/exhibit_gate/gate_similarity_index.json');
+                    console.log('Gate similarity index loaded:', this.gateSimilarityIndex.stats);
                 } catch (similarityError) {
                     console.warn('Gate similarity index load failed; using YOLO gate only:', similarityError.message);
                 }
@@ -389,6 +417,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     async connectToBackend() {
         console.log('🎯 Connecting to YOUR REAL PyTorch model backend (99.04% accuracy)...');
+        const backendStartedAt = performance.now();
 
         try {
             // Test backend connection
@@ -399,7 +428,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             }
 
             const healthData = await healthResponse.json();
-            console.log('✅ Backend connection successful!');
+            console.log(`✅ Backend connection successful in ${(performance.now() - backendStartedAt).toFixed(0)}ms`);
             console.log(`🏆 Model loaded: ${healthData.model_loaded}`);
             console.log(`📊 Accuracy: ${healthData.accuracy}%`);
 
@@ -449,9 +478,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             try {
                 const metadataPath = '/models/exhibit_models_onnx/main_model/yolov8s_exhibit_fixed_metadata.json';
                 console.log('📋 Loading main model metadata...');
-                const metadataResponse = await fetch(metadataPath);
-                if (metadataResponse.ok) {
-                    this.metadata = await metadataResponse.json();
+                const metadataResponse = await this.fetchModelJson(metadataPath);
+                if (metadataResponse) {
+                    this.metadata = metadataResponse;
                     console.log('✅ Main model metadata loaded successfully!');
                     console.log('📊 Model info:', {
                         architecture: this.metadata.architecture || this.metadata.model_name || 'YOLOv8 classifier',
@@ -524,15 +553,15 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const metadataPath = `/models/exhibit_models_onnx/classifiers_model/${zone.toLowerCase()}_metadata.json`;
 
             // Load model
-            const model = await ort.InferenceSession.create(modelPath, sessionOptions);
+            const model = await this.createCachedONNXSession(modelPath, sessionOptions);
             console.log(`✅ ${zoneName} classifier loaded successfully!`);
 
             // Load metadata
             let metadata = null;
             try {
-                const metadataResponse = await fetch(metadataPath);
-                if (metadataResponse.ok) {
-                    metadata = await metadataResponse.json();
+                const metadataResponse = await this.fetchModelJson(metadataPath);
+                if (metadataResponse) {
+                    metadata = metadataResponse;
                     console.log(`📊 ${zoneName} metadata loaded: ${metadata.num_classes} exhibits`);
                 }
             } catch (metadataError) {
@@ -649,9 +678,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 });
 
                 try {
-                    const metadataResponse = await fetch(specialist.metadataPath);
-                    if (metadataResponse.ok) {
-                        specialist.assignMetadata(await metadataResponse.json());
+                    const metadataResponse = await this.fetchModelJson(specialist.metadataPath);
+                    if (metadataResponse) {
+                        specialist.assignMetadata(metadataResponse);
                         console.log(`✅ ${specialist.label} specialist metadata loaded`);
                         if (specialist.label === 'ARICC') {
                             console.log('🧾 ARICC runtime configuration:', {
@@ -928,6 +957,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
 
     async detectHierarchical(imageElement) {
+        const inferenceStartedAt = performance.now();
+        if (!this.firstInferenceLogged) {
+            console.log('⏱️ First inference started');
+        }
         console.log('🔄 Starting hierarchical detection (v6 with clarity gate + confidence filter)...');
         try {
             // Step -1: Frame clarity gate (optional but recommended)
@@ -1742,12 +1775,18 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const processingTime = performance.now() - startTime;
             console.log(`🏆 Exhibit classifier inference complete in ${processingTime.toFixed(2)}ms`);
 
-            return {
+            const detectionResult = {
                 ...result,
                 success: true,
                 processingTime,
                 timestamp: Date.now()
             };
+
+            if (!this.firstInferenceLogged) {
+                this.firstInferenceLogged = true;
+                console.log(`⏱️ First inference completed in ${(performance.now() - inferenceStartedAt).toFixed(0)}ms`);
+            }
+            return detectionResult;
 
         } catch (error) {
             console.error('❌ Exhibit classifier inference failed:', error);
