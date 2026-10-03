@@ -272,7 +272,21 @@ def train_model(args: argparse.Namespace, summary: dict) -> str:
     onnx_path = Path(trained.export(format="onnx", imgsz=args.imgsz, simplify=True, opset=12))
     labels = sorted({label for split in ("train", "val") for label in summary[split]})
     metadata_path = RUNS_DIR / args.run_name / f"{args.run_name}_metadata.json"
-    metadata_path.write_text(json.dumps({"displayNames": labels, "classes": labels, "dataset_summary": str(args.output / "dataset_summary.json"), "onnx": str(onnx_path)}, indent=2), encoding="utf-8")
+    metadata_path.write_text(json.dumps({
+        "displayNames": labels,
+        "classes": labels,
+        "dataset_summary": str(args.output / "dataset_summary.json"),
+        "onnx": str(onnx_path),
+        "input_shape": [1, 3, args.imgsz, args.imgsz],
+        "inputSize": args.imgsz,
+        "preprocessing": {
+            "mean": [0, 0, 0],
+            "std": [1, 1, 1],
+            "layout": "NCHW",
+            "input_format": "RGB"
+        },
+        "output_type": "logits"
+    }, indent=2), encoding="utf-8")
     return str(onnx_path)
 
 

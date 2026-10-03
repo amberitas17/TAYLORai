@@ -1033,7 +1033,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             console.log('Stage 1: Running binary exhibit/background gate...');
             const gateResult = await this.detectExhibitGate(imageElement);
 
-            if (!gateResult.isExhibit) {
+            const caesarGateAccepted = this.classifierMode === 'caesar' && gateResult.isModelExhibit;
+            if (!gateResult.isExhibit && !caesarGateAccepted) {
                 console.log(`Gate rejected frame as noise/background (${(gateResult.exhibitConfidence * 100).toFixed(1)}% exhibit confidence)`);
                 await this.logRejectedFrame(imageElement, 'noise_rejected', {
                     gateClass: gateResult.predictedClass,
@@ -1962,7 +1963,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             ? model.inputMetadata[inputName]
             : null;
         const rawShape = runtimeInput?.dimensions || runtimeInput?.shape ||
-            metadata?.input_shape || metadata?.inputShape;
+            metadata?.input_shape || metadata?.inputShape ||
+            (modelName === 'CAESAR' ? [1, 3, 224, 224] : null);
         const shape = Array.isArray(rawShape)
             ? rawShape.map(dimension => Number.isFinite(Number(dimension)) ? Number(dimension) : null)
             : null;

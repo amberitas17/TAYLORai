@@ -42,5 +42,14 @@
     "velocity_18r_pro_centrifuge"
   ],
   "dataset_summary": "runs\\caesar_filename_dataset\\dataset_summary.json",
-  "onnx": "E:\\TAYLORai\\runs\\classify\\caesar_filename_v1\\weights\\best.onnx"
+  "onnx": "E:\\TAYLORai\\runs\\classify\\caesar_filename_v1\\weights\\best.onnx",
+  "input_shape": [1, 3, 224, 224],
+  "inputSize": 224,
+  "preprocessing": {
+    "mean": [0, 0, 0],
+    "std": [1, 1, 1],
+    "layout": "NCHW",
+    "input_format": "RGB"
+  },
+  "output_type": "logits"
 }
