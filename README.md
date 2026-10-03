@@ -72,6 +72,59 @@ Open the preview URL printed by Vite. To check code quality, run `npm run lint`.
 
 ## Train RECON Center Exhibit Data
 
+## Train Caesar Multi-Exhibit Data
+
+For mixed recordings, Caesar supports annotation-driven crops as described
+below. When each recording is treated as one exhibit, filename labels can be
+used explicitly:
+
+```powershell
+python scripts\train_caesar_from_annotations.py `
+   --filename-labels `
+   --train `
+   --output runs\caesar_filename_dataset `
+   --run-name caesar_filename_v1
+```
+
+This run strips trailing recording numbers, so `Analytical Balance 2.MOV`
+and `Analytical Balance.MOV` share a class. It also normalizes the known
+`Multi-Paramter` filename typo into `multi_parameter`. The `img` class created
+from `IMG_*.HEIC` filenames remains provisional and should be annotated before
+being treated as a trusted exhibit label.
+
+For mixed recordings, create annotations before building the crop dataset:
+
+1. Copy `Documentation/caesar_annotations.example.json` to
+   `Documentation/datasets/CAESAR/annotations.json`.
+2. Replace the example sources, labels, time ranges, and normalized boxes.
+   Boxes use `[left, top, right, bottom]` values from `0` to `1`.
+3. Add one region per visible labeled exhibit. Regions from the same frame are
+   saved as separate crops. Use `"ambiguous": true` or `"exclude": true` for
+   regions that should not enter training.
+4. Add a region with `"label": "unknown_background"` when a frame or region
+   clearly contains no registered exhibit. Omitting its box uses the full frame.
+
+Build the dataset and inspect `runs/caesar_annotated_dataset`:
+
+```powershell
+cd E:\TAYLORai
+.\.venv\Scripts\Activate.ps1
+python scripts\train_caesar_from_annotations.py
+```
+
+Train and export the classifier only after inspecting the generated crops:
+
+```powershell
+python scripts\train_caesar_from_annotations.py `
+  --train `
+  --run-name caesar_annotated_v1
+```
+
+The builder splits complete source recordings between train and validation,
+never copies a full frame into multiple exhibit classes, rejects tiny,
+full-frame exhibit, ambiguous, and blurry exhibit regions, and records skipped
+regions in `dataset_summary.json`.
+
 RECON uses a separate five-class classifier because its documented exhibits are
 different from the ARICC taxonomy:
 

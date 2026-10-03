@@ -1,0 +1,43 @@
+{
+  "annotations": [
+    {
+      "source": "Analytical Balance.MOV",
+      "start_seconds": 0,
+      "end_seconds": 12,
+      "regions": [
+        {
+          "label": "Analytical Balance",
+          "box": [0.18, 0.12, 0.76, 0.88]
+        },
+        {
+          "label": "unknown_background",
+          "box": [0.0, 0.0, 1.0, 1.0]
+        }
+      ]
+    },
+    {
+      "source": "Chemical Testing Area.MOV",
+      "start_seconds": 4,
+      "end_seconds": 10,
+      "regions": [
+        {
+          "label": "Exhibit A",
+          "box": [0.05, 0.18, 0.48, 0.92]
+        },
+        {
+          "label": "Exhibit B",
+          "box": [0.52, 0.18, 0.96, 0.92]
+        }
+      ]
+    },
+    {
+      "source": "IMG_4816.HEIC",
+      "regions": [
+        {
+          "label": "Analytical Balance",
+          "box": [0.2, 0.1, 0.8, 0.9]
+        }
+      ]
+    }
+  ]
+}

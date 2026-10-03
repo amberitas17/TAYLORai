@@ -46,6 +46,7 @@ class ExhibitDetectionService {
         this.ariccModel = null; // ARICC exhibit classifier
         this.reconModel = null; // RECON Center exhibit classifier
         this.fablabModel = null; // FABLAB equipment classifier
+        this.caesarModel = null; // CAESAR equipment classifier
         this.macModel = null;  // Mechanics Alive classifier
         this.mepModel = null;  // Mind Eye classifier
         this.qsModel = null;   // Quanta School classifier
@@ -76,6 +77,7 @@ class ExhibitDetectionService {
         this.ariccMetadata = null;
         this.reconMetadata = null;
         this.fablabMetadata = null;
+        this.caesarMetadata = null;
         this.macMetadata = null;
         this.mepMetadata = null;
         this.qsMetadata = null;
@@ -199,6 +201,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             } else if (requestedMode === 'fablab') {
                 this.gateOnlyMode = false;
                 await this.loadFablabModel();
+            } else if (requestedMode === 'caesar') {
+                this.gateOnlyMode = false;
+                await this.loadCaesarModel();
             } else {
                 try {
                     if (!this.model) {
@@ -369,6 +374,23 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         this.fablabModel = await this.createCachedONNXSession(modelPath, sessionOptions);
         this.fablabMetadata = await this.fetchModelJson(metadataPath);
         console.log('FABLAB classifier loaded:', this.fablabMetadata.displayNames);
+    }
+
+    async loadCaesarModel() {
+        if (this.caesarModel && this.caesarMetadata) {
+            return;
+        }
+        const sessionOptions = {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all',
+            logSeverityLevel: 0
+        };
+        const modelPath = '/models/caesar/caesar_classifier.onnx';
+        const metadataPath = '/models/caesar/caesar_classifier_metadata.json';
+        console.log('Loading CAESAR equipment classifier...');
+        this.caesarModel = await this.createCachedONNXSession(modelPath, sessionOptions);
+        this.caesarMetadata = await this.fetchModelJson(metadataPath);
+        console.log('CAESAR classifier loaded:', this.caesarMetadata.displayNames);
     }
 
     async loadExhibitGateModel() {
@@ -959,7 +981,6 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
 
     async detectHierarchical(imageElement) {
-        const inferenceStartedAt = performance.now();
         if (!this.firstInferenceLogged) {
             console.log('⏱️ First inference started');
         }
@@ -1045,6 +1066,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     ? Boolean(this.ariccModel && this.ariccMetadata)
                     : this.classifierMode === 'fablab'
                         ? Boolean(this.fablabModel && this.fablabMetadata)
+                        : this.classifierMode === 'caesar'
+                            ? Boolean(this.caesarModel && this.caesarMetadata)
                         : Boolean(this.model);
             if (!hasRequestedClassifier || (this.gateOnlyMode && !hasRequestedClassifier)) {
                 await this.logRejectedFrame(imageElement, 'main_classifier_unavailable', {
@@ -1215,6 +1238,44 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 };
             }
 
+            if (this.classifierMode === 'caesar' && this.caesarModel && this.caesarMetadata) {
+                const caesarResult = await this.runZoneSpecificInference(imageElement, 'CAESAR');
+                const caesarDisplayName = caesarResult.displayName || caesarResult.exhibit;
+                if (isUnknownSpecialistResult(caesarResult)) {
+                    return {
+                        success: false,
+                        reason: 'unknown_exhibit',
+                        zone: 'CAESAR',
+                        exhibit: 'Unknown / Unrecognized Equipment',
+                        exhibitConfidence: caesarResult.confidence,
+                        specificConfidenceGap: caesarResult.confidenceGap,
+                        message: 'Equipment is outside the confident CAESAR classes',
+                        gate: gateResult,
+                        classifier: 'caesar'
+                    };
+                }
+                return {
+                    success: true,
+                    zone: 'CAESAR',
+                    zoneConfidence: caesarResult.confidence,
+                    exhibit: caesarResult.exhibit,
+                    exhibitConfidence: caesarResult.confidence,
+                    combinedConfidence: caesarResult.confidence,
+                    exhibitInfo: {
+                        displayName: caesarDisplayName,
+                        code: caesarResult.exhibit,
+                        number: caesarResult.exhibit
+                    },
+                    coordinates: this.getExhibitCoordinates('default', 'default'),
+                    detectionTime: new Date().toISOString(),
+                    isLikelyBackground: caesarResult.isLikelyBackground,
+                    mainConfidenceGap: caesarResult.confidenceGap,
+                    specificConfidenceGap: caesarResult.confidenceGap,
+                    gate: gateResult,
+                    classifier: 'caesar'
+                };
+            }
+
             if (this.classifierMode === 'aricc') {
                 await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
                     classifier: 'aricc',
@@ -1335,7 +1396,6 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             }
 
             const SPECIFIC_MIN_CONFIDENCE = RECOGNITION_MIN_CONFIDENCE;
-            const zoneDisplayName = zoneInfo?.name || this.config.exhibitMapping[detectedZone] || detectedZone;
             if (!specificResult.isRecognized || specificResult.confidence < SPECIFIC_MIN_CONFIDENCE) {
                 return {
                     success: false,
@@ -1649,6 +1709,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     }
 
     async detectExhibit(imageElement) {
+        const inferenceStartedAt = performance.now();
         try {
             if (!this.isInitialized) {
                 throw new Error('Exhibit detection service not initialized');
@@ -2185,6 +2246,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             'ARICC': { model: this.ariccModel, metadata: this.ariccMetadata, name: 'ARICC', emoji: '🏭' },
             'RECON': { model: this.reconModel, metadata: this.reconMetadata, name: 'RECON Center', emoji: '🔬' },
             'FABLAB': { model: this.fablabModel, metadata: this.fablabMetadata, name: 'FABLAB', emoji: '🛠️' },
+            'CAESAR': { model: this.caesarModel, metadata: this.caesarMetadata, name: 'CAESAR', emoji: '🧪' },
             'MAC': { model: this.macModel, metadata: this.macMetadata, name: 'Mechanics Alive', emoji: '🔧' },
             'MEP': { model: this.mepModel, metadata: this.mepMetadata, name: 'Mind Eye', emoji: '👁️' },
             'QS': { model: this.qsModel, metadata: this.qsMetadata, name: 'Quanta School', emoji: '🎓' },

@@ -196,6 +196,7 @@ export default function App() {
       <Route path="/machine-vision-exhibit-aricc" element={<AiExhibit classifierMode="aricc" />} />
       <Route path="/machine-vision-aricc" element={<AiExhibit classifierMode="aricc" />} />
       <Route path="/machine-vision-fablab" element={<AiExhibit classifierMode="fablab" />} />
+      <Route path="/machine-vision-caesar" element={<AiExhibit classifierMode="caesar" />} />
       <Route path="/test" element={<AiVisionTest />} />
       <Route path="/client-ai" element={<ClientSideAIInterface />} />
       <Route path="/face-api" element={<FaceApiInterface />} />
