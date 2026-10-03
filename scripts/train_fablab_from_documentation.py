@@ -18,8 +18,9 @@ SOURCE_DIR = ROOT / "Documentation" / "datasets" / "FABLAB"
 WORK_DIR = ROOT / "runs" / "fablab_documentation_dataset"
 RUNS_DIR = ROOT / "runs" / "classify"
 DEPLOY_DIR = ROOT / "public" / "models" / "fablab"
+UNKNOWN_BACKGROUND_DIR = ROOT / "Documentation" / "training" / "unknown_background"
 
-CLASS_NAMES = [
+REGISTERED_CLASS_NAMES = [
     "3D Outputs",
     "BCN3d",
     "Crealty Ender 3D Printer",
@@ -28,6 +29,7 @@ CLASS_NAMES = [
     "STRATASYS",
     "VAQUFORM",
 ]
+CLASS_NAMES = [*REGISTERED_CLASS_NAMES, "unknown_background"]
 
 
 def remove_readonly(func, path, _exc_info):
@@ -45,7 +47,7 @@ def canonical_class_name(stem: str) -> str | None:
 
 
 def collect_videos() -> dict[str, list[Path]]:
-    videos = {name: [] for name in CLASS_NAMES}
+    videos = {name: [] for name in REGISTERED_CLASS_NAMES}
     for path in sorted(SOURCE_DIR.iterdir()):
         if not path.is_file() or path.suffix.lower() not in {".mov", ".mp4", ".avi", ".mkv"}:
             continue
@@ -83,7 +85,25 @@ def extract_video(
     return saved
 
 
-def build_dataset(seed: int, validation_ratio: float, frame_step: int, max_frames: int) -> dict:
+def collect_background_files(path: Path) -> list[Path]:
+    if not path.is_dir():
+        raise RuntimeError(f"Unknown-background directory not found: {path}")
+    files = [item for item in sorted(path.iterdir()) if item.is_file() and item.suffix.lower() in {".mov", ".mp4", ".avi", ".mkv", ".jpg", ".jpeg", ".png", ".webp", ".bmp"}]
+    if not files:
+        raise RuntimeError(f"Add confirmed non-exhibit frames or recordings to: {path}")
+    return files
+
+
+def extract_background(path: Path, output: Path, step: int, limit: int) -> int:
+    if path.suffix.lower() in {".mov", ".mp4", ".avi", ".mkv"}:
+        return extract_video(path, output, step, limit)
+    output.mkdir(parents=True, exist_ok=True)
+    target = output / f"{path.stem}.jpg"
+    shutil.copy2(path, target)
+    return 1
+
+
+def build_dataset(seed: int, validation_ratio: float, frame_step: int, max_frames: int, unknown_background_dir: Path) -> dict:
     random.seed(seed)
     sources = collect_videos()
     missing = [name for name, paths in sources.items() if not paths]
@@ -124,6 +144,17 @@ def build_dataset(seed: int, validation_ratio: float, frame_step: int, max_frame
                 count = sum(extract_video(path, target, frame_step, max_frames) for path in selected)
             summary[split][class_name] = count
 
+    background_files = collect_background_files(unknown_background_dir)
+    random.shuffle(background_files)
+    background_val_count = max(1, round(len(background_files) * validation_ratio)) if len(background_files) > 1 else 0
+    background_val = set(background_files[:background_val_count])
+    for split in ("train", "val"):
+        target = WORK_DIR / split / "unknown_background"
+        selected = [path for path in background_files if (path in background_val) == (split == "val")]
+        summary[split]["unknown_background"] = sum(
+            extract_background(path, target, frame_step, max_frames) for path in selected
+        )
+
     (WORK_DIR / "dataset_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary
 
@@ -142,6 +173,7 @@ def main() -> None:
     parser.add_argument("--device", default="auto")
     parser.add_argument("--run-name", default="fablab_documentation_v1")
     parser.add_argument("--dataset-dir", type=Path, default=WORK_DIR)
+    parser.add_argument("--unknown-background-dir", type=Path, default=UNKNOWN_BACKGROUND_DIR)
     parser.add_argument("--deploy", action="store_true")
     args = parser.parse_args()
     WORK_DIR = args.dataset_dir if args.dataset_dir.is_absolute() else ROOT / args.dataset_dir
@@ -149,7 +181,7 @@ def main() -> None:
     if device == "auto":
         device = "0" if __import__("torch").cuda.is_available() else "cpu"
 
-    summary = build_dataset(args.seed, args.validation_ratio, args.frame_step, args.max_frames)
+    summary = build_dataset(args.seed, args.validation_ratio, args.frame_step, args.max_frames, args.unknown_background_dir)
     print(json.dumps(summary, indent=2))
     model = YOLO(args.model)
     model.train(

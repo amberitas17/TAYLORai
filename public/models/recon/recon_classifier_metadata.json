@@ -1,14 +1,22 @@
 {
-  "model_name": "recon_documentation_ocr_v1",
+  "model_name": "recon_unified_v1",
   "displayNames": [
-    "Fluid Transfer Systems",
-    "Food and Thermal Processing Machinery",
-    "Industrial Measurement Instrumentation",
-    "Renewable Energy Training Systems",
-    "Unmanned Aerial Systems"
+    "charcoal_oven_machine",
+    "festo_solar_wind_training_system",
+    "fluke_2042_cable_tracer",
+    "fluke_355_clamp_meter",
+    "fluke_922_air_flow_meter",
+    "fluke_930_non_contact_tachometer",
+    "fluke_941_temperature_humidity_meter",
+    "ip_display_area",
+    "quadruple_suction_single_discharge_cooking_oil_transfer_device",
+    "root_crop_slicing_machine",
+    "testo_420_volume_flow_hood",
+    "testo_440_air_velocity_iaq",
+    "unmanned_aerial_system"
   ],
-  "source_dataset": "E:\\TAYLORai\\Documentation\\datasets\\RECON",
-  "dataset_summary": "E:\\TAYLORai\\runs\\recon_documentation_dataset_ocr_deploy_v1\\dataset_summary.json",
+  "source_dataset": "E:\\TAYLORai\\runs\\recon_unified_dataset",
+  "source_manifest_report": "E:\\TAYLORai\\runs\\recon_unified_dataset\\unified_manifest_report.json",
   "input_shape": [
     1,
     3,
@@ -17,11 +25,9 @@
   ],
   "output_shape": [
     1,
-    5
+    13
   ],
   "output_type": "logits",
-  "unknown_category": "UNKNOWN",
-  "unknown_display_name": "No exhibit detected",
   "preprocessing": {
     "mean": [
       0.0,

@@ -72,6 +72,32 @@ Open the preview URL printed by Vite. To check code quality, run `npm run lint`.
 
 ## Train RECON Center Exhibit Data
 
+### Add RECON/FABLAB Unknown Background Samples
+
+Both RECON and FABLAB classifiers support an explicit `unknown_background`
+class. Add confirmed non-exhibit images, videos, or cropped background regions
+to:
+
+```text
+Documentation/training/unknown_background/
+```
+
+Do not add a frame that clearly contains a registered exhibit. For a mixed
+frame, crop only the region that contains no registered exhibit. The same
+background set is used by both trainers and is split into train and validation.
+
+After adding samples, retrain and deploy each model:
+
+```powershell
+python scripts\train_recon_from_documentation.py --deploy --run-name recon_unknown_background_v1
+python scripts\train_fablab_from_documentation.py --deploy --run-name fablab_unknown_background_v1
+```
+
+The resulting models include `unknown_background` in their metadata and the
+browser treats that prediction as “No exhibit detected.” Existing deployed
+models remain unchanged until these commands are run with real background
+samples.
+
 ## Train Caesar Multi-Exhibit Data
 
 For mixed recordings, Caesar supports annotation-driven crops as described
@@ -141,9 +167,35 @@ The OCR evidence and normalized class for each source are stored in:
 Documentation/datasets/RECON/ocr_labels.json
 ```
 
-Each manifest entry must contain non-empty `text` and `label` fields. The
-trainer fails when a source is missing from the manifest or has an unsupported
-label, so an unverified recording cannot silently enter the wrong class.
+Each single-label manifest entry must contain non-empty `text` and `label`
+fields. When one recording contains different exhibits at different times,
+use `segments` instead of a top-level label:
+
+```json
+{
+   "Mixed recording.MOV": {
+      "segments": [
+         {
+            "start_seconds": 0,
+            "end_seconds": 18,
+            "label": "Industrial Measurement Instrumentation",
+            "text": "FLUKE 355 CLAMP METER"
+         },
+         {
+            "start_seconds": 18,
+            "end_seconds": 36,
+            "label": "Fluid Transfer Systems",
+            "text": "COOKING OIL TRANSFER DEVICE"
+         }
+      ]
+   }
+}
+```
+
+The trainer splits complete source recordings between train and validation,
+then extracts each segment into its verified class. It fails when a source is
+missing from the manifest or has an unsupported label, so an unverified
+recording cannot silently enter the wrong class.
 
 ### UNKNOWN category
 

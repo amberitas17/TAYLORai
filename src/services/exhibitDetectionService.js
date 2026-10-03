@@ -2331,10 +2331,12 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const confidenceGap = Number.isFinite(secondHighest) && Number.isFinite(confidence)
             ? Math.max(0, confidence - secondHighest)
             : 0;
-        const isLikelyBackground = confidenceGap < RECOGNITION_MIN_MARGIN;
+        const isUnknownBackground = exhibit.trim().toLowerCase().replace(/[\s-]+/g, '_') === 'unknown_background';
+        const isLikelyBackground = isUnknownBackground || confidenceGap < RECOGNITION_MIN_MARGIN;
         const isRecognized = confidence >= RECOGNITION_MIN_CONFIDENCE &&
             confidenceGap >= RECOGNITION_MIN_MARGIN &&
-            exhibit !== 'UNKNOWN' && exhibit !== 'OTHER';
+            exhibit !== 'UNKNOWN' && exhibit !== 'OTHER' &&
+            exhibit.toLowerCase() !== 'unknown_background';
         const rankedPredictions = probabilities
             .map((probability, index) => ({
                 class: classNames[index] || `Unknown_${index}`,
