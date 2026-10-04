@@ -90,7 +90,7 @@ def extract_video(path: Path, record: dict, args: argparse.Namespace, counts: di
                 continue
             segment_start = float(active["start_seconds"])
             segment_end = float(active["end_seconds"])
-            split = "val" if second >= segment_start + (segment_end - segment_start) * 0.8 else "train"
+            split = active.get("split") or ("val" if second >= segment_start + (segment_end - segment_start) * 0.8 else "train")
             regions = active["regions"]
         else:
             split = "val" if second >= validation_start else "train"
