@@ -1129,7 +1129,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       `🔍 Combined confidence: ${(combinedConfidence * 100).toFixed(1)}% (${detection.zone} / ${detection.exhibitInfo?.displayName || detection.exhibit})`
     );
 
-    if (!hasRealLabel || !detection.isRecognized || combinedConfidence < 0.80 || (detection.specificConfidenceGap || detection.mainConfidenceGap || 0) < 0.15) {
+    const displayConfidenceThreshold = detectedZone === "RECON" ? 0.60 : 0.80;
+    if (!hasRealLabel || !detection.isRecognized || combinedConfidence < displayConfidenceThreshold || (detection.specificConfidenceGap || detection.mainConfidenceGap || 0) < 0.15) {
       pendingLabelRef.current = "";
       pendingLabelCountRef.current = 0;
       setCurrentExhibit(null);

@@ -1153,6 +1153,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     coordinates: this.getExhibitCoordinates(code, 'default'),
                     detectionTime: new Date().toISOString(),
                     isLikelyBackground: reconResult.isLikelyBackground,
+                    isRecognized: reconResult.isRecognized || (
+                        reconResult.confidence >= SPECIALIST_MIN_CONFIDENCE &&
+                        !reconResult.isLikelyBackground
+                    ),
                     mainConfidenceGap: reconResult.confidenceGap,
                     specificConfidenceGap: reconResult.confidenceGap,
                     gate: gateResult,
@@ -2351,8 +2355,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const predictedIdx = probabilities.indexOf(Math.max(...probabilities));
         const confidence = probabilities[predictedIdx];
         // Handle different metadata formats (classes vs class_names)
-        const classNames = metadata.class_names || metadata.classes || [];
         const displayNames = metadata.displayNames || metadata.display_names || [];
+        const classNames = metadata.class_names || metadata.classes || displayNames;
         const exhibit = displayNames[predictedIdx] || classNames[predictedIdx];
 
         if (!exhibit) {
