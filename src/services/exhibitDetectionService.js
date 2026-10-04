@@ -7,7 +7,7 @@ import * as tf from '@tensorflow/tfjs';
 import * as ort from 'onnxruntime-web';
 import * as faceapi from 'face-api.js';
 
-const MODEL_ASSET_VERSION = '20260925-gate-v2';
+const MODEL_ASSET_VERSION = '20261004-recon-unified-v1';
 const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
 const MODEL_REQUEST_TIMEOUT_MS = 8000;
 const MODEL_RETRY_DELAYS_MS = [500, 1500, 3500];
@@ -1033,15 +1033,19 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             console.log('Stage 1: Running binary exhibit/background gate...');
             const gateResult = await this.detectExhibitGate(imageElement);
 
-            const caesarGateAccepted = this.classifierMode === 'caesar' && gateResult.isModelExhibit;
-            if (!gateResult.isExhibit && !caesarGateAccepted) {
+            const exactRejectionCondition = !gateResult.classifierAccepted && !gateResult.similarityAccepted;
+            if (exactRejectionCondition) {
                 console.log(`Gate rejected frame as noise/background (${(gateResult.exhibitConfidence * 100).toFixed(1)}% exhibit confidence)`);
                 await this.logRejectedFrame(imageElement, 'noise_rejected', {
                     gateClass: gateResult.predictedClass,
                     gateConfidence: gateResult.confidence,
                     exhibitConfidence: gateResult.exhibitConfidence,
                     backgroundConfidence: gateResult.backgroundConfidence,
-                    requiredConfidence: gateResult.threshold
+                    requiredConfidence: gateResult.threshold,
+                    classifierAccepted: gateResult.classifierAccepted,
+                    similarityAccepted: gateResult.similarityAccepted,
+                    finalGateDecision: gateResult.finalGateDecision,
+                    exactRejectionCondition
                 });
                 return {
                     success: false,
@@ -1051,6 +1055,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     exhibitConfidence: gateResult.exhibitConfidence,
                     backgroundConfidence: gateResult.backgroundConfidence,
                     requiredConfidence: gateResult.threshold,
+                    classifierAccepted: gateResult.classifierAccepted,
+                    similarityAccepted: gateResult.similarityAccepted,
+                    finalGateDecision: gateResult.finalGateDecision,
+                    exactRejectionCondition,
                     similarity: gateResult.similarity,
                     message: gateResult.isModelExhibit && !gateResult.isSimilarityExhibit
                         ? 'Frame rejected because it does not look similar to exhibit dataset examples'
@@ -1059,6 +1067,12 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 };
             }
 
+            console.log('Gate decision:', {
+                classifierAccepted: gateResult.classifierAccepted,
+                similarityAccepted: gateResult.similarityAccepted,
+                finalGateDecision: gateResult.finalGateDecision,
+                exactRejectionCondition
+            });
             console.log(`Gate accepted frame (${(gateResult.exhibitConfidence * 100).toFixed(1)}% exhibit confidence)`);
 
             const hasRequestedClassifier = this.classifierMode === 'recon'
@@ -1476,8 +1490,27 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const exhibitConfidence = probabilities[this.gateConfig.exhibitClassIndex] || 0;
             const backgroundConfidence = probabilities[0] || 0;
             const isModelExhibit = exhibitConfidence >= this.gateConfig.threshold;
-            const isSimilarityExhibit = !similarity || similarity.isSimilarToExhibit;
-            const isExhibit = isModelExhibit && isSimilarityExhibit;
+            const classifierAccepted = predictedClass === 'exhibit' && maxProb >= this.gateConfig.threshold;
+            const similarityAccepted = !similarity || similarity.isSimilarToExhibit;
+            const finalGateDecision = classifierAccepted || (maxProb < this.gateConfig.threshold && similarityAccepted)
+                ? 'accepted'
+                : 'noise_rejected';
+            const isSimilarityExhibit = similarityAccepted;
+            const isExhibit = finalGateDecision === 'accepted';
+
+            if (classifierAccepted && finalGateDecision === 'noise_rejected') {
+                console.error('GATE LOGIC ERROR: high-confidence exhibit was rejected');
+            }
+
+            console.log('Gate decision details:', {
+                gateClass: predictedClass,
+                gateConfidence: maxProb,
+                requiredConfidence: this.gateConfig.threshold,
+                classifierAccepted,
+                similarityAccepted,
+                finalGateDecision,
+                exactRejectionCondition: !classifierAccepted && !similarityAccepted
+            });
 
             console.log('Gate raw output:', rawOutput.map(value => value.toFixed(4)).join(', '));
             console.log('Gate probabilities:',
@@ -1487,6 +1520,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 isExhibit,
                 isModelExhibit,
                 isSimilarityExhibit,
+                classifierAccepted,
+                similarityAccepted,
+                finalGateDecision,
                 predictedClass,
                 confidence: maxProb,
                 exhibitConfidence,
