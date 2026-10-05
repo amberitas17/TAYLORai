@@ -1,5 +1,5 @@
 const AVATAR_CACHE_NAME = 'taylor-avatar-assets-v1';
-const AVATAR_ASSETS = ['/sarah-avatar.glb', '/sarah-idle.glb'];
+const AVATAR_ASSETS = ['/sarah-avatar.glb'];
 const AVATAR_TIMEOUT_MS = 30000;
 
 class AvatarAssetService {
@@ -14,12 +14,14 @@ class AvatarAssetService {
     this.cacheMisses = 0;
     this.error = '';
     this.resources = {};
+    this.loadStartedAt = 0;
   }
 
   async initialize() {
     if (this.state === 'AVATAR_READY') return this.getDiagnostics();
     if (this.initializePromise) return this.initializePromise;
 
+    this.loadStartedAt = performance.now();
     this.initializePromise = this.loadAssets()
       .then(() => {
         this.state = 'AVATAR_READY';
@@ -71,7 +73,10 @@ class AvatarAssetService {
   }
 
   markFirstRender() {
-    if (!this.firstRenderTime) this.firstRenderTime = performance.now();
+    if (!this.firstRenderTime) {
+      this.firstRenderTime = performance.now() - this.loadStartedAt;
+      this.initializationTime = this.firstRenderTime;
+    }
   }
 
   getDiagnostics() {

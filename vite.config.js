@@ -8,10 +8,17 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      includeAssets: [
+        'manifest.json',
+        'icons/icon-192.svg',
+        'icons/icon-512.svg'
+      ],
       manifest: false,
       workbox: {
         maximumFileSizeToCacheInBytes: 100 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => (

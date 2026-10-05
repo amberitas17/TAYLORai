@@ -104,14 +104,13 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
   const smileRef = useRef(0.55);
   const debugArmBonesRef = useRef(null);
 
-  const { scene: avatarScene, animations: avatarAnims } = useGLTF('/sarah-avatar.glb');
-  const { scene: idleScene, animations: idleAnims } = useGLTF('/sarah-idle.glb');
-  const displayScene = assetPreset === 'idle' ? idleScene : assetPreset === 'avatar' ? avatarScene : (idleScene || avatarScene);
-  const activeAnims = assetPreset === 'idle'
-    ? (idleAnims || [])
-    : assetPreset === 'avatar'
-      ? (avatarAnims || [])
-      : (idleAnims?.length ? idleAnims : avatarAnims);
+  const modelPaths = assetPreset === 'auto'
+    ? ['/sarah-avatar.glb', '/sarah-idle.glb']
+    : [assetPreset === 'idle' ? '/sarah-idle.glb' : '/sarah-avatar.glb'];
+  const loadedModels = useGLTF(modelPaths);
+  const selectedModel = assetPreset === 'auto' ? loadedModels[1] || loadedModels[0] : loadedModels[0];
+  const displayScene = selectedModel.scene;
+  const activeAnims = selectedModel.animations || [];
 
   const debugArmBoneTransforms = (scene) => {
     if (!scene) return;
