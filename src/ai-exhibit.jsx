@@ -4,7 +4,7 @@ import './ai-exhibit.css';
 import AINavigation from './components/AINavigation';
 import LeafletMap from './components/LeafletMap';
 import aiNavigationService from './services/aiNavigationService';
-import exhibitDetectionService from './services/exhibitDetectionService.js';
+import exhibitDetectionService, { EXHIBIT_MODEL_STATES } from './services/exhibitDetectionService.js';
 
 const width = window.innerWidth;
 // Complete exhibit database with all Science Centre exhibits
@@ -656,6 +656,18 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState('Loading models...');
   const [statusMessage, setStatusMessage] = useState("");
+  const [recognitionState, setRecognitionState] = useState(EXHIBIT_MODEL_STATES.CAMERA_READY);
+  const [diagnosticsTick, setDiagnosticsTick] = useState(0);
+  const diagnosticsEnabled = new URLSearchParams(window.location.search).has('recognitionDebug');
+  const currentZoneKey = classifierMode.toLowerCase();
+  const zoneReadyState = exhibitDetectionService.zoneStates?.[currentZoneKey] || 'MODEL_LOADING';
+  const cameraReady = Boolean(videoRef.current?.srcObject || uploadedVideoRef.current);
+  const currentResourceDiagnostics = Object.entries(exhibitDetectionService.resourceDiagnostics || {})
+    .filter(([resource]) => resource.includes(`/${currentZoneKey}/`) || resource.includes('/exhibit_gate/') || resource.includes('/ort/'));
+  const currentZoneResources = Object.entries(exhibitDetectionService.resourceDiagnostics || {})
+    .filter(([resource]) => resource.includes(`/${currentZoneKey}/`));
+  const currentZoneSource = currentZoneResources.length > 0 &&
+    currentZoneResources.every(([, diagnostic]) => diagnostic.source === 'CACHE') ? 'CACHE' : 'NETWORK';
 
   const formatDetectionStatus = (detection) => {
     if (!detection) return "";
@@ -700,6 +712,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       try {
         setIsLoading(true);
         setLoadingMessage('Recognition loading...');
+        setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOADING);
 
         const initializePromise = exhibitDetectionService.initialize({ classifier: classifierMode });
         initializePromise.then(() => {
@@ -707,17 +720,23 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           console.log(`⏱️ Recognition service ready in ${(performance.now() - startedAt).toFixed(0)}ms`);
           detectionServiceRef.current = exhibitDetectionService;
           setDetectionService(exhibitDetectionService);
+          setRecognitionState(exhibitDetectionService.modelState);
           window.exhibitDetectionService = exhibitDetectionService;
           setIsLoading(false);
           setLoadingMessage('');
-          setStatusMessage('Recognition ready');
+          setStatusMessage(exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY
+            ? 'Offline recognition ready'
+            : 'Recognition ready');
           window.setTimeout(() => setStatusMessage(''), 1200);
         }).catch((error) => {
           if (cancelled) return;
           console.error('❌ Background recognition initialization failed:', error);
+          setRecognitionState(exhibitDetectionService.modelState);
           setIsLoading(false);
           setLoadingMessage('');
-          setStatusMessage('Limited connection - preparing offline recognition.');
+          setStatusMessage(exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
+            ? 'Internet required for first-time model download'
+            : 'Recognition model failed to initialize');
         });
 
         await Promise.race([
@@ -726,15 +745,17 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         ]);
         if (!cancelled && !exhibitDetectionService.isInitialized) {
           console.warn(`⏱️ Recognition initialization exceeded ${initializationTimeoutMs}ms; camera remains available`);
+          setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR);
           setIsLoading(false);
           setLoadingMessage('');
-          setStatusMessage('Limited connection - preparing offline recognition.');
+          setStatusMessage('Recognition model failed to initialize');
         }
       } catch (error) {
         if (cancelled) return;
         setIsLoading(false);
         setLoadingMessage('');
-        setStatusMessage('Recognition unavailable - camera remains active.');
+        setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR);
+        setStatusMessage('Recognition model failed to initialize');
         console.error(`❌ Recognition initialization failed after ${(performance.now() - startedAt).toFixed(0)}ms:`, error);
       }
     };
@@ -744,11 +765,17 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   }, [classifierMode]);
 
   useEffect(() => {
+    if (!diagnosticsEnabled) return undefined;
+    const timer = window.setInterval(() => setDiagnosticsTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [diagnosticsEnabled]);
+
+  useEffect(() => {
     if (detectionService && videoRef.current && !detectionIntervalRef.current &&
         (uploadedVideoRef.current || videoRef.current.srcObject)) {
       startRealTimeDetection();
     }
-  }, [detectionService]);
+  }, [detectionService, recognitionState]);
 
   // Point-based navigation state (removed drawing system)
   const [currentPathway, setCurrentPathway] = useState('DWT_to_EAP');
@@ -967,7 +994,11 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   // Start real-time detection
   const startRealTimeDetection = () => {
-    if (!detectionService || !videoRef.current) return;
+    if (!detectionService || !videoRef.current ||
+      detectionService.runtimeState !== 'RUNTIME_READY' ||
+      detectionService.zoneStates?.[classifierMode.toLowerCase()] !== `${classifierMode.toUpperCase()}_READY` ||
+        (recognitionState !== EXHIBIT_MODEL_STATES.MODEL_READY &&
+         recognitionState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY)) return;
 
     console.log('🚀 Starting continuous real-time exhibit detection...');
     setStatusMessage('Starting continuous real-time exhibit detection...');
@@ -1034,7 +1065,11 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   // };
 
   const performDetection = async () => {
-  if (!detectionService || !videoRef.current || detectionInFlightRef.current) return;
+    if (!detectionService || !videoRef.current || detectionInFlightRef.current ||
+      detectionService.runtimeState !== 'RUNTIME_READY' ||
+      detectionService.zoneStates?.[classifierMode.toLowerCase()] !== `${classifierMode.toUpperCase()}_READY` ||
+      (recognitionState !== EXHIBIT_MODEL_STATES.MODEL_READY &&
+       recognitionState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY)) return;
 
   detectionInFlightRef.current = true;
   try {
@@ -1560,7 +1595,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     </div>
   </div>
 )}
-    {import.meta.env.DEV && recognitionDebug && (
+    {diagnosticsEnabled && recognitionDebug && (
       <div style={{
         position: "absolute",
         left: 12,
@@ -1578,6 +1613,40 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         <div>Top 2: {recognitionDebug.top2.class} {(recognitionDebug.top2.confidence * 100).toFixed(1)}%</div>
         <div>Inference: {Number(recognitionDebug.inferenceTime || 0).toFixed(0)} ms</div>
         <div>Confirmation: {recognitionDebug.confirmationCount}/3</div>
+      </div>
+    )}
+    {diagnosticsEnabled && (
+      <div
+        data-testid="recognition-diagnostics"
+        style={{
+          position: "absolute",
+          right: 12,
+          bottom: 12,
+          zIndex: 1300,
+          background: "rgba(0,0,0,0.82)",
+          color: "#fff",
+          borderRadius: 6,
+          padding: "9px 11px",
+          fontSize: 11,
+          lineHeight: 1.45,
+          fontFamily: "monospace",
+          minWidth: 210
+        }}
+      >
+        <div>Current zone: {classifierMode.toUpperCase()}</div>
+        <div>Camera: {cameraReady ? 'READY' : 'WAITING'}</div>
+        <div>Runtime: {exhibitDetectionService.runtimeState}</div>
+        <div>Model: {zoneReadyState}</div>
+        <div>Source: {currentZoneSource}</div>
+        <div>Inference: {isDetecting ? 'RUNNING' : 'WAITING'}</div>
+        <div>Last inference: {Number(recognitionDebug?.inferenceTime || 0).toFixed(0)} ms</div>
+        <div>Cache:</div>
+        {currentResourceDiagnostics.map(([resource, diagnostic]) => (
+          <div key={resource}>
+            {resource.split('/').pop().split('?')[0]}: {diagnostic.status}
+          </div>
+        ))}
+        <div aria-hidden="true">refresh:{diagnosticsTick}</div>
       </div>
     )}
       {/* Upload video for testing (replaces the live camera feed) */}

@@ -17,7 +17,8 @@ export default defineConfig({
             urlPattern: ({ url }) => (
               url.pathname.startsWith('/models/') ||
               url.pathname.includes('/ort/') ||
-              url.pathname.endsWith('.wasm')
+              url.pathname.endsWith('.wasm') ||
+              /\.(json|bin|onnx|tflite)$/i.test(url.pathname)
             ),
             handler: 'CacheFirst',
             options: {

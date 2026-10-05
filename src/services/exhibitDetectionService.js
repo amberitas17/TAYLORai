@@ -7,19 +7,65 @@ import * as tf from '@tensorflow/tfjs';
 import * as ort from 'onnxruntime-web';
 import * as faceapi from 'face-api.js';
 
+export const EXHIBIT_MODEL_STATES = Object.freeze({
+    CAMERA_READY: 'CAMERA_READY',
+    MODEL_LOADING: 'MODEL_LOADING',
+    MODEL_READY: 'MODEL_READY',
+    OFFLINE_MODEL_READY: 'OFFLINE_MODEL_READY',
+    MODEL_DOWNLOAD_REQUIRED: 'MODEL_DOWNLOAD_REQUIRED',
+    MODEL_LOAD_ERROR: 'MODEL_LOAD_ERROR'
+});
+
+export const EXHIBIT_ZONE_STATES = Object.freeze({
+    FABLAB_READY: 'FABLAB_READY',
+    ARICC_READY: 'ARICC_READY',
+    RECON_READY: 'RECON_READY',
+    CAESAR_READY: 'CAESAR_READY'
+});
+
 const MODEL_ASSET_VERSION = '20261004-recon-unified-v1';
 const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
 const MODEL_REQUEST_TIMEOUT_MS = 8000;
 const MODEL_RETRY_DELAYS_MS = [500, 1500, 3500];
 const RECOGNITION_MIN_CONFIDENCE = 0.80;
 const RECOGNITION_MIN_MARGIN = 0.15;
+const RUNTIME_ASSETS = [
+    '/ort/ort-wasm.wasm',
+    '/ort/ort-wasm-simd.wasm',
+    '/ort/ort-wasm-simd-threaded.wasm',
+    '/ort/ort-wasm-simd-threaded.jsep.wasm'
+];
+const ZONE_RESOURCES = Object.freeze({
+    fablab: [
+        ['/models/fablab/fablab_classifier.onnx', 'fablab_classifier.onnx'],
+        ['/models/fablab/fablab_classifier_metadata.json', 'fablab_classifier_metadata.json']
+    ],
+    aricc: [
+        ['/models/aricc/aricc_classifier.onnx', 'aricc_classifier.onnx'],
+        ['/models/aricc/aricc_classifier_metadata.json', 'aricc_classifier_metadata.json']
+    ],
+    recon: [
+        ['/models/recon/recon_classifier.onnx', 'recon_classifier.onnx'],
+        ['/models/recon/recon_classifier_metadata.json', 'recon_classifier_metadata.json']
+    ],
+    caesar: [
+        ['/models/caesar/caesar_classifier.onnx', 'caesar_classifier.onnx'],
+        ['/models/caesar/caesar_classifier_metadata.json', 'caesar_classifier_metadata.json']
+    ]
+});
+const SHARED_RESOURCES = [
+    ['/models/exhibit_gate/exhibit_gate.onnx', 'exhibit_gate.onnx'],
+    ['/models/exhibit_gate/exhibit_gate_metadata.json', 'exhibit_gate_metadata.json'],
+    ['/models/exhibit_gate/gate_similarity_index.json', 'gate_similarity_index.json'],
+    ['/models/tiny_face_detector_model-weights_manifest.json', 'tiny_face_detector_model-weights_manifest.json'],
+    ['/models/tiny_face_detector_model-shard1.bin', 'tiny_face_detector_model-shard1.bin']
+];
 
 // Configure ORT-Web to use matching WASM files (OpenAI solution)
 console.log('🔧 Configuring ORT-Web with matching WASM files...');
 
-// Tell ORT exactly where to find the matching .wasm files for THIS version
-// Use CDN for reliable access to matching WASM files
-ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.0/dist/';
+// Keep the inference runtime local so a cached model does not depend on WAN access.
+ort.env.wasm.wasmPaths = '/ort/';
 console.log('wasmPaths:', ort.env.wasm.wasmPaths);
 
 // Keep SIMD on; disable threads unless you have COOP/COEP
@@ -113,6 +159,23 @@ class ExhibitDetectionService {
         this.faceDetectorReady = false;
         this.faceDetectorLoad = null;
         this.firstInferenceLogged = false;
+        this.modelState = EXHIBIT_MODEL_STATES.CAMERA_READY;
+        this.modelLoadStartedAt = 0;
+        this.modelLoadTimeMs = 0;
+        this.modelCacheHits = 0;
+        this.modelNetworkDownloads = 0;
+        this.runtimeState = 'RUNTIME_LOADING';
+        this.zoneStates = {
+            fablab: 'MODEL_LOADING',
+            aricc: 'MODEL_LOADING',
+            recon: 'MODEL_LOADING',
+            caesar: 'MODEL_LOADING'
+        };
+        this.resourceDiagnostics = {};
+        this.runtimeReadyPromise = null;
+        this.zoneLoadPromises = new Map();
+        this.prefetchPromise = null;
+        this.cacheOnly = false;
 
         // Model configuration (will be updated from real metadata)
         this.config = {
@@ -180,11 +243,22 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         }
         this.classifierMode = requestedMode;
         const initializationStartedAt = performance.now();
+        this.modelState = EXHIBIT_MODEL_STATES.MODEL_LOADING;
+        this.modelLoadStartedAt = initializationStartedAt;
+        this.modelCacheHits = 0;
+        this.modelNetworkDownloads = 0;
+        this.cacheOnly = Boolean(options.cacheOnly);
         try {
-            console.log('🎯 Initializing exhibit detection service with ONNX model...');
+            console.log('🎯 Model initialization start', {
+                modelVersion: MODEL_ASSET_VERSION,
+                classifier: requestedMode,
+                modelState: this.modelState,
+                wasmPath: ort.env.wasm.wasmPaths
+            });
 
-            // Load the binary gate, main exhibit classifier, and legacy specialists.
-            console.log('🔄 Loading exhibit gate and main classifier');
+            console.log('🔄 Loading shared runtime, exhibit gate, and current zone model');
+
+            await this.ensureRuntimeReady();
 
             if (!this.gateModel) {
                 await this.loadExhibitGateModel();
@@ -194,16 +268,20 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
             if (requestedMode === 'recon') {
                 await this.loadReconModel();
+                this.zoneStates.recon = EXHIBIT_ZONE_STATES.RECON_READY;
                 this.gateOnlyMode = false;
             } else if (requestedMode === 'aricc') {
                 this.gateOnlyMode = false;
-                await this.loadSpecialistModels();
+                await this.loadSpecialistModels({ labels: ['ARICC'] });
+                this.zoneStates.aricc = EXHIBIT_ZONE_STATES.ARICC_READY;
             } else if (requestedMode === 'fablab') {
                 this.gateOnlyMode = false;
                 await this.loadFablabModel();
+                this.zoneStates.fablab = EXHIBIT_ZONE_STATES.FABLAB_READY;
             } else if (requestedMode === 'caesar') {
                 this.gateOnlyMode = false;
                 await this.loadCaesarModel();
+                this.zoneStates.caesar = EXHIBIT_ZONE_STATES.CAESAR_READY;
             } else {
                 try {
                     if (!this.model) {
@@ -219,13 +297,89 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
             this.isInitialized = true;
             this.initializedMode = requestedMode;
-            console.log(`✅ Exhibit detection service initialized with ONNX model in ${(performance.now() - initializationStartedAt).toFixed(0)}ms`);
+            this.modelState = this.modelNetworkDownloads === 0
+                ? EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY
+                : EXHIBIT_MODEL_STATES.MODEL_READY;
+            this.modelLoadTimeMs = performance.now() - initializationStartedAt;
+            console.log(`✅ Model initialization end in ${(performance.now() - initializationStartedAt).toFixed(0)}ms`, {
+                modelVersion: MODEL_ASSET_VERSION,
+                modelState: this.modelState,
+                loadTimeMs: Math.round(this.modelLoadTimeMs),
+                cacheHits: this.modelCacheHits,
+                networkDownloads: this.modelNetworkDownloads
+            });
+            if (!this.cacheOnly) {
+                void this.prefetchAllZoneModels();
+            }
 
         } catch (error) {
-            console.error('❌ ONNX model initialization failed:', error);
-            console.error('🚫 ONNX model must work - no fallbacks!');
-            throw error;
+            let initializationError = error;
+            this.zoneStates[requestedMode] = this.modelState === EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
+                ? EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
+                : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
+            if (!options.cacheOnly && !options.retry) {
+                console.warn('⚠️ Retrying recognition initialization from local cache', error.message);
+                try {
+                    return await this.initialize({ ...options, retry: true, cacheOnly: true });
+                } catch (cacheRetryError) {
+                    initializationError = cacheRetryError;
+                }
+            }
+            this.modelState = initializationError.code === 'MODEL_DOWNLOAD_REQUIRED' ||
+                (this.modelNetworkDownloads === 0 && this.modelCacheHits === 0)
+                ? EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
+                : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
+            this.zoneStates[requestedMode] = this.modelState;
+            console.error('❌ ONNX model initialization failed:', initializationError);
+            console.error('❌ Model-loading error', {
+                modelVersion: MODEL_ASSET_VERSION,
+                modelState: this.modelState,
+                cacheHits: this.modelCacheHits,
+                networkDownloads: this.modelNetworkDownloads,
+                elapsedMs: Math.round(performance.now() - initializationStartedAt),
+                message: initializationError.message
+            });
+            throw initializationError;
         }
+    }
+
+    async ensureRuntimeReady() {
+        if (this.runtimeReadyPromise) return this.runtimeReadyPromise;
+        this.runtimeReadyPromise = (async () => {
+            console.log('🔧 Runtime initialization start', { wasmPath: ort.env.wasm.wasmPaths });
+            await Promise.all(RUNTIME_ASSETS.map((url) => this.fetchModelResource(url, { cacheKey: url })));
+            this.runtimeState = 'RUNTIME_READY';
+            console.log('✅ Runtime initialization end', { runtimeState: this.runtimeState });
+        })().catch((error) => {
+            this.runtimeState = 'RUNTIME_LOAD_ERROR';
+            this.runtimeReadyPromise = null;
+            throw error;
+        });
+        return this.runtimeReadyPromise;
+    }
+
+    getZoneState(zone) {
+        return this.zoneStates[zone] || 'MODEL_LOAD_ERROR';
+    }
+
+    async prefetchAllZoneModels() {
+        if (this.prefetchPromise) return this.prefetchPromise;
+        this.prefetchPromise = (async () => {
+            console.log('📦 Background recognition prefetch start', { zones: Object.keys(ZONE_RESOURCES) });
+            const resources = [...SHARED_RESOURCES, ...Object.values(ZONE_RESOURCES).flat()];
+            await Promise.all(resources.map(async ([url, label]) => {
+                try {
+                    await this.fetchModelResource(url, { cacheKey: url, prefetch: true });
+                    console.log(`[CACHE] ${label} READY`);
+                } catch (error) {
+                    console.warn(`[CACHE] ${label} PREFETCH_FAILED`, error.message);
+                }
+            }));
+            console.log('✅ Background recognition prefetch end');
+        })().finally(() => {
+            this.prefetchPromise = null;
+        });
+        return this.prefetchPromise;
     }
 
     async loadFaceDetector() {
@@ -293,15 +447,28 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     async fetchModelResource(url, options = {}) {
         const cacheKey = options.cacheKey || url;
+        const normalizedCacheKey = cacheKey.includes('.onnx') && !cacheKey.includes('?')
+            ? `${cacheKey}?v=${MODEL_ASSET_VERSION}`
+            : cacheKey;
         const requestOptions = { ...options };
         delete requestOptions.cacheKey;
+        delete requestOptions.prefetch;
 
         if (typeof caches !== 'undefined') {
             const cache = await caches.open(MODEL_CACHE_NAME);
-            const cached = await cache.match(cacheKey);
+            const cached = await cache.match(normalizedCacheKey);
             if (cached) {
-                console.log(`📦 Model resource cache hit: ${url}`);
+                this.modelCacheHits += 1;
+                this.resourceDiagnostics[url] = { source: 'CACHE', status: 'HIT' };
+                console.log(`[CACHE] ${url.split('/').pop()} HIT`, { modelVersion: MODEL_ASSET_VERSION });
                 return cached;
+            }
+            this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'MISS' };
+            console.log(`[CACHE] ${url.split('/').pop()} MISS`, { modelVersion: MODEL_ASSET_VERSION });
+            if (this.cacheOnly) {
+                const cacheError = new Error(`Required model resource is not cached: ${url}`);
+                cacheError.code = 'MODEL_DOWNLOAD_REQUIRED';
+                throw cacheError;
             }
         }
 
@@ -311,6 +478,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const timeout = window.setTimeout(() => controller.abort(), MODEL_REQUEST_TIMEOUT_MS);
             const startedAt = performance.now();
             try {
+                console.log(`📥 Model download start: ${url}`, {
+                    modelVersion: MODEL_ASSET_VERSION,
+                    attempt: attempt + 1
+                });
                 const response = await fetch(url, {
                     ...requestOptions,
                     cache: 'no-store',
@@ -319,9 +490,13 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 if (!response.ok) throw new Error(`Model resource request failed: ${response.status} ${url}`);
                 if (typeof caches !== 'undefined') {
                     const cache = await caches.open(MODEL_CACHE_NAME);
-                    await cache.put(cacheKey, response.clone());
+                    await cache.put(normalizedCacheKey, response.clone());
                 }
-                console.log(`📥 Model resource downloaded in ${(performance.now() - startedAt).toFixed(0)}ms: ${url}`);
+                this.modelNetworkDownloads += 1;
+                this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'DOWNLOADED' };
+                console.log(`📥 Model download end in ${(performance.now() - startedAt).toFixed(0)}ms: ${url}`, {
+                    modelVersion: MODEL_ASSET_VERSION
+                });
                 return response;
             } catch (error) {
                 lastError = error;
@@ -441,6 +616,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     async connectToBackend() {
         console.log('🎯 Connecting to YOUR REAL PyTorch model backend (99.04% accuracy)...');
+        console.log('🔧 Backend initialization start', { backendUrl: this.backendUrl });
         const backendStartedAt = performance.now();
 
         try {
@@ -660,7 +836,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         this.umpMetadata = result.metadata;
     }
 
-    async loadSpecialistModels() {
+    async loadSpecialistModels({ labels } = {}) {
         const sessionOptions = {
             executionProviders: ['wasm'],
             logSeverityLevel: 0
@@ -690,7 +866,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             }
         ];
 
-        for (const specialist of specialists) {
+        const specialistsToLoad = labels
+            ? specialists.filter((specialist) => labels.includes(specialist.label))
+            : specialists;
+        for (const specialist of specialistsToLoad) {
             try {
                 console.log(`Loading ${specialist.label} specialist classifier...`);
                 const model = await this.createCachedONNXSession(specialist.modelPath, sessionOptions);
@@ -981,8 +1160,27 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
 
     async detectHierarchical(imageElement) {
+        if (this.modelState !== EXHIBIT_MODEL_STATES.MODEL_READY &&
+            this.modelState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY) {
+            console.warn('⏸️ Inference skipped: exhibit model is not ready', {
+                modelState: this.modelState,
+                modelVersion: MODEL_ASSET_VERSION
+            });
+            return {
+                success: false,
+                reason: 'model_not_ready',
+                modelState: this.modelState,
+                message: this.modelState === EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
+                    ? 'Internet required to download recognition model'
+                    : 'Recognition model is still loading'
+            };
+        }
         if (!this.firstInferenceLogged) {
-            console.log('⏱️ First inference started');
+            console.log('⏱️ Inference start', {
+                modelState: this.modelState,
+                modelVersion: MODEL_ASSET_VERSION
+            });
+            this.firstInferenceLogged = true;
         }
         console.log('🔄 Starting hierarchical detection (v6 with clarity gate + confidence filter)...');
         try {
