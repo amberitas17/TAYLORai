@@ -627,6 +627,14 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const detectionInFlightRef = useRef(false);
   const cameraStreamRef = useRef(null);
   const uploadedVideoRef = useRef(null);
+  const uploadedObjectUrlRef = useRef(null);
+  const cameraReadyResolveRef = useRef(null);
+  const cameraReadySignalRef = useRef(null);
+  if (!cameraReadySignalRef.current) {
+    cameraReadySignalRef.current = new Promise((resolve) => {
+      cameraReadyResolveRef.current = resolve;
+    });
+  }
   const acceptStreakRef = useRef(0);
   const rejectStreakRef = useRef(0);
   const pendingLabelRef = useRef("");
@@ -712,9 +720,11 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       const startedAt = performance.now();
       try {
         setIsLoading(true);
-        setLoadingMessage(`Preparing ${zoneLabel} recognition for offline use...`);
+        setLoadingMessage(`Preparing ${zoneLabel} recognition...`);
         setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOADING);
 
+        await cameraReadySignalRef.current;
+        if (cancelled) return;
         const initializePromise = exhibitDetectionService.initialize({ classifier: classifierMode });
         initializePromise.then(() => {
           if (cancelled) return;
@@ -740,7 +750,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           setIsLoading(false);
           setLoadingMessage('');
           setStatusMessage(exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
-            ? `${zoneLabel} recognition needs a one-time connection to prepare for offline use.`
+            ? `${zoneLabel} needs a one-time connection to prepare recognition.`
             : `${zoneLabel} recognition could not initialize. The camera remains available.`);
         });
 
@@ -750,7 +760,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         ]);
         if (!cancelled && !exhibitDetectionService.isInitialized) {
           console.warn(`⏱️ Recognition initialization exceeded ${initializationTimeoutMs}ms; camera remains available`);
-          setLoadingMessage(`Preparing ${zoneLabel} recognition for offline use...`);
+          setLoadingMessage(`Preparing ${zoneLabel} recognition...`);
         }
       } catch (error) {
         if (cancelled) return;
@@ -761,19 +771,27 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         setLoadingMessage('');
         setRecognitionState(recognitionState);
         setStatusMessage(recognitionState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
-          ? `${zoneLabel} recognition needs a one-time connection to prepare for offline use.`
+          ? `${zoneLabel} needs a one-time connection to prepare recognition.`
           : `${zoneLabel} recognition could not initialize. The camera remains available.`);
         console.error(`❌ Recognition initialization failed after ${(performance.now() - startedAt).toFixed(0)}ms:`, error);
       }
     };
 
     initService();
-    return () => { cancelled = true; };
+    exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'ROUTE_MOUNT');
+    return () => {
+      cancelled = true;
+      cameraReadyResolveRef.current?.();
+    };
   }, [classifierMode]);
 
   useEffect(() => () => {
     stopRealTimeDetection();
     stopCameraStream();
+    if (uploadedObjectUrlRef.current) {
+      URL.revokeObjectURL(uploadedObjectUrlRef.current);
+      uploadedObjectUrlRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -944,10 +962,12 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     let cancelled = false;
     const startCamera = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
+        cameraReadyResolveRef.current?.();
         setError('Camera access is not supported in this browser. Upload a video instead.');
         return;
       }
       try {
+        exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'CAMERA_REQUEST');
         const cameraStartedAt = performance.now();
         console.time('camera initialization');
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -961,10 +981,15 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         cameraStreamRef.current = stream;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'CAMERA_READY', {
+          elapsedMs: Math.round(performance.now() - cameraStartedAt)
+        });
+        cameraReadyResolveRef.current?.();
         console.timeEnd('camera initialization');
         console.log(`⏱️ Camera initialized in ${(performance.now() - cameraStartedAt).toFixed(0)}ms`);
         if (detectionServiceRef.current) startRealTimeDetection();
       } catch (cameraError) {
+        cameraReadyResolveRef.current?.();
         console.error('Camera error:', cameraError);
         const message = cameraError.name === 'NotAllowedError'
           ? 'Camera permission was denied. Allow camera access or upload a video.'
@@ -976,6 +1001,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     startCamera();
     return () => {
       cancelled = true;
+      cameraReadyResolveRef.current?.();
       stopRealTimeDetection();
       stopCameraStream();
     };
@@ -986,16 +1012,22 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     const file = event.target.files?.[0];
     if (!file || !videoRef.current) return;
 
+    cameraReadyResolveRef.current?.();
+    setShowCamera(false);
     stopRealTimeDetection();
     const video = videoRef.current;
+    exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'VIDEO_UPLOAD_START', { name: file.name });
     uploadedVideoRef.current = file;
     stopCameraStream();
     setError("");
-    video.src = URL.createObjectURL(file);
+    if (uploadedObjectUrlRef.current) URL.revokeObjectURL(uploadedObjectUrlRef.current);
+    uploadedObjectUrlRef.current = URL.createObjectURL(file);
+    video.src = uploadedObjectUrlRef.current;
     video.loop = true;
     video.muted = true;
     video.onloadedmetadata = () => {
       video.play().then(() => {
+        exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'VIDEO_UPLOAD_READY', { name: file.name });
         startRealTimeDetection();
       }).catch((playError) => {
         setError(`Video playback failed: ${playError.message}`);
@@ -1015,6 +1047,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     console.log('🚀 Starting continuous real-time exhibit detection...');
     setStatusMessage('Starting continuous real-time exhibit detection...');
     setIsDetecting(true);
+    exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'INFERENCE_LOOP_START', {
+      source: uploadedVideoRef.current ? 'UPLOAD' : 'CAMERA'
+    });
 
     // Run detection every 2 seconds for better performance and stability
     detectionIntervalRef.current = setInterval(async () => {
@@ -1668,6 +1703,12 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         {currentResourceDiagnostics.map(([resource, diagnostic]) => (
           <div key={resource}>
             {resource.split('/').pop().split('?')[0]}: {diagnostic.status}
+          </div>
+        ))}
+        <div>Lifecycle:</div>
+        {(exhibitDetectionService.getZoneDiagnostics(currentZoneKey) || []).map((diagnostic, index) => (
+          <div key={`${diagnostic.event}-${diagnostic.timestamp}-${index}`}>
+            {diagnostic.event}: {diagnostic.elapsedMs} ms
           </div>
         ))}
         <div aria-hidden="true">refresh:{diagnosticsTick}</div>

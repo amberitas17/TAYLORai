@@ -173,6 +173,13 @@ class ExhibitDetectionService {
             caesar: 'MODEL_LOADING'
         };
         this.resourceDiagnostics = {};
+        this.zoneDiagnostics = {
+            fablab: [],
+            aricc: [],
+            recon: [],
+            caesar: []
+        };
+        this.zoneDiagnosticStarts = new Map();
         this.runtimeReadyPromise = null;
         this.zoneLoadPromises = new Map();
         this.initializationPromises = new Map();
@@ -192,6 +199,7 @@ class ExhibitDetectionService {
         this.prefetchPromise = null;
         this.cacheOnly = false;
         this.zoneResourceCacheMisses = new Set();
+        this.firstInferenceLoggedZones = new Set();
 
         // Model configuration (will be updated from real metadata)
         this.config = {
@@ -261,6 +269,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         if (existingPromise) return existingPromise;
 
         const generation = ++this.initializationGeneration;
+        this.isInitialized = false;
+        this.initializedMode = null;
         const initializationPromise = this.initializeMode({ ...options, generation })
             .finally(() => {
                 if (this.initializationPromises.get(requestedMode) === initializationPromise) {
@@ -274,8 +284,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     async initializeMode(options = {}) {
         const requestedMode = options.classifier || 'aricc';
         const generation = options.generation || this.initializationGeneration;
-        this.classifierMode = requestedMode;
         const initializationStartedAt = performance.now();
+        this.zoneDiagnosticStarts.set(requestedMode, initializationStartedAt);
         this.initializationDiagnostics = {
             ...this.initializationDiagnostics,
             route: `/machine-vision-${requestedMode}`,
@@ -303,6 +313,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             console.log('🔄 Loading shared runtime, exhibit gate, and current zone model');
 
             await this.ensureRuntimeReady();
+            const runtimeStatuses = RUNTIME_ASSETS.map((resource) => this.resourceDiagnostics[resource]?.status);
+            this.recordZoneDiagnostic(requestedMode,
+                runtimeStatuses.every((status) => status === 'HIT') ? 'RUNTIME_CACHE_HIT' : 'RUNTIME_CACHE_MISS',
+                { runtimeState: this.runtimeState, resources: RUNTIME_ASSETS });
 
             if (!this.gateModel) {
                 await this.loadExhibitGateModel();
@@ -345,6 +359,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.info('Ignoring stale recognition initialization completion', { requestedMode, generation });
                 return;
             }
+            this.classifierMode = requestedMode;
             this.isInitialized = true;
             this.initializedMode = requestedMode;
             this.modelState = this.modelNetworkDownloads === 0
@@ -352,6 +367,11 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 : EXHIBIT_MODEL_STATES.MODEL_READY;
             this.modelLoadTimeMs = performance.now() - initializationStartedAt;
             this.initializationDiagnostics.initializationEnd = performance.now();
+            this.recordZoneDiagnostic(requestedMode, 'ZONE_READY', {
+                modelState: this.modelState,
+                cacheHits: this.modelCacheHits,
+                networkDownloads: this.modelNetworkDownloads
+            });
             console.log(`✅ Model initialization end in ${(performance.now() - initializationStartedAt).toFixed(0)}ms`, {
                 modelVersion: MODEL_ASSET_VERSION,
                 modelState: this.modelState,
@@ -380,6 +400,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
             this.zoneStates[requestedMode] = this.modelState;
+            this.recordZoneDiagnostic(requestedMode, this.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+                ? 'MODEL_CACHE_MISS'
+                : 'SESSION_CREATE_FAIL', { message: initializationError.message });
             console.error('❌ ONNX model initialization failed:', initializationError);
             console.error('❌ Model-loading error', {
                 modelVersion: MODEL_ASSET_VERSION,
@@ -417,6 +440,31 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     getZoneState(zone) {
         return this.zoneStates[zone] || 'MODEL_LOAD_ERROR';
+    }
+
+    recordZoneDiagnostic(zone, event, details = {}) {
+        const normalizedZone = String(zone || this.classifierMode || '').toLowerCase();
+        if (!this.zoneDiagnostics[normalizedZone]) return;
+        const start = this.zoneDiagnosticStarts.get(normalizedZone) || performance.now();
+        const entry = {
+            event: `${normalizedZone.toUpperCase()}_${event}`,
+            zone: normalizedZone.toUpperCase(),
+            elapsedMs: Math.round(performance.now() - start),
+            timestamp: new Date().toISOString(),
+            ...details
+        };
+        this.zoneDiagnostics[normalizedZone] = [
+            ...this.zoneDiagnostics[normalizedZone].slice(-99),
+            entry
+        ];
+        if (typeof window !== 'undefined') {
+            window.taylorExhibitDiagnostics = this.zoneDiagnostics;
+        }
+        return entry;
+    }
+
+    getZoneDiagnostics(zone) {
+        return this.zoneDiagnostics[String(zone || '').toLowerCase()] || [];
     }
 
     async prefetchAllZoneModels() {
@@ -470,6 +518,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     }
 
     async createCachedONNXSession(modelPath, sessionOptions) {
+        const diagnosticZone = Object.keys(ZONE_RESOURCES).find((zone) => modelPath.includes(`/models/${zone}/`));
+        if (diagnosticZone) this.recordZoneDiagnostic(diagnosticZone, 'SESSION_CREATE_START', { modelUrl: modelPath });
         const createSession = (source) => ort.InferenceSession.create(source, sessionOptions);
         const versionedPath = `${modelPath}${modelPath.includes('?') ? '&' : '?'}v=${MODEL_ASSET_VERSION}`;
         const logResponse = async (response, source) => {
@@ -508,7 +558,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 runtime: 'onnxruntime-web',
                 backend: sessionOptions.executionProviders?.join(',') || 'default'
             };
-            return createSession(await logResponse(response, source));
+            const session = await createSession(await logResponse(response, source));
+            if (diagnosticZone) this.recordZoneDiagnostic(diagnosticZone, 'SESSION_CREATE_SUCCESS', { modelUrl: modelPath, source });
+            return session;
         } catch (error) {
             this.initializationDiagnostics = {
                 ...this.initializationDiagnostics,
@@ -527,12 +579,17 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 exceptionMessage: error.message,
                 stack: error.stack
             });
+            if (diagnosticZone) this.recordZoneDiagnostic(diagnosticZone, 'SESSION_CREATE_FAIL', {
+                modelUrl: modelPath,
+                message: error.message
+            });
             throw error;
         }
     }
 
     async fetchModelResource(url, options = {}) {
         const cacheKey = options.cacheKey || url;
+        const zoneWithCacheMiss = Object.keys(ZONE_RESOURCES).find((zone) => url.includes(`/models/${zone}/`));
         const normalizedCacheKey = cacheKey.includes('.onnx') && !cacheKey.includes('?')
             ? `${cacheKey}?v=${MODEL_ASSET_VERSION}`
             : cacheKey;
@@ -546,11 +603,16 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             if (cached) {
                 this.modelCacheHits += 1;
                 this.resourceDiagnostics[url] = { source: 'CACHE', status: 'HIT' };
+                const cachedZone = Object.keys(ZONE_RESOURCES).find((zone) => url.includes(`/models/${zone}/`));
+                if (cachedZone) {
+                    this.recordZoneDiagnostic(cachedZone, 'MODEL_CACHE_HIT', { resource: url });
+                    this.recordZoneDiagnostic(cachedZone, 'MODEL_BYTES_READY', { resource: url, source: 'CACHE' });
+                }
                 console.log(`[CACHE] ${url.split('/').pop()} HIT`, { modelVersion: MODEL_ASSET_VERSION });
                 return cached;
             }
-            const zoneWithCacheMiss = Object.keys(ZONE_RESOURCES).find((zone) => url.includes(`/models/${zone}/`));
             if (zoneWithCacheMiss) this.zoneResourceCacheMisses.add(zoneWithCacheMiss);
+            if (zoneWithCacheMiss) this.recordZoneDiagnostic(zoneWithCacheMiss, 'MODEL_CACHE_MISS', { resource: url });
             this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'MISS' };
             console.log(`[CACHE] ${url.split('/').pop()} MISS`, { modelVersion: MODEL_ASSET_VERSION });
             if (this.cacheOnly) {
@@ -587,6 +649,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 }
                 this.modelNetworkDownloads += 1;
                 this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'DOWNLOADED' };
+                if (zoneWithCacheMiss) this.recordZoneDiagnostic(zoneWithCacheMiss, 'MODEL_BYTES_READY', { resource: url, source: 'NETWORK' });
                 console.log(`📥 Model download end in ${(performance.now() - startedAt).toFixed(0)}ms: ${url}`, {
                     modelVersion: MODEL_ASSET_VERSION
                 });
@@ -1265,8 +1328,12 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
 
     async detectHierarchical(imageElement) {
+        const activeZone = this.classifierMode;
         if (this.modelState !== EXHIBIT_MODEL_STATES.MODEL_READY &&
-            this.modelState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY) {
+            this.modelState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY ||
+            !this.isInitialized ||
+            this.initializedMode !== activeZone ||
+            this.zoneStates[activeZone] !== `${activeZone.toUpperCase()}_READY`) {
             console.warn('⏸️ Inference skipped: exhibit model is not ready', {
                 modelState: this.modelState,
                 modelVersion: MODEL_ASSET_VERSION
@@ -1286,6 +1353,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 modelVersion: MODEL_ASSET_VERSION
             });
             this.firstInferenceLogged = true;
+        }
+        if (!this.firstInferenceLoggedZones.has(activeZone)) {
+            this.firstInferenceLoggedZones.add(activeZone);
+            this.recordZoneDiagnostic(activeZone, 'FIRST_INFERENCE');
         }
         console.log('🔄 Starting hierarchical detection (v6 with clarity gate + confidence filter)...');
         try {
