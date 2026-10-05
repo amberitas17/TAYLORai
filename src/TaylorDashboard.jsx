@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 const Hologram = lazy(() => import('./hologram.jsx'));
 import { handleSpeechInteraction, onSpeechStarted, textToSpeech, getSpeechSupportState } from './services/speechAPI.js';
+import { subscribePwaBootstrap } from './services/pwaBootstrapService.js';
 import './HomePage.css';
 
 const API_URL = (import.meta.env.VITE_NODEJS_API_URL || '').trim();
@@ -44,6 +45,9 @@ export default function TaylorDashboard() {
     if (typeof window === 'undefined') return false;
     return window.sessionStorage.getItem('taylorGreetingPlayed') === 'true';
   });
+  const [bootstrap, setBootstrap] = useState(() => ({ state: 'BOOTSTRAP_PENDING', completed: 0, total: 4 }));
+
+  useEffect(() => subscribePwaBootstrap(setBootstrap), []);
 
   useEffect(() => {
     const stopListening = onSpeechStarted(() => setIsSpeaking(true));
@@ -218,6 +222,15 @@ export default function TaylorDashboard() {
           <div>
             <div className="eyebrow">Bulacan State University • ARICC</div>
             <h1>TAYLOR</h1>
+            {bootstrap.state !== 'BOOTSTRAP_READY' && (
+              <p aria-live="polite">
+                {bootstrap.state === 'BOOTSTRAP_NEEDS_CONNECTION'
+                  ? 'This AI feature needs a one-time connection to prepare for offline use.'
+                  : 'Preparing TAYLOR for offline use...'}
+                {' '}{bootstrap.completed}/{bootstrap.total}
+              </p>
+            )}
+            {bootstrap.state === 'BOOTSTRAP_READY' && <p aria-live="polite">TAYLOR is ready.</p>}
             <p className="hero-subtitle">BulSU AI Hologram Guide</p>
           </div>
           <div className="status-card">

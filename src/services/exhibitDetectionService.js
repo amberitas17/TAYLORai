@@ -12,6 +12,7 @@ export const EXHIBIT_MODEL_STATES = Object.freeze({
     MODEL_LOADING: 'MODEL_LOADING',
     MODEL_READY: 'MODEL_READY',
     OFFLINE_MODEL_READY: 'OFFLINE_MODEL_READY',
+    MODEL_NOT_PREPARED: 'MODEL_NOT_PREPARED',
     MODEL_DOWNLOAD_REQUIRED: 'MODEL_DOWNLOAD_REQUIRED',
     MODEL_LOAD_ERROR: 'MODEL_LOAD_ERROR'
 });
@@ -190,6 +191,7 @@ class ExhibitDetectionService {
         };
         this.prefetchPromise = null;
         this.cacheOnly = false;
+        this.zoneResourceCacheMisses = new Set();
 
         // Model configuration (will be updated from real metadata)
         this.config = {
@@ -337,6 +339,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 }
             }
 
+            this.zoneResourceCacheMisses.delete(requestedMode);
+
             if (generation !== this.initializationGeneration) {
                 console.info('Ignoring stale recognition initialization completion', { requestedMode, generation });
                 return;
@@ -355,18 +359,14 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 cacheHits: this.modelCacheHits,
                 networkDownloads: this.modelNetworkDownloads
             });
-            if (!this.cacheOnly) {
-                void this.prefetchAllZoneModels();
-            }
-
         } catch (error) {
             if (generation !== this.initializationGeneration) {
                 console.info('Ignoring stale recognition initialization error', { requestedMode, generation });
                 throw error;
             }
             let initializationError = error;
-            this.zoneStates[requestedMode] = this.modelState === EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
-                ? EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
+            this.zoneStates[requestedMode] = this.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+                ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
             if (!options.cacheOnly && !options.retry) {
                 console.warn('⚠️ Retrying recognition initialization from local cache', error.message);
@@ -376,9 +376,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     initializationError = cacheRetryError;
                 }
             }
-            this.modelState = initializationError.code === 'MODEL_DOWNLOAD_REQUIRED' ||
-                (this.modelNetworkDownloads === 0 && this.modelCacheHits === 0)
-                ? EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
+            this.modelState = this.zoneResourceCacheMisses.has(requestedMode) || initializationError.code === 'MODEL_DOWNLOAD_REQUIRED'
+                ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
             this.zoneStates[requestedMode] = this.modelState;
             console.error('❌ ONNX model initialization failed:', initializationError);
@@ -550,6 +549,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.log(`[CACHE] ${url.split('/').pop()} HIT`, { modelVersion: MODEL_ASSET_VERSION });
                 return cached;
             }
+            const zoneWithCacheMiss = Object.keys(ZONE_RESOURCES).find((zone) => url.includes(`/models/${zone}/`));
+            if (zoneWithCacheMiss) this.zoneResourceCacheMisses.add(zoneWithCacheMiss);
             this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'MISS' };
             console.log(`[CACHE] ${url.split('/').pop()} MISS`, { modelVersion: MODEL_ASSET_VERSION });
             if (this.cacheOnly) {
@@ -578,6 +579,11 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 if (typeof caches !== 'undefined') {
                     const cache = await caches.open(MODEL_CACHE_NAME);
                     await cache.put(normalizedCacheKey, response.clone());
+                    if (!await cache.match(normalizedCacheKey)) {
+                        const verificationError = new Error(`Model resource cache verification failed: ${url}`);
+                        verificationError.code = 'MODEL_CACHE_VERIFICATION_FAILED';
+                        throw verificationError;
+                    }
                 }
                 this.modelNetworkDownloads += 1;
                 this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'DOWNLOADED' };

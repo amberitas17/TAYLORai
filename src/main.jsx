@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { registerSW } from 'virtual:pwa-register';
+import { startPwaBootstrap } from './services/pwaBootstrapService.js';
 
 if (window.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
   window.__REACT_DEVTOOLS_GLOBAL_HOOK__.react = undefined;
@@ -24,16 +25,7 @@ const updateSW = registerSW({
 });
 
 const root = document.getElementById('root');
-const splash = document.createElement('div');
-splash.id = 'taylor-splash';
-splash.innerHTML = '<div class="taylor-splash-card"><div class="taylor-splash-ring"></div><p>Initializing TAYLOR</p></div>';
-document.body.insertBefore(splash, root);
-
-setTimeout(() => {
-  splash.style.opacity = '0';
-  splash.style.pointerEvents = 'none';
-  setTimeout(() => splash.remove(), 400);
-}, 1200);
+startPwaBootstrap();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

@@ -660,6 +660,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [diagnosticsTick, setDiagnosticsTick] = useState(0);
   const diagnosticsEnabled = new URLSearchParams(window.location.search).has('recognitionDebug');
   const currentZoneKey = classifierMode.toLowerCase();
+  const zoneLabel = classifierMode.toUpperCase();
   const zoneReadyState = exhibitDetectionService.zoneStates?.[currentZoneKey] || 'MODEL_LOADING';
   const cameraReady = Boolean(videoRef.current?.srcObject || uploadedVideoRef.current);
   const currentResourceDiagnostics = Object.entries(exhibitDetectionService.resourceDiagnostics || {})
@@ -711,7 +712,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       const startedAt = performance.now();
       try {
         setIsLoading(true);
-        setLoadingMessage('Recognition loading...');
+        setLoadingMessage(`Preparing ${zoneLabel} recognition for offline use...`);
         setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOADING);
 
         const initializePromise = exhibitDetectionService.initialize({ classifier: classifierMode });
@@ -724,9 +725,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           window.exhibitDetectionService = exhibitDetectionService;
           setIsLoading(false);
           setLoadingMessage('');
-          setStatusMessage(exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY
-            ? 'Offline recognition ready'
-            : 'Recognition ready');
+          setStatusMessage(`${zoneLabel} recognition ready.`);
           window.setTimeout(() => setStatusMessage(''), 1200);
         }).catch((error) => {
           if (cancelled) return;
@@ -740,9 +739,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           setRecognitionState(exhibitDetectionService.modelState);
           setIsLoading(false);
           setLoadingMessage('');
-          setStatusMessage(exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
-            ? 'Internet required for first-time model download'
-            : 'Recognition model failed to initialize');
+          setStatusMessage(exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+            ? `${zoneLabel} recognition needs a one-time connection to prepare for offline use.`
+            : `${zoneLabel} recognition could not initialize. The camera remains available.`);
         });
 
         await Promise.race([
@@ -751,17 +750,19 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         ]);
         if (!cancelled && !exhibitDetectionService.isInitialized) {
           console.warn(`⏱️ Recognition initialization exceeded ${initializationTimeoutMs}ms; camera remains available`);
-          setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR);
-          setIsLoading(false);
-          setLoadingMessage('');
-          setStatusMessage('Recognition model failed to initialize');
+          setLoadingMessage(`Preparing ${zoneLabel} recognition for offline use...`);
         }
       } catch (error) {
         if (cancelled) return;
+        const recognitionState = exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+          ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+          : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
         setIsLoading(false);
         setLoadingMessage('');
-        setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR);
-        setStatusMessage('Recognition model failed to initialize');
+        setRecognitionState(recognitionState);
+        setStatusMessage(recognitionState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+          ? `${zoneLabel} recognition needs a one-time connection to prepare for offline use.`
+          : `${zoneLabel} recognition could not initialize. The camera remains available.`);
         console.error(`❌ Recognition initialization failed after ${(performance.now() - startedAt).toFixed(0)}ms:`, error);
       }
     };
