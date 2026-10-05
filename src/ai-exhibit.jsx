@@ -731,6 +731,12 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         }).catch((error) => {
           if (cancelled) return;
           console.error('❌ Background recognition initialization failed:', error);
+          if (diagnosticsEnabled) {
+            setRecognitionDebug((previous) => ({
+              ...previous,
+              initializationError: exhibitDetectionService.initializationDiagnostics
+            }));
+          }
           setRecognitionState(exhibitDetectionService.modelState);
           setIsLoading(false);
           setLoadingMessage('');
@@ -763,6 +769,11 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     initService();
     return () => { cancelled = true; };
   }, [classifierMode]);
+
+  useEffect(() => () => {
+    stopRealTimeDetection();
+    stopCameraStream();
+  }, []);
 
   useEffect(() => {
     if (!diagnosticsEnabled) return undefined;
@@ -1638,6 +1649,18 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         <div>Runtime: {exhibitDetectionService.runtimeState}</div>
         <div>Model: {zoneReadyState}</div>
         <div>Source: {currentZoneSource}</div>
+        <div>Model URL: {exhibitDetectionService.initializationDiagnostics.modelUrl || 'Pending'}</div>
+        <div>Model source: {exhibitDetectionService.initializationDiagnostics.modelSource || 'Pending'}</div>
+        <div>Init start: {Math.round(exhibitDetectionService.initializationDiagnostics.initializationStart || 0)}</div>
+        <div>Init end: {Math.round(exhibitDetectionService.initializationDiagnostics.initializationEnd || 0)}</div>
+        <div>Runtime/backend: {exhibitDetectionService.initializationDiagnostics.runtime}/{exhibitDetectionService.initializationDiagnostics.backend}</div>
+        {exhibitDetectionService.initializationDiagnostics.exceptionMessage && (
+          <>
+            <div>Exception: {exhibitDetectionService.initializationDiagnostics.exceptionName}</div>
+            <div>Message: {exhibitDetectionService.initializationDiagnostics.exceptionMessage}</div>
+            <details><summary>Stack</summary><div>{exhibitDetectionService.initializationDiagnostics.stack}</div></details>
+          </>
+        )}
         <div>Inference: {isDetecting ? 'RUNNING' : 'WAITING'}</div>
         <div>Last inference: {Number(recognitionDebug?.inferenceTime || 0).toFixed(0)} ms</div>
         <div>Cache:</div>

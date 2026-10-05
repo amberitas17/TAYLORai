@@ -174,6 +174,20 @@ class ExhibitDetectionService {
         this.resourceDiagnostics = {};
         this.runtimeReadyPromise = null;
         this.zoneLoadPromises = new Map();
+        this.initializationPromises = new Map();
+        this.initializationGeneration = 0;
+        this.initializationDiagnostics = {
+            route: '',
+            modelUrl: '',
+            modelSource: '',
+            runtime: 'onnxruntime-web',
+            backend: 'wasm',
+            initializationStart: 0,
+            initializationEnd: 0,
+            exceptionName: '',
+            exceptionMessage: '',
+            stack: ''
+        };
         this.prefetchPromise = null;
         this.cacheOnly = false;
 
@@ -236,13 +250,41 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     ctx.restore();
 }
 
-    async initialize(options = {}) {
+    initialize(options = {}) {
         const requestedMode = options.classifier || 'aricc';
         if (this.isInitialized && this.initializedMode === requestedMode) {
-            return;
+            return Promise.resolve();
         }
+        const existingPromise = this.initializationPromises.get(requestedMode);
+        if (existingPromise) return existingPromise;
+
+        const generation = ++this.initializationGeneration;
+        const initializationPromise = this.initializeMode({ ...options, generation })
+            .finally(() => {
+                if (this.initializationPromises.get(requestedMode) === initializationPromise) {
+                    this.initializationPromises.delete(requestedMode);
+                }
+            });
+        this.initializationPromises.set(requestedMode, initializationPromise);
+        return initializationPromise;
+    }
+
+    async initializeMode(options = {}) {
+        const requestedMode = options.classifier || 'aricc';
+        const generation = options.generation || this.initializationGeneration;
         this.classifierMode = requestedMode;
         const initializationStartedAt = performance.now();
+        this.initializationDiagnostics = {
+            ...this.initializationDiagnostics,
+            route: `/machine-vision-${requestedMode}`,
+            modelUrl: '',
+            modelSource: '',
+            initializationStart: initializationStartedAt,
+            initializationEnd: 0,
+            exceptionName: '',
+            exceptionMessage: '',
+            stack: ''
+        };
         this.modelState = EXHIBIT_MODEL_STATES.MODEL_LOADING;
         this.modelLoadStartedAt = initializationStartedAt;
         this.modelCacheHits = 0;
@@ -295,12 +337,17 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 }
             }
 
+            if (generation !== this.initializationGeneration) {
+                console.info('Ignoring stale recognition initialization completion', { requestedMode, generation });
+                return;
+            }
             this.isInitialized = true;
             this.initializedMode = requestedMode;
             this.modelState = this.modelNetworkDownloads === 0
                 ? EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY
                 : EXHIBIT_MODEL_STATES.MODEL_READY;
             this.modelLoadTimeMs = performance.now() - initializationStartedAt;
+            this.initializationDiagnostics.initializationEnd = performance.now();
             console.log(`✅ Model initialization end in ${(performance.now() - initializationStartedAt).toFixed(0)}ms`, {
                 modelVersion: MODEL_ASSET_VERSION,
                 modelState: this.modelState,
@@ -313,6 +360,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             }
 
         } catch (error) {
+            if (generation !== this.initializationGeneration) {
+                console.info('Ignoring stale recognition initialization error', { requestedMode, generation });
+                throw error;
+            }
             let initializationError = error;
             this.zoneStates[requestedMode] = this.modelState === EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
                 ? EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
@@ -320,7 +371,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             if (!options.cacheOnly && !options.retry) {
                 console.warn('⚠️ Retrying recognition initialization from local cache', error.message);
                 try {
-                    return await this.initialize({ ...options, retry: true, cacheOnly: true });
+                    return await this.initializeMode({ ...options, retry: true, cacheOnly: true, generation });
                 } catch (cacheRetryError) {
                     initializationError = cacheRetryError;
                 }
@@ -339,6 +390,13 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 elapsedMs: Math.round(performance.now() - initializationStartedAt),
                 message: initializationError.message
             });
+            this.initializationDiagnostics = {
+                ...this.initializationDiagnostics,
+                initializationEnd: performance.now(),
+                exceptionName: initializationError.name || 'Error',
+                exceptionMessage: initializationError.message || String(initializationError),
+                stack: initializationError.stack || ''
+            };
             throw initializationError;
         }
     }
@@ -440,9 +498,38 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             }
             return buffer;
         };
-        const response = await this.fetchModelResource(versionedPath);
-        const source = response.headers.get('x-taylor-cache-hit') === '1' ? 'cache' : 'network';
-        return createSession(await logResponse(response, source));
+        try {
+            const response = await this.fetchModelResource(versionedPath);
+            const source = this.resourceDiagnostics[versionedPath]?.source
+                || (response.headers.get('x-taylor-cache-hit') === '1' ? 'CACHE' : 'NETWORK');
+            this.initializationDiagnostics = {
+                ...this.initializationDiagnostics,
+                modelUrl: modelPath,
+                modelSource: source,
+                runtime: 'onnxruntime-web',
+                backend: sessionOptions.executionProviders?.join(',') || 'default'
+            };
+            return createSession(await logResponse(response, source));
+        } catch (error) {
+            this.initializationDiagnostics = {
+                ...this.initializationDiagnostics,
+                modelUrl: modelPath,
+                exceptionName: error.name || 'Error',
+                exceptionMessage: error.message || String(error),
+                stack: error.stack || ''
+            };
+            console.error('❌ ONNX session initialization failed', {
+                route: this.initializationDiagnostics.route,
+                modelUrl: modelPath,
+                modelSource: this.initializationDiagnostics.modelSource || 'UNKNOWN',
+                runtime: 'onnxruntime-web',
+                backend: sessionOptions.executionProviders?.join(',') || 'default',
+                exceptionName: error.name,
+                exceptionMessage: error.message,
+                stack: error.stack
+            });
+            throw error;
+        }
     }
 
     async fetchModelResource(url, options = {}) {
@@ -871,6 +958,18 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             : specialists;
         for (const specialist of specialistsToLoad) {
             try {
+                const existingModel = specialist.label === 'ARICC' ? this.ariccModel
+                    : specialist.label === 'DWT' ? this.dwtModel
+                        : specialist.label === 'EAP' ? this.eapModel
+                            : null;
+                const existingMetadata = specialist.label === 'ARICC' ? this.ariccMetadata
+                    : specialist.label === 'DWT' ? this.dwtMetadata
+                        : specialist.label === 'EAP' ? this.eapMetadata
+                            : null;
+                if (existingModel && existingMetadata) {
+                    console.log(`${specialist.label} specialist classifier already initialized; reusing existing runtime session`);
+                    continue;
+                }
                 console.log(`Loading ${specialist.label} specialist classifier...`);
                 const model = await this.createCachedONNXSession(specialist.modelPath, sessionOptions);
                 specialist.assignModel(model);
