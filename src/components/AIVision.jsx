@@ -20,6 +20,7 @@ function getFaceStatusLabel(status, avatarReady) {
 function getAvatarStatusLabel(status) {
   if (status === 'AVATAR_READY') return 'AI Vision ready';
   if (status === 'AVATAR_ERROR') return 'Avatar unavailable. AI Vision can still use the camera.';
+  if (status === 'AVATAR_CACHE_CHECK' || status === 'AVATAR_LOADING_FROM_CACHE') return 'Loading TAYLOR...';
   if (status === 'AVATAR_DOWNLOADING') return 'Preparing AI Vision...';
   return 'Preparing AI Vision...';
 }
@@ -76,9 +77,16 @@ export default function AIVision() {
   const latestProfileRef = useRef(null);
   const inferenceCountRef = useRef(0);
   const inferenceWindowStartedRef = useRef(performance.now());
+  const faceInitializationStartedRef = useRef(false);
+  const startupTimestampsRef = useRef({
+    cameraReady: null,
+    avatarInitializationStart: null,
+    avatarFirstRender: null,
+    faceInitializationStart: null,
+    faceReady: null
+  });
 
   useEffect(() => {
-    initializeModels();
     startEntertainmentSequence();
     initializeAvatar();
 
@@ -91,6 +99,8 @@ export default function AIVision() {
   }, []);
 
   const initializeAvatar = async () => {
+    startupTimestampsRef.current.avatarInitializationStart = performance.now();
+    console.info('[machine-vision] avatar initialization start', startupTimestampsRef.current.avatarInitializationStart);
     setAvatarState('AVATAR_CACHE_CHECK');
     try {
       await avatarAssetService.initialize();
@@ -100,14 +110,26 @@ export default function AIVision() {
       setAvatarState('AVATAR_ERROR');
       setAvatarDiagnostics(avatarAssetService.getDiagnostics());
       console.error('Avatar initialization failed:', error);
+      scheduleFaceInitialization();
     }
   };
 
+  const scheduleFaceInitialization = useRef(() => {
+    if (faceInitializationStartedRef.current) return;
+    faceInitializationStartedRef.current = true;
+    const start = () => initializeModels();
+    if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 1200 });
+    else window.setTimeout(start, 0);
+  }).current;
+
   const handleAvatarReady = useRef(() => {
+    startupTimestampsRef.current.avatarFirstRender = performance.now();
+    console.info('[machine-vision] avatar first render', startupTimestampsRef.current.avatarFirstRender);
     setAvatarState('AVATAR_READY');
     avatarAssetService.markFirstRender();
     setAvatarDiagnostics(avatarAssetService.getDiagnostics());
     setDiagnosticsTick((tick) => tick + 1);
+    scheduleFaceInitialization();
   }).current;
   const handleAvatarError = useRef((error) => {
     setAvatarState('AVATAR_ERROR');
@@ -122,6 +144,8 @@ export default function AIVision() {
     videoRef.current.playsInline = true;
 
     videoRef.current.play().then(() => {
+      startupTimestampsRef.current.cameraReady = performance.now();
+      console.info('[machine-vision] camera ready', startupTimestampsRef.current.cameraReady);
       setCameraStatus('CAMERA_READY');
     }).catch((error) => {
       console.error('Unable to start video playback:', error);
@@ -132,6 +156,8 @@ export default function AIVision() {
 
   const initializeModels = async () => {
     try {
+      startupTimestampsRef.current.faceInitializationStart = performance.now();
+      console.info('[machine-vision] FaceAPI initialization start', startupTimestampsRef.current.faceInitializationStart);
       console.log('🧠 Loading face-api.js models...');
       setModelStatus('FACE_CACHE_CHECK');
       setFlowError('');
@@ -139,7 +165,10 @@ export default function AIVision() {
       const success = await clientSideFaceAnalysisService.initialize();
 
       if (success) {
+        startupTimestampsRef.current.faceReady = performance.now();
+        console.info('[machine-vision] FaceAPI ready', startupTimestampsRef.current.faceReady);
         setModelStatus(clientSideFaceAnalysisService.getModelStatus().state);
+        setEntertainmentPhase('analyzing');
         console.log('✅ Face-api.js models loaded successfully!');
       } else {
         setModelStatus('FACE_MODEL_ERROR');
@@ -345,11 +374,6 @@ export default function AIVision() {
   const startEntertainmentSequence = async () => {
     console.log('🎭 Starting entertainment sequence...');
     await startCamera();
-    
-    // After camera warms up, start detection
-    setTimeout(() => {
-      setEntertainmentPhase('analyzing'); // UI shows "Analyzing..." immediately // ✅ this will trigger your useEffect
-    }, 800);
   };
 
 
@@ -514,6 +538,11 @@ export default function AIVision() {
           <div>Avatar first-render time: {Math.round(avatarDiagnostics.firstRenderTime)} ms</div>
           <div>Avatar cache hits/misses: {avatarDiagnostics.cacheHits}/{avatarDiagnostics.cacheMisses}</div>
           <div>Avatar error: {avatarDiagnostics.error || 'None'}</div>
+          <div>Camera ready at: {startupTimestampsRef.current.cameraReady ? Math.round(startupTimestampsRef.current.cameraReady) : 'Pending'}</div>
+          <div>Avatar init started at: {startupTimestampsRef.current.avatarInitializationStart ? Math.round(startupTimestampsRef.current.avatarInitializationStart) : 'Pending'}</div>
+          <div>Avatar first render at: {startupTimestampsRef.current.avatarFirstRender ? Math.round(startupTimestampsRef.current.avatarFirstRender) : 'Pending'}</div>
+          <div>FaceAPI init started at: {startupTimestampsRef.current.faceInitializationStart ? Math.round(startupTimestampsRef.current.faceInitializationStart) : 'Pending'}</div>
+          <div>FaceAPI ready at: {startupTimestampsRef.current.faceReady ? Math.round(startupTimestampsRef.current.faceReady) : 'Pending'}</div>
           <div aria-hidden="true">refresh:{diagnosticsTick}</div>
         </div>
       )}
