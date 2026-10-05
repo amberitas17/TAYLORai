@@ -14,7 +14,7 @@ class ClientSideFaceAnalysisService {
     this.modelsLoadTime = 0;
     this.lastError = '';
     this.resourceDiagnostics = {};
-    this.state = 'FACE_MODELS_LOADING';
+    this.state = 'FACE_CACHE_CHECK';
     this.modelResources = [
       'tiny_face_detector_model-weights_manifest.json',
       'tiny_face_detector_model-shard1',
@@ -47,7 +47,7 @@ class ClientSideFaceAnalysisService {
 
   async initializeOnce() {
     const startedAt = performance.now();
-    this.state = 'FACE_MODELS_LOADING';
+    this.state = 'FACE_CACHE_CHECK';
     this.lastError = '';
     console.log('Initializing FaceAPI models from local application assets...');
 
@@ -98,11 +98,14 @@ class ClientSideFaceAnalysisService {
       cache = await caches.open(this.cacheName);
       const cached = await caches.match(url);
       if (cached) {
+        this.state = 'FACE_LOADING_FROM_CACHE';
         await cache.put(url, cached.clone());
+        if (!await cache.match(url)) throw new Error(`${resource} could not be verified in Cache Storage`);
         this.resourceDiagnostics[resource] = { status: 'CACHE', duration: performance.now() - startedAt };
         return 'CACHE';
       }
 
+      this.state = 'FACE_DOWNLOADING';
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.modelTimeoutMs);
       let response;
@@ -113,6 +116,7 @@ class ClientSideFaceAnalysisService {
       }
       if (!response.ok) throw new Error(`${resource} returned HTTP ${response.status}`);
       await cache.put(url, response.clone());
+      if (!await cache.match(url)) throw new Error(`${resource} could not be verified in Cache Storage`);
       this.resourceDiagnostics[resource] = { status: 'NETWORK', duration: performance.now() - startedAt };
       return 'NETWORK';
     } catch (error) {

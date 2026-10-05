@@ -6,6 +6,24 @@ import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js'
 import avatarAssetService from '../services/avatarAssetService.js';
 import './AIVision.css';
 const Hologram = lazy(() => import('../../src/hologram.jsx'));
+
+function getFaceStatusLabel(status, avatarReady) {
+  if (['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(status)) {
+    if (!avatarReady) return 'Face analysis ready';
+    return status === 'OFFLINE_FACE_MODELS_READY' ? 'Using offline AI' : 'AI Vision ready';
+  }
+  if (status === 'FACE_MODEL_DOWNLOAD_REQUIRED') return 'Connect once to prepare AI Vision for offline use';
+  if (status === 'FACE_MODEL_ERROR') return 'Face analysis unavailable';
+  return 'Preparing AI Vision...';
+}
+
+function getAvatarStatusLabel(status) {
+  if (status === 'AVATAR_READY') return 'AI Vision ready';
+  if (status === 'AVATAR_ERROR') return 'Avatar unavailable. AI Vision can still use the camera.';
+  if (status === 'AVATAR_DOWNLOADING') return 'Preparing AI Vision...';
+  return 'Preparing AI Vision...';
+}
+
 class AvatarErrorBoundary extends React.Component {
   state = { hasError: false };
 
@@ -19,7 +37,7 @@ class AvatarErrorBoundary extends React.Component {
 
   render() {
     return this.state.hasError
-      ? <div className="avatar-placeholder">AVATAR_ERROR</div>
+      ? <div className="avatar-placeholder">Avatar unavailable. AI Vision can still use the camera.</div>
       : this.props.children;
   }
 }
@@ -28,7 +46,7 @@ export default function AIVision() {
   const navigate = useNavigate();
   const [cameraPermission, setCameraPermission] = useState(null);
   const [cameraStatus, setCameraStatus] = useState('CAMERA_INITIALIZING');
-  const [modelStatus, setModelStatus] = useState('FACE_MODELS_LOADING');
+  const [modelStatus, setModelStatus] = useState('FACE_CACHE_CHECK');
   const [stream, setStream] = useState(null);
   const [detectedProfile, setDetectedProfile] = useState(null);
   const [personDetected, setPersonDetected] = useState(false);
@@ -40,10 +58,11 @@ export default function AIVision() {
   const [lastInference, setLastInference] = useState({ status: 'STOPPED', time: 0, rate: 0 });
   const [inferenceState, setInferenceState] = useState('STOPPED');
   const [diagnosticsTick, setDiagnosticsTick] = useState(0);
-  const [avatarState, setAvatarState] = useState('AVATAR_LOADING');
+  const [avatarState, setAvatarState] = useState('AVATAR_CACHE_CHECK');
   const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
   const [avatarDiagnostics, setAvatarDiagnostics] = useState(avatarAssetService.getDiagnostics());
   const faceDebugEnabled = new URLSearchParams(window.location.search).has('faceDebug');
+  const aiVisionReady = ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) && avatarState === 'AVATAR_READY';
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -72,7 +91,7 @@ export default function AIVision() {
   }, []);
 
   const initializeAvatar = async () => {
-    setAvatarState('AVATAR_LOADING');
+    setAvatarState('AVATAR_CACHE_CHECK');
     try {
       await avatarAssetService.initialize();
       setAvatarAssetsReady(true);
@@ -114,7 +133,7 @@ export default function AIVision() {
   const initializeModels = async () => {
     try {
       console.log('🧠 Loading face-api.js models...');
-      setModelStatus('FACE_MODELS_LOADING');
+      setModelStatus('FACE_CACHE_CHECK');
       setFlowError('');
 
       const success = await clientSideFaceAnalysisService.initialize();
@@ -132,7 +151,9 @@ export default function AIVision() {
       console.error('❌ Model loading failed:', error);
       const status = clientSideFaceAnalysisService.getModelStatus();
       setModelStatus(status.state || 'FACE_MODEL_ERROR');
-      setFlowError(status.lastError || error.message || 'Unable to initialize detection models.');
+      setFlowError(error?.code === 'FACE_MODEL_DOWNLOAD_REQUIRED'
+        ? 'Connect once to prepare AI Vision for offline use.'
+        : 'Face analysis is temporarily unavailable. The camera can still be used.');
     }
   };
 
@@ -425,7 +446,7 @@ export default function AIVision() {
             </div>
             <div className="status-row">
               <div className={`status-dot ${['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) ? 'green' : modelStatus === 'FACE_MODEL_ERROR' || modelStatus === 'FACE_MODEL_DOWNLOAD_REQUIRED' ? 'red' : 'yellow'}`} />
-              <span>{modelStatus}</span>
+              <span>{getFaceStatusLabel(modelStatus, aiVisionReady)}</span>
             </div>
             <div className="live-profile">
         <h3>Live Detected Emotion & Age</h3>
@@ -447,12 +468,12 @@ export default function AIVision() {
       <div className="avatar-stage">
         {avatarAssetsReady && avatarState !== 'AVATAR_ERROR' ? (
           <AvatarErrorBoundary onError={handleAvatarError}>
-            <Suspense fallback={<div className="avatar-placeholder">AVATAR_LOADING</div>}>
+            <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
               <Hologram onReady={handleAvatarReady} emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" />
             </Suspense>
           </AvatarErrorBoundary>
         ) : (
-          <div className="avatar-placeholder">{avatarState}</div>
+          <div className="avatar-placeholder">{getAvatarStatusLabel(avatarState)}</div>
         )}
       </div>
 

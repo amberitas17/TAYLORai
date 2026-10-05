@@ -85,7 +85,7 @@ function LandingPage() {
             alignItems: 'center',
             gap: 16
           }}>
-            <Suspense fallback={<div className="avatar-placeholder">AVATAR_LOADING</div>}>
+            <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
               <Hologram emotion={guestProfile.emotion || 'happy'} isAnimating={true} spokenText={`Welcome! I detected a ${guestProfile.emotion || 'friendly'} mood.`} />
             </Suspense>
             <h2 style={{ margin: 0, color: '#12324a', fontSize: 28 }}>Welcome, Guest!</h2>

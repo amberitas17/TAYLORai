@@ -44,11 +44,13 @@ class AvatarAssetService {
       const url = new URL(asset, window.location.origin).href;
       const cached = await cache.match(url);
       if (cached) {
+        this.state = 'AVATAR_LOADING_FROM_CACHE';
         this.cacheHits += 1;
         this.resources[asset] = { source: 'CACHE', duration: performance.now() - assetStartedAt };
         return 'CACHE';
       }
 
+      this.state = 'AVATAR_DOWNLOADING';
       this.cacheMisses += 1;
       const controller = new AbortController();
       const timeoutId = window.setTimeout(() => controller.abort(), AVATAR_TIMEOUT_MS);
@@ -56,6 +58,7 @@ class AvatarAssetService {
         const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
         if (!response.ok) throw new Error(`${asset} returned HTTP ${response.status}`);
         await cache.put(url, response.clone());
+        if (!await cache.match(url)) throw new Error(`${asset} could not be verified in Cache Storage`);
         this.resources[asset] = { source: 'NETWORK', duration: performance.now() - assetStartedAt };
         return 'NETWORK';
       } catch (error) {

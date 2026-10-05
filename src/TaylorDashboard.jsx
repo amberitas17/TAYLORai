@@ -236,7 +236,7 @@ export default function TaylorDashboard() {
 
         <section className="guide-section">
           <div className="avatar-card">
-            <Suspense fallback={<div className="avatar-placeholder">AVATAR_LOADING</div>}>
+            <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
               <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
             </Suspense>
           </div>
