@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
 import AiText from './ai-text.jsx';
@@ -8,7 +8,7 @@ import AiVisionTest from './ai-vision-test.jsx';
 import ClientSideAIInterface from './components/ClientSideAIInterface.jsx';
 import FaceApiInterface from './components/FaceApiInterface.jsx';
 import ClientSideFaceAnalysis from './ClientSideFaceAnalysis.jsx';
-import Hologram from './hologram.jsx';
+const Hologram = lazy(() => import('./hologram.jsx'));
 import HomePage from './HomePage.jsx';
 import TaylorDashboard from './TaylorDashboard.jsx';
 
@@ -85,7 +85,9 @@ function LandingPage() {
             alignItems: 'center',
             gap: 16
           }}>
-            <Hologram emotion={guestProfile.emotion || 'happy'} isAnimating={true} spokenText={`Welcome! I detected a ${guestProfile.emotion || 'friendly'} mood.`} />
+            <Suspense fallback={<div className="avatar-placeholder">AVATAR_LOADING</div>}>
+              <Hologram emotion={guestProfile.emotion || 'happy'} isAnimating={true} spokenText={`Welcome! I detected a ${guestProfile.emotion || 'friendly'} mood.`} />
+            </Suspense>
             <h2 style={{ margin: 0, color: '#12324a', fontSize: 28 }}>Welcome, Guest!</h2>
             <p style={{ margin: 0, color: '#345d7a', fontSize: 18, lineHeight: 1.5 }}>
               The AI avatar detected your {guestProfile.emotion || 'friendly'} mood and is ready to entertain you.

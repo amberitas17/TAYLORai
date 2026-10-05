@@ -6,7 +6,23 @@ import * as faceapi from 'face-api.js';
 class ClientSideFaceAnalysisService {
   constructor() {
     this.isLoaded = false;
-    this.modelPath = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'; // Official models
+    this.initializePromise = null;
+    this.modelPath = '/models/faceapi';
+    this.cacheName = 'taylor-faceapi-models-v1';
+    this.modelTimeoutMs = 20000;
+    this.modelSource = 'NETWORK';
+    this.modelsLoadTime = 0;
+    this.lastError = '';
+    this.resourceDiagnostics = {};
+    this.state = 'FACE_MODELS_LOADING';
+    this.modelResources = [
+      'tiny_face_detector_model-weights_manifest.json',
+      'tiny_face_detector_model-shard1',
+      'face_expression_model-weights_manifest.json',
+      'face_expression_model-shard1',
+      'age_gender_model-weights_manifest.json',
+      'age_gender_model-shard1'
+    ];
     this.emotionLabels = ['angry', 'disgusted', 'fearful', 'happy', 'neutral', 'sad', 'surprised'];
   }
 
@@ -14,37 +30,107 @@ class ClientSideFaceAnalysisService {
    * Initialize face-api.js models in the browser
    */
   async initialize() {
-    console.log('🚀 Initializing face-api.js models in browser...');
+    if (this.isLoaded) return true;
+    if (this.initializePromise) return this.initializePromise;
+
+    this.initializePromise = this.initializeOnce().catch((error) => {
+      this.isLoaded = false;
+      this.state = error.code === 'FACE_MODEL_DOWNLOAD_REQUIRED' ? 'FACE_MODEL_DOWNLOAD_REQUIRED' : 'FACE_MODEL_ERROR';
+      this.lastError = error.message || 'Face models failed to initialize.';
+      console.error('FaceAPI model initialization failed:', error);
+      throw error;
+    }).finally(() => {
+      if (!this.isLoaded) this.initializePromise = null;
+    });
+    return this.initializePromise;
+  }
+
+  async initializeOnce() {
+    const startedAt = performance.now();
+    this.state = 'FACE_MODELS_LOADING';
+    this.lastError = '';
+    console.log('Initializing FaceAPI models from local application assets...');
+
+    const sources = await Promise.all(this.modelResources.map((resource) => this.cacheResource(resource)));
+    this.modelSource = sources.every((source) => source === 'CACHE') ? 'CACHE' : 'NETWORK';
+
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const modelPrefix = new URL(`${this.modelPath}/`, window.location.origin).href;
+    globalThis.fetch = async (input, init) => {
+      const requestUrl = typeof input === 'string' ? input : input.url;
+      if (requestUrl.startsWith(modelPrefix)) {
+        const cached = await caches.match(requestUrl);
+        if (cached) return cached;
+      }
+      return originalFetch(input, init);
+    };
 
     try {
-      // Load all required models from public/models directory
       await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(this.modelPath),
-        faceapi.nets.faceLandmark68Net.loadFromUri(this.modelPath),
-        faceapi.nets.faceRecognitionNet.loadFromUri(this.modelPath),
-        faceapi.nets.faceExpressionNet.loadFromUri(this.modelPath),
-        faceapi.nets.ageGenderNet.loadFromUri(this.modelPath)
+        this.loadModel('tinyFaceDetector', () => faceapi.nets.tinyFaceDetector.loadFromUri(this.modelPath)),
+        this.loadModel('faceExpression', () => faceapi.nets.faceExpressionNet.loadFromUri(this.modelPath)),
+        this.loadModel('ageGender', () => faceapi.nets.ageGenderNet.loadFromUri(this.modelPath))
       ]);
 
       const warmupCanvas = document.createElement('canvas');
       warmupCanvas.width = 224;
       warmupCanvas.height = 224;
-      const warmupStartedAt = performance.now();
       await faceapi
         .detectSingleFace(warmupCanvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.2 }))
         .withFaceExpressions()
         .withAgeAndGender();
-      console.log(`🔥 Face-api warmup completed in ${(performance.now() - warmupStartedAt).toFixed(0)}ms`);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
 
-      this.isLoaded = true;
-      console.log('✅ All face-api.js models loaded successfully in browser!');
-      console.log('🏷️ Emotion classes:', this.emotionLabels.join(', '));
-      return true;
+    this.modelsLoadTime = performance.now() - startedAt;
+    this.isLoaded = true;
+    this.state = this.modelSource === 'CACHE' ? 'OFFLINE_FACE_MODELS_READY' : 'FACE_MODELS_READY';
+    console.log(`FaceAPI models ready from ${this.modelSource} in ${this.modelsLoadTime.toFixed(0)}ms`);
+    return true;
+  }
 
+  async cacheResource(resource) {
+    const url = `${this.modelPath}/${resource}`;
+    const startedAt = performance.now();
+    let cache;
+    try {
+      cache = await caches.open(this.cacheName);
+      const cached = await caches.match(url);
+      if (cached) {
+        await cache.put(url, cached.clone());
+        this.resourceDiagnostics[resource] = { status: 'CACHE', duration: performance.now() - startedAt };
+        return 'CACHE';
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.modelTimeoutMs);
+      let response;
+      try {
+        response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (!response.ok) throw new Error(`${resource} returned HTTP ${response.status}`);
+      await cache.put(url, response.clone());
+      this.resourceDiagnostics[resource] = { status: 'NETWORK', duration: performance.now() - startedAt };
+      return 'NETWORK';
     } catch (error) {
-      console.error('❌ Error loading face-api.js models in browser:', error);
-      this.isLoaded = false;
-      return false;
+      const message = `${resource}: ${error.name === 'AbortError' ? 'timed out' : error.message}`;
+      this.resourceDiagnostics[resource] = { status: 'ERROR', duration: performance.now() - startedAt, error: message };
+      const downloadError = new Error(`Face model download required: ${message}`);
+      downloadError.code = 'FACE_MODEL_DOWNLOAD_REQUIRED';
+      throw downloadError;
+    }
+  }
+
+  async loadModel(name, loader) {
+    try {
+      await loader();
+    } catch (error) {
+      const message = `${name} model failed: ${error.message || error}`;
+      this.lastError = message;
+      throw new Error(message);
     }
   }
 
@@ -58,7 +144,6 @@ class ClientSideFaceAnalysisService {
       throw new Error('Face-api.js models not loaded yet. Please wait for initialization.');
     }
 
-    console.log('🧠 Starting client-side face analysis...');
     const startTime = Date.now();
 
     const {
@@ -264,7 +349,24 @@ class ClientSideFaceAnalysisService {
       emotion: this.isLoaded,
       exhibit: false,
       framework: 'face-api.js',
-      mode: 'client-side'
+      mode: 'client-side',
+      state: this.state,
+      modelSource: this.modelSource,
+      modelsLoadTime: this.modelsLoadTime,
+      lastError: this.lastError
+    };
+  }
+
+  getDiagnostics() {
+    return {
+      device: `${navigator.userAgentData?.platform || navigator.platform || 'Unknown'}`,
+      detector: 'TinyFaceDetector',
+      expressionModel: this.isLoaded ? 'READY' : 'WAITING',
+      ageModel: this.isLoaded ? 'READY' : 'WAITING',
+      modelSource: this.modelSource,
+      modelsLoadTime: this.modelsLoadTime,
+      resourceDiagnostics: this.resourceDiagnostics,
+      lastError: this.lastError
     };
   }
 

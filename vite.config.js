@@ -18,7 +18,7 @@ export default defineConfig({
               url.pathname.startsWith('/models/') ||
               url.pathname.includes('/ort/') ||
               url.pathname.endsWith('.wasm') ||
-              /\.(json|bin|onnx|tflite)$/i.test(url.pathname)
+              /\.(json|bin|onnx|tflite|glb|gltf)$/i.test(url.pathname)
             ),
             handler: 'CacheFirst',
             options: {

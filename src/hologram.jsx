@@ -95,7 +95,7 @@ function findIdleClip(animations = []) {
     || animations[0];
 }
 
-function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto' }) {
+function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', onReady }) {
   const groupRef = useRef();
   const idleMixerRef = useRef(null);
   const meshesRef = useRef([]);
@@ -136,6 +136,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
 
   useEffect(() => {
     if (!displayScene) return;
+    onReady?.();
     const found = [];
     displayScene.traverse((child) => {
       if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
@@ -154,7 +155,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
         if (pascal in dict) inf[dict[pascal]] = 0;
       });
     });
-  }, [displayScene]);
+  }, [displayScene, onReady]);
 
   useEffect(() => {
     if (!displayScene) return;
@@ -328,7 +329,7 @@ function LoadingFallback() {
   );
 }
 
-export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto' }) {
+export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', onReady }) {
   return (
     <div className="hologram-container">
       <Canvas camera={{ position: [0, 1.3, 4.3], fov: 30 }} dpr={[1, 1.5]}>
@@ -338,7 +339,7 @@ export default function Hologram({ emotion, isAnimating = false, spokenText = ''
         <directionalLight position={[-5, 5, -5]} intensity={0.6} />
         <pointLight position={[0, 3, 3]} intensity={0.4} color="#ffffff" />
         <Suspense fallback={<LoadingFallback />}>
-          <AvatarModel emotion={emotion} isAnimating={isAnimating} spokenText={spokenText} disableAnimations={disableAnimations} poseMode={poseMode} assetPreset={assetPreset} />
+          <AvatarModel onReady={onReady} emotion={emotion} isAnimating={isAnimating} spokenText={spokenText} disableAnimations={disableAnimations} poseMode={poseMode} assetPreset={assetPreset} />
         </Suspense>
         <OrbitControls enableZoom={false} enablePan={false} target={[0, 1.18, 0]} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
       </Canvas>

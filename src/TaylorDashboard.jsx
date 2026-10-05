@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Hologram from './hologram.jsx';
+const Hologram = lazy(() => import('./hologram.jsx'));
 import { handleSpeechInteraction, onSpeechStarted, textToSpeech, getSpeechSupportState } from './services/speechAPI.js';
 import './HomePage.css';
 
@@ -236,7 +236,9 @@ export default function TaylorDashboard() {
 
         <section className="guide-section">
           <div className="avatar-card">
-            <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
+            <Suspense fallback={<div className="avatar-placeholder">AVATAR_LOADING</div>}>
+              <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
+            </Suspense>
           </div>
           <div className="suggestion-row">
                 {suggestionItems.map((item) => (

@@ -27,7 +27,7 @@ self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
   const isModelAsset = requestUrl.pathname.startsWith('/models/') ||
     requestUrl.pathname.includes('/ort/') ||
-    /\.(json|bin|onnx|tflite|wasm)$/i.test(requestUrl.pathname);
+    /\.(json|bin|onnx|tflite|wasm|glb|gltf)$/i.test(requestUrl.pathname);
   if (isModelAsset) {
     event.respondWith(
       caches.open(MODEL_CACHE_NAME).then(async (cache) => {

@@ -1,15 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { Camera, Shield, User, Smile, Upload, Eye, Zap, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clientSideFaceAnalysisService from '../services/clientSideFaceAnalysis.js';
 import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
+import avatarAssetService from '../services/avatarAssetService.js';
 import './AIVision.css';
-import Hologram from '../../src/hologram'
+const Hologram = lazy(() => import('../../src/hologram.jsx'));
+class AvatarErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    this.props.onError?.(error);
+  }
+
+  render() {
+    return this.state.hasError
+      ? <div className="avatar-placeholder">AVATAR_ERROR</div>
+      : this.props.children;
+  }
+}
 
 export default function AIVision() {
   const navigate = useNavigate();
   const [cameraPermission, setCameraPermission] = useState(null);
-  const [modelStatus, setModelStatus] = useState(null);
+  const [cameraStatus, setCameraStatus] = useState('CAMERA_INITIALIZING');
+  const [modelStatus, setModelStatus] = useState('FACE_MODELS_LOADING');
   const [stream, setStream] = useState(null);
   const [detectedProfile, setDetectedProfile] = useState(null);
   const [personDetected, setPersonDetected] = useState(false);
@@ -18,6 +37,13 @@ export default function AIVision() {
   const [avatarSpeaking, setAvatarSpeaking] = useState(false);
   const [welcomeDone, setWelcomeDone] = useState(false);
   const [flowError, setFlowError] = useState('');
+  const [lastInference, setLastInference] = useState({ status: 'STOPPED', time: 0, rate: 0 });
+  const [inferenceState, setInferenceState] = useState('STOPPED');
+  const [diagnosticsTick, setDiagnosticsTick] = useState(0);
+  const [avatarState, setAvatarState] = useState('AVATAR_LOADING');
+  const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
+  const [avatarDiagnostics, setAvatarDiagnostics] = useState(avatarAssetService.getDiagnostics());
+  const faceDebugEnabled = new URLSearchParams(window.location.search).has('faceDebug');
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -26,17 +52,16 @@ export default function AIVision() {
   const streamRef = useRef(null);
   const isProcessingRef = useRef(false);
   const inferenceCancelledRef = useRef(false);
-  const lastAgeAtRef = useRef(0);
   const ageHistoryRef = useRef([]);
   const emotionCandidateRef = useRef({ label: '', count: 0 });
   const latestProfileRef = useRef(null);
-  const faceCropCanvasRef = useRef(null);
   const inferenceCountRef = useRef(0);
   const inferenceWindowStartedRef = useRef(performance.now());
 
   useEffect(() => {
     initializeModels();
     startEntertainmentSequence();
+    initializeAvatar();
 
     return () => {
       if (detectionInterval.current) clearInterval(detectionInterval.current);
@@ -46,6 +71,30 @@ export default function AIVision() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const initializeAvatar = async () => {
+    setAvatarState('AVATAR_LOADING');
+    try {
+      await avatarAssetService.initialize();
+      setAvatarAssetsReady(true);
+      setAvatarDiagnostics(avatarAssetService.getDiagnostics());
+    } catch (error) {
+      setAvatarState('AVATAR_ERROR');
+      setAvatarDiagnostics(avatarAssetService.getDiagnostics());
+      console.error('Avatar initialization failed:', error);
+    }
+  };
+
+  const handleAvatarReady = useRef(() => {
+    setAvatarState('AVATAR_READY');
+    avatarAssetService.markFirstRender();
+    setAvatarDiagnostics(avatarAssetService.getDiagnostics());
+    setDiagnosticsTick((tick) => tick + 1);
+  }).current;
+  const handleAvatarError = useRef((error) => {
+    setAvatarState('AVATAR_ERROR');
+    setAvatarDiagnostics((previous) => ({ ...previous, error: error?.message || 'Avatar render failed.' }));
+  }).current;
+
   useEffect(() => {
     if (!stream || !videoRef.current) return;
 
@@ -53,8 +102,11 @@ export default function AIVision() {
     videoRef.current.muted = true;
     videoRef.current.playsInline = true;
 
-    videoRef.current.play().catch((error) => {
+    videoRef.current.play().then(() => {
+      setCameraStatus('CAMERA_READY');
+    }).catch((error) => {
       console.error('Unable to start video playback:', error);
+      setCameraStatus('CAMERA_ERROR');
       setFlowError('Camera stream connected, but the video could not start automatically.');
     });
   }, [stream]);
@@ -62,30 +114,32 @@ export default function AIVision() {
   const initializeModels = async () => {
     try {
       console.log('🧠 Loading face-api.js models...');
-      setModelStatus('loading');
+      setModelStatus('FACE_MODELS_LOADING');
       setFlowError('');
 
       const success = await clientSideFaceAnalysisService.initialize();
 
       if (success) {
-        setModelStatus('ready');
+        setModelStatus(clientSideFaceAnalysisService.getModelStatus().state);
         console.log('✅ Face-api.js models loaded successfully!');
       } else {
-        setModelStatus('error');
+        setModelStatus('FACE_MODEL_ERROR');
         setFlowError('Detection models failed to load.');
         console.error('❌ Failed to load face-api.js models');
       }
 
     } catch (error) {
       console.error('❌ Model loading failed:', error);
-      setModelStatus('error');
-      setFlowError('Unable to initialize detection models.');
+      const status = clientSideFaceAnalysisService.getModelStatus();
+      setModelStatus(status.state || 'FACE_MODEL_ERROR');
+      setFlowError(status.lastError || error.message || 'Unable to initialize detection models.');
     }
   };
 
   const startCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraPermission('denied');
+      setCameraStatus('CAMERA_ERROR');
       setFlowError('This browser does not support camera access.');
       return;
     }
@@ -98,12 +152,14 @@ export default function AIVision() {
       setStream(mediaStream);
       streamRef.current = mediaStream;
       setCameraPermission('granted');
+      setCameraStatus('CAMERA_READY');
       setFlowError('');
 
       console.log('🎥 Camera started successfully');
     } catch (error) {
       console.error('❌ Camera access denied:', error);
       setCameraPermission('denied');
+      setCameraStatus('CAMERA_ERROR');
 
       if (error.name === 'NotAllowedError') {
         setFlowError('Camera permission was blocked. Please allow camera access and try again.');
@@ -135,21 +191,6 @@ export default function AIVision() {
     textToSpeech(text, false, 'taylor', 'en').then(() => fallbackComplete()).catch(() => fallbackComplete());
   };
 
-  const createFaceCrop = (sourceCanvas, box) => {
-    if (!box) return null;
-    const cropCanvas = faceCropCanvasRef.current || document.createElement('canvas');
-    faceCropCanvasRef.current = cropCanvas;
-    const padding = Math.max(box.width, box.height) * 0.2;
-    const x = Math.max(0, box.x - padding);
-    const y = Math.max(0, box.y - padding);
-    const width = Math.min(sourceCanvas.width - x, box.width + padding * 2);
-    const height = Math.min(sourceCanvas.height - y, box.height + padding * 2);
-    cropCanvas.width = 128;
-    cropCanvas.height = 128;
-    cropCanvas.getContext('2d').drawImage(sourceCanvas, x, y, width, height, 0, 0, 128, 128);
-    return cropCanvas;
-  };
-
   const applySmoothedResult = (result, ageValue) => {
     const emotion = result.emotion;
     const candidate = emotionCandidateRef.current;
@@ -177,33 +218,17 @@ export default function AIVision() {
   const analyzeFrame = async (canvas) => {
     const totalStartedAt = performance.now();
     const result = await clientSideFaceAnalysisService.analyzeFaceFromImage(canvas, {
-      includeAge: false,
+      includeAge: true,
       retryOnMiss: false,
       inputSize: 224,
       scoreThreshold: 0.3
     });
     const faceDetectionTime = performance.now() - totalStartedAt;
     let ageValue;
-    let ageInferenceTime = 0;
-
-    if (result?.success && performance.now() - lastAgeAtRef.current >= 1500) {
-      const faceCrop = createFaceCrop(canvas, result.predictions.face_analysis.box);
-      if (faceCrop) {
-        const ageStartedAt = performance.now();
-        const ageResult = await clientSideFaceAnalysisService.analyzeFaceFromImage(faceCrop, {
-          includeAge: true,
-          retryOnMiss: false,
-          inputSize: 128,
-          scoreThreshold: 0.25
-        });
-        ageInferenceTime = performance.now() - ageStartedAt;
-        lastAgeAtRef.current = performance.now();
-        if (ageResult?.success && Number.isFinite(ageResult.predictions.age.value)) {
-          ageHistoryRef.current = [...ageHistoryRef.current, ageResult.predictions.age.value].slice(-3);
-          const sortedAges = [...ageHistoryRef.current].sort((a, b) => a - b);
-          ageValue = sortedAges[Math.floor(sortedAges.length / 2)];
-        }
-      }
+    if (result?.success && Number.isFinite(result.predictions.age.value)) {
+      ageHistoryRef.current = [...ageHistoryRef.current, result.predictions.age.value].slice(-3);
+      const sortedAges = [...ageHistoryRef.current].sort((a, b) => a - b);
+      ageValue = sortedAges[Math.floor(sortedAges.length / 2)];
     }
 
     const totalInferenceTime = performance.now() - totalStartedAt;
@@ -213,7 +238,7 @@ export default function AIVision() {
     console.log({
       faceDetectionTime: Math.round(faceDetectionTime),
       emotionInferenceTime: Math.round(faceDetectionTime),
-      ageInferenceTime: Math.round(ageInferenceTime),
+      ageInferenceTime: Math.round(faceDetectionTime),
       totalInferenceTime: Math.round(totalInferenceTime),
       inferenceFPS: Number(inferenceFPS.toFixed(2))
     });
@@ -221,6 +246,8 @@ export default function AIVision() {
       inferenceCountRef.current = 0;
       inferenceWindowStartedRef.current = performance.now();
     }
+    setLastInference({ status: 'RUNNING', time: totalInferenceTime, rate: inferenceFPS });
+    setDiagnosticsTick((tick) => tick + 1);
     return { result, ageValue };
   };
 
@@ -228,7 +255,7 @@ export default function AIVision() {
   useEffect(() => {
     inferenceCancelledRef.current = false;
     let runInference;
-    if (stream && modelStatus === 'ready' && !document.hidden) {
+    if (stream && ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) && !document.hidden) {
       if (!isGreeting) {
         setEntertainmentPhase('analyzing');
       }
@@ -238,6 +265,7 @@ export default function AIVision() {
         const video = videoRef.current;
         if (video.videoWidth === 0 || video.videoHeight === 0) return;
         isProcessingRef.current = true;
+        setInferenceState('FACE_INFERENCE_RUNNING');
         try {
           const canvas = canvasRef.current;
           canvas.width = 224;
@@ -261,6 +289,7 @@ export default function AIVision() {
           if (!inferenceCancelledRef.current) console.error('Analysis error:', error);
         } finally {
           isProcessingRef.current = false;
+          setInferenceState('STOPPED');
         }
       };
 
@@ -273,8 +302,10 @@ export default function AIVision() {
         inferenceCancelledRef.current = true;
         if (detectionInterval.current) clearInterval(detectionInterval.current);
         detectionInterval.current = null;
-      } else if (stream && modelStatus === 'ready') {
+      } else if (stream && ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus)) {
         inferenceCancelledRef.current = false;
+        const track = streamRef.current?.getVideoTracks?.()[0];
+        if (!track || track.readyState === 'ended') startCamera();
         if (runInference && !detectionInterval.current) {
           detectionInterval.current = setInterval(runInference, 400);
           runInference();
@@ -343,23 +374,6 @@ export default function AIVision() {
     input.click();
   };
 
-  const handleReset = () => {
-    if (detectionInterval.current) clearInterval(detectionInterval.current);
-    if (stream) stream.getTracks().forEach(track => track.stop());
-    window.speechSynthesis?.cancel();
-
-    setStream(null);
-    setDetectedProfile(null);
-    setPersonDetected(false);
-    setEntertainmentPhase('detecting');
-    setIsGreeting(false);
-    setWelcomeDone(false);
-    setFlowError('');
-    hasWelcomedRef.current = false;
-
-    startEntertainmentSequence();
-  };
-
   if (cameraPermission === null) {
     return (
       <div className="ai-vision-container permission-container">
@@ -410,8 +424,8 @@ export default function AIVision() {
               <span>{personDetected ? 'Person Detected' : 'Waiting for visitor...'}</span>
             </div>
             <div className="status-row">
-              <div className={`status-dot ${modelStatus === 'ready' ? 'green' : 'yellow'}`} />
-              <span>{modelStatus === 'ready' ? 'Model ready' : 'Loading models...'}</span>
+              <div className={`status-dot ${['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) ? 'green' : modelStatus === 'FACE_MODEL_ERROR' || modelStatus === 'FACE_MODEL_DOWNLOAD_REQUIRED' ? 'red' : 'yellow'}`} />
+              <span>{modelStatus}</span>
             </div>
             <div className="live-profile">
         <h3>Live Detected Emotion & Age</h3>
@@ -430,7 +444,17 @@ export default function AIVision() {
         </div>
       </div>
 
-      <Hologram emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" />
+      <div className="avatar-stage">
+        {avatarAssetsReady && avatarState !== 'AVATAR_ERROR' ? (
+          <AvatarErrorBoundary onError={handleAvatarError}>
+            <Suspense fallback={<div className="avatar-placeholder">AVATAR_LOADING</div>}>
+              <Hologram onReady={handleAvatarReady} emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" />
+            </Suspense>
+          </AvatarErrorBoundary>
+        ) : (
+          <div className="avatar-placeholder">{avatarState}</div>
+        )}
+      </div>
 
       <div className="camera-container">
         <div className="camera-frame">
@@ -438,6 +462,40 @@ export default function AIVision() {
           <canvas ref={canvasRef} style={{ display: 'none' }} />
         </div>
       </div>
+      {faceDebugEnabled && (
+        <div data-testid="face-diagnostics" style={{
+          position: 'fixed',
+          right: 12,
+          bottom: 12,
+          zIndex: 100,
+          maxWidth: 320,
+          padding: '10px 12px',
+          background: 'rgba(0, 0, 0, 0.82)',
+          color: '#fff',
+          borderRadius: 6,
+          font: '11px/1.45 monospace'
+        }}>
+          <div>Device: {clientSideFaceAnalysisService.getDiagnostics().device}</div>
+          <div>Camera: {cameraStatus}</div>
+          <div>Face detector: {clientSideFaceAnalysisService.getDiagnostics().detector}</div>
+          <div>Expression model: {clientSideFaceAnalysisService.getDiagnostics().expressionModel}</div>
+          <div>Age model: {clientSideFaceAnalysisService.getDiagnostics().ageModel}</div>
+          <div>Model source: {clientSideFaceAnalysisService.getDiagnostics().modelSource}</div>
+          <div>Models load time: {Math.round(clientSideFaceAnalysisService.getDiagnostics().modelsLoadTime)} ms</div>
+          <div>Inference: {inferenceState === 'FACE_INFERENCE_RUNNING' ? 'RUNNING' : 'STOPPED'}</div>
+          <div>Last inference time: {Math.round(lastInference.time)} ms</div>
+          <div>FPS/inference rate: {lastInference.rate.toFixed(2)}</div>
+          <div>Last error: {clientSideFaceAnalysisService.getDiagnostics().lastError || 'None'}</div>
+          <div>Avatar state: {avatarState}</div>
+          <div>Avatar source: {avatarDiagnostics.source}</div>
+          <div>Avatar download time: {Math.round(avatarDiagnostics.downloadTime)} ms</div>
+          <div>Avatar initialization time: {Math.round(avatarDiagnostics.initializationTime)} ms</div>
+          <div>Avatar first-render time: {Math.round(avatarDiagnostics.firstRenderTime)} ms</div>
+          <div>Avatar cache hits/misses: {avatarDiagnostics.cacheHits}/{avatarDiagnostics.cacheMisses}</div>
+          <div>Avatar error: {avatarDiagnostics.error || 'None'}</div>
+          <div aria-hidden="true">refresh:{diagnosticsTick}</div>
+        </div>
+      )}
     </div>
   );
 }
