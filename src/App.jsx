@@ -11,6 +11,7 @@ import ClientSideFaceAnalysis from './ClientSideFaceAnalysis.jsx';
 const Hologram = lazy(() => import('./hologram.jsx'));
 import HomePage from './HomePage.jsx';
 import TaylorDashboard from './TaylorDashboard.jsx';
+import AINavigation from './components/AINavigation.jsx';
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -193,6 +194,7 @@ export default function App() {
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/ai-text" element={<AiText />} />
       <Route path="/machine-vision" element={<AIVision />} />
+      <Route path="/ai-navigation" element={<AINavigation />} />
       <Route path="/machine-vision-exhibit" element={<AiExhibit classifierMode="recon" />} />
       <Route path="/machine-vision-recon" element={<AiExhibit classifierMode="recon" />} />
       <Route path="/machine-vision-exhibit-aricc" element={<AiExhibit classifierMode="aricc" />} />

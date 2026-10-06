@@ -1,9 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './AINavigation.css';
 import FloorPlanMap from './FloorPlanMap';
 import LeafletMap from './LeafletMap';
+import { textToSpeech } from '../services/speechAPI.js';
+import IndoorNavigationRuntime from '../services/indoorNavigationRuntime.js';
+import IndoorNavigationState from '../services/indoorNavigationState.js';
+import recognizeNavigationLandmark from '../services/navigationLandmarkRecognition.js';
 
-const AINavigation = ({ onBack, detectedExhibit, onExhibitSelect }) => {
+const AINavigation = ({
+  onBack,
+  detectedExhibit,
+  onExhibitSelect,
+  landmarkClassifier,
+}) => {
+  const navigate = useNavigate();
+  const formatLandmark = (landmark) => String(landmark || 'Unknown')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+
   const [currentExhibit, setCurrentExhibit] = useState(2);
   const [totalExhibits] = useState(23);
   const [currentLocation, setCurrentLocation] = useState({ x: 50, y: 60 });
@@ -23,6 +38,96 @@ const AINavigation = ({ onBack, detectedExhibit, onExhibitSelect }) => {
   const stepDetectionRef = useRef(null);
   const lastAccelerationRef = useRef(0);
   const lastStepTimeRef = useRef(0);
+  const navigationRuntimeRef = useRef(null);
+  const [navigationState, setNavigationState] = useState(null);
+  const [navigationInstruction, setNavigationInstruction] = useState(null);
+  const [selectedDestination, setSelectedDestination] = useState('aricc');
+  const [startFloor] = useState(1);
+  const [targetFloor] = useState(4);
+  const videoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+  const recognitionTimerRef = useRef(null);
+  const recognitionInFlightRef = useRef(false);
+
+  useEffect(() => {
+    const runtime = new IndoorNavigationRuntime({
+      navigationState: new IndoorNavigationState({
+        startFloor,
+        targetFloor,
+        destination: selectedDestination,
+      }),
+    });
+    navigationRuntimeRef.current = runtime;
+    setNavigationState(runtime.navigationState.getState());
+    setNavigationInstruction(null);
+
+    return () => {
+      if (navigationRuntimeRef.current === runtime) {
+        navigationRuntimeRef.current = null;
+      }
+    };
+  }, [selectedDestination, startFloor, targetFloor]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const stopCamera = () => {
+      if (recognitionTimerRef.current) {
+        clearInterval(recognitionTimerRef.current);
+        recognitionTimerRef.current = null;
+      }
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+
+    const processFrame = async () => {
+      if (cancelled || recognitionInFlightRef.current || !videoRef.current?.srcObject) return;
+      recognitionInFlightRef.current = true;
+      try {
+        const prediction = await recognizeNavigationLandmark(videoRef.current, landmarkClassifier);
+        if (cancelled) return;
+        const result = navigationRuntimeRef.current?.processPrediction(prediction);
+        if (!result) return;
+        setNavigationState(result.navigation.state);
+        if (result.navigation.instruction) {
+          setNavigationInstruction(result.navigation.instruction);
+          await textToSpeech(result.navigation.instruction, false, 'taylor', 'en');
+        }
+      } catch (error) {
+        console.warn('[taylor] navigation landmark recognition failed', error);
+      } finally {
+        recognitionInFlightRef.current = false;
+      }
+    };
+
+    const startCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia || !videoRef.current) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+        if (cancelled || !videoRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        cameraStreamRef.current = stream;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        await processFrame();
+        recognitionTimerRef.current = setInterval(processFrame, 1000);
+      } catch (error) {
+        console.warn('[taylor] navigation camera unavailable', error);
+      }
+    };
+
+    startCamera();
+    return () => {
+      cancelled = true;
+      stopCamera();
+    };
+  }, [landmarkClassifier]);
 
   // Map images per exhibit (from React Native implementation)
   const getMapImageForExhibit = (exhibitKey) => {
@@ -213,7 +318,7 @@ const AINavigation = ({ onBack, detectedExhibit, onExhibitSelect }) => {
   return (
     <div className="ai-navigation-container">
       <div className="navigation-header">
-        <button className="back-button" onClick={onBack}>
+        <button className="back-button" onClick={onBack || (() => navigate(-1))}>
           ← Back
         </button>
         <div className="header-content">
@@ -222,11 +327,49 @@ const AINavigation = ({ onBack, detectedExhibit, onExhibitSelect }) => {
         </div>
       </div>
 
+      {navigationState && (
+        <section className="indoor-navigation-status" data-testid="indoor-navigation-status">
+          <div className="indoor-navigation-status__destination">
+            <strong>{String(navigationState.destination || selectedDestination).toUpperCase()}</strong>
+            <span>Navigation Active</span>
+          </div>
+          <label>
+            Destination
+            <select value={selectedDestination} onChange={(event) => setSelectedDestination(event.target.value)}>
+              <option value="aricc">ARICC</option>
+              <option value="fablab">FABLAB</option>
+              <option value="caesar">CAESAR</option>
+              <option value="rio">RIO</option>
+            </select>
+          </label>
+          <div>Current: {formatLandmark(navigationState.current_landmark || navigationState.last_confirmed_landmark)}</div>
+          <div>Target floor: {navigationState.target_floor ?? 'Not set'}</div>
+          {navigationState.floor_transition_active && (
+            <div>Next: {navigationState.target_floor}th Floor - {formatLandmark(navigationState.next_expected_landmark)}</div>
+          )}
+          {!navigationState.floor_transition_active && navigationState.next_expected_landmark && (
+            <div>Next: {formatLandmark(navigationState.next_expected_landmark)}</div>
+          )}
+          {navigationInstruction && (
+            <div className="indoor-navigation-status__instruction">{navigationInstruction}</div>
+          )}
+        </section>
+      )}
+
       <div className="detect-button-container">
         <button className="detect-exhibit-btn">
           👁 Detect Exhibit Display
         </button>
       </div>
+
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        aria-label="Navigation camera"
+        className="navigation-camera"
+      />
 
       <div className="map-section">
         <h2>Map to Next Exhibit</h2>

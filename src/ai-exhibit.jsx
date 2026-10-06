@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FiEye, FiArrowLeft, FiMapPin, FiChevronRight, FiNavigation } from 'react-icons/fi';
 import './ai-exhibit.css';
-import AINavigation from './components/AINavigation';
 import LeafletMap from './components/LeafletMap';
-import aiNavigationService from './services/aiNavigationService';
 import exhibitDetectionService, { EXHIBIT_MODEL_STATES } from './services/exhibitDetectionService.js';
 
 const width = window.innerWidth;
@@ -622,7 +620,6 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [lastDetection, setLastDetection] = useState(null);
   const [stableExhibitDetected, setStableExhibitDetected] = useState(false);
   const [stayOnCamera, setStayOnCamera] = useState(true); // Keep camera active by default
-  const [showNavigation, setShowNavigation] = useState(false);
   const detectionIntervalRef = useRef(null);
   const detectionInFlightRef = useRef(false);
   const cameraStreamRef = useRef(null);
@@ -1050,6 +1047,10 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'INFERENCE_LOOP_START', {
       source: uploadedVideoRef.current ? 'UPLOAD' : 'CAMERA'
     });
+    exhibitDetectionService.setCandidateSourceContext({
+      type: uploadedVideoRef.current ? 'video' : 'camera',
+      video: uploadedVideoRef.current?.name || null
+    });
 
     // Run detection every 2 seconds for better performance and stability
     detectionIntervalRef.current = setInterval(async () => {
@@ -1353,28 +1354,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     pendingLabelCountRef.current = 0;
     setError("");
     setLastDetection(null);
-    setShowNavigation(false);
     // Real-time detection will restart automatically when camera shows
     console.log('🔄 Restarting automatic detection...');
-  };
-
-  const handleShowNavigation = () => {
-    if (currentExhibit) {
-      // Update navigation service with current exhibit
-      const exhibit = aiNavigationService.findExhibitByName(currentExhibit.name);
-      if (exhibit) {
-        aiNavigationService.markExhibitVisited(exhibit.id);
-      }
-    }
-    setShowNavigation(true);
-  };
-
-  const handleBackFromNavigation = () => {
-    setShowNavigation(false);
-  };
-
-  const handleExhibitSelect = (exhibit) => {
-    console.log('Selected exhibit for navigation:', exhibit);
   };
 
   // Get unique map image for current exhibit (from React Native implementation)
@@ -1559,17 +1540,6 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   };
 
   const navigationInfo = { distance: 120, steps: 160, direction: "North-East" };
-
-  // Show navigation if requested
-  if (showNavigation) {
-    return (
-      <AINavigation
-        onBack={handleBackFromNavigation}
-        detectedExhibit={currentExhibit}
-        onExhibitSelect={handleExhibitSelect}
-      />
-    );
-  }
 
   return (
     <div style={{ flex: 1, position: "relative", height: "100vh", overflow: "hidden" }}>

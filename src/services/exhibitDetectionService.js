@@ -6,6 +6,7 @@
 import * as tf from '@tensorflow/tfjs';
 import * as ort from 'onnxruntime-web';
 import * as faceapi from 'face-api.js';
+import { exhibitImprovementCandidateStore } from './exhibitImprovementCandidateStore.js';
 
 export const EXHIBIT_MODEL_STATES = Object.freeze({
     CAMERA_READY: 'CAMERA_READY',
@@ -155,6 +156,13 @@ class ExhibitDetectionService {
         };
         this.rejectedFrameLogKey = 'scienceCentreRejectedFrames';
         this.rejectedFrameLogLimit = 50;
+        this.candidateSourceContext = {
+            type: null,
+            sessionId: `exhibit-session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            video: null
+        };
+        this.candidateTemporalHistory = new Map();
+        this.candidateRejectionCounts = new Map();
         this.classifierMode = 'aricc';
         this.initializedMode = null;
         this.faceDetectorReady = false;
@@ -1328,6 +1336,90 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
 
     async detectHierarchical(imageElement) {
+        const detection = await this.detectHierarchicalCore(imageElement);
+        this.observeImprovementCandidate(detection, imageElement);
+        return detection;
+    }
+
+    setCandidateSourceContext(source = {}) {
+        this.candidateSourceContext = {
+            type: source.type || null,
+            sessionId: source.sessionId || null,
+            video: source.video || null
+        };
+    }
+
+    getImprovementCandidateDiagnostics() {
+        return exhibitImprovementCandidateStore.getDiagnostics();
+    }
+
+    getImprovementCandidates() {
+        return exhibitImprovementCandidateStore.list();
+    }
+
+    clearImprovementCandidates() {
+        return exhibitImprovementCandidateStore.clear();
+    }
+
+    observeImprovementCandidate(detection, imageElement) {
+        try {
+            const zone = this.classifierMode.toUpperCase();
+            const top1 = detection?.top1 || {
+                class: detection?.exhibit || detection?.class || 'UNKNOWN',
+                confidence: detection?.exhibitConfidence || detection?.mainConfidence || 0
+            };
+            const top2 = detection?.top2 || { class: 'UNKNOWN', confidence: 0 };
+            const confidenceMargin = Number.isFinite(Number(detection?.specificConfidenceGap))
+                ? Number(detection.specificConfidenceGap)
+                : Number(top1.confidence || 0) - Number(top2.confidence || 0);
+            const history = this.candidateTemporalHistory.get(zone) || [];
+            const temporalPrediction = {
+                timestamp: new Date().toISOString(),
+                top1_class: top1.class || null,
+                top1_confidence: Number(top1.confidence || 0),
+                top2_class: top2.class || null,
+                top2_confidence: Number(top2.confidence || 0),
+                confidence_margin: confidenceMargin
+            };
+            const temporalPredictions = [...history, temporalPrediction].slice(-5);
+            this.candidateTemporalHistory.set(zone, temporalPredictions);
+
+            const labels = temporalPredictions.map(prediction => prediction.top1_class).filter(Boolean);
+            const unstable = new Set(labels).size > 1 && labels.length >= 2;
+            const reasons = [];
+            if (Number(top1.confidence || 0) < RECOGNITION_MIN_CONFIDENCE) reasons.push('LOW_CONFIDENCE');
+            if (confidenceMargin < RECOGNITION_MIN_MARGIN) reasons.push('LOW_MARGIN');
+            if (unstable) reasons.push('UNSTABLE');
+            if (detection?.reason === 'unknown_exhibit' || detection?.reason === 'model_not_ready') reasons.push('UNKNOWN');
+            if (detection?.reason === 'noise_rejected' || detection?.reason === 'background_class') reasons.push('FALSE_POSITIVE_CANDIDATE');
+            if (!detection?.success) {
+                this.candidateRejectionCounts.set(zone, (this.candidateRejectionCounts.get(zone) || 0) + 1);
+            } else {
+                this.candidateRejectionCounts.set(zone, 0);
+            }
+            if ((this.candidateRejectionCounts.get(zone) || 0) >= 3) reasons.push('REPEATED_REJECTION');
+            if (reasons.length === 0) return;
+
+            const timestampSeconds = Number.isFinite(Number(imageElement?.currentTime))
+                ? Number(imageElement.currentTime)
+                : null;
+            exhibitImprovementCandidateStore.capture({
+                zone,
+                timestamp: new Date().toISOString(),
+                timestampSeconds,
+                modelVersion: MODEL_ASSET_VERSION,
+                top1,
+                top2,
+                temporalPredictions,
+                candidateReasons: reasons,
+                source: this.candidateSourceContext
+            });
+        } catch (error) {
+            console.warn('Improvement candidate observation failed:', error.message);
+        }
+    }
+
+    async detectHierarchicalCore(imageElement) {
         const activeZone = this.classifierMode;
         if (this.modelState !== EXHIBIT_MODEL_STATES.MODEL_READY &&
             this.modelState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY ||
