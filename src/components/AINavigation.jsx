@@ -40,6 +40,7 @@ const AINavigation = ({
   const lastStepTimeRef = useRef(0);
   const navigationRuntimeRef = useRef(null);
   const [navigationState, setNavigationState] = useState(null);
+  const [confirmedLandmark, setConfirmedLandmark] = useState(null);
   const [navigationInstruction, setNavigationInstruction] = useState(null);
   const [selectedDestination, setSelectedDestination] = useState('aricc');
   const [startFloor] = useState(1);
@@ -54,7 +55,7 @@ const AINavigation = ({
       navigationState: new IndoorNavigationState({
         startFloor,
         targetFloor,
-        destination: selectedDestination,
+          destination: 'aricc',
       }),
     });
     navigationRuntimeRef.current = runtime;
@@ -66,7 +67,15 @@ const AINavigation = ({
         navigationRuntimeRef.current = null;
       }
     };
-  }, [selectedDestination, startFloor, targetFloor]);
+  }, [startFloor, targetFloor]);
+
+  useEffect(() => {
+    const runtime = navigationRuntimeRef.current;
+    if (!runtime) return;
+    setNavigationState({
+      ...runtime.navigationState.setDestination(selectedDestination),
+    });
+  }, [selectedDestination]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +99,9 @@ const AINavigation = ({
         const result = navigationRuntimeRef.current?.processPrediction(prediction);
         if (!result) return;
         setNavigationState(result.navigation.state);
+        if (result.confirmation.confirmed && result.confirmation.landmark !== 'unknown') {
+          setConfirmedLandmark(result.confirmation.landmark);
+        }
         if (result.navigation.instruction) {
           setNavigationInstruction(result.navigation.instruction);
           await textToSpeech(result.navigation.instruction, false, 'taylor', 'en');
@@ -129,36 +141,6 @@ const AINavigation = ({
     };
   }, [landmarkClassifier]);
 
-  // Map images per exhibit (from React Native implementation)
-  const getMapImageForExhibit = (exhibitKey) => {
-    const mapImages = {
-      'kinetic_garden': 'https://i.imgur.com/NF7WVY5.png',
-      'minds_eye': 'https://i.imgur.com/4t0Xtcw.png',
-      'laser_maze': 'https://i.imgur.com/7AKHjGj.png',
-      'mirror_maze': 'https://i.imgur.com/uXbgGhm.png',
-      'giant_zoetrope': 'https://i.imgur.com/M71vqcs.png',
-      'waterworks': 'https://i.imgur.com/8udgEnu.png',
-      'urban_mutations': 'https://i.imgur.com/DT4TZni.png',
-      'savage_garden': 'https://i.imgur.com/sOvinHc.png',
-      'some_call_it_science': 'https://i.imgur.com/dqGpqIc.png',
-      'know_your_poo': 'https://i.imgur.com/6bnTsMP.png',
-      'phobia2': 'https://i.imgur.com/tR0R65c.png',
-      'earth_alive': 'https://i.imgur.com/h3h0OLG.png',
-      'dialogue_with_time': 'https://i.imgur.com/cBiPZB1.png',
-      'energy': 'https://i.imgur.com/QOyi2IG.png',
-      'climate_changed': 'https://i.imgur.com/HvQ2Icg.png',
-      'ecogarden': 'https://i.imgur.com/KCEu5jH.png',
-      'singapore_innovations': 'https://i.imgur.com/wpJ23HJ.png',
-      'future_makers': 'https://i.imgur.com/Z0UOv3k.png',
-      'everyday_science': 'https://i.imgur.com/7qT2lGl.png',
-      'e3': 'https://i.imgur.com/m1Qvmfa.png',
-      'tinkering_studio': 'https://i.imgur.com/KkZhLHd.png',
-      'going_viral': 'https://i.imgur.com/nxIDrTe.png',
-      'smart_nation': 'https://i.imgur.com/dBip4jT.png',
-    };
-    return mapImages[exhibitKey] || 'https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg';
-  };
-
   // Exhibit locations on the map (as percentages)
   const exhibits = [
     { id: 1, name: 'Giant Labyrinth', x: 15, y: 40, visited: true, key: 'laser_maze' },
@@ -171,6 +153,7 @@ const AINavigation = ({
 
   // Live tracking with device sensors
   useEffect(() => {
+    let cancelled = false;
     let accelerometerSubscription = null;
     let orientationSubscription = null;
 
@@ -240,7 +223,7 @@ const AINavigation = ({
       } catch (error) {
         console.log('Live tracking not available:', error);
         // Fallback to simulated tracking for desktop
-        startSimulatedTracking();
+        return startSimulatedTracking();
       }
     };
 
@@ -263,10 +246,21 @@ const AINavigation = ({
       return () => clearInterval(interval);
     };
 
-    const cleanup = startLiveTracking();
+    let trackingCleanup;
+    startLiveTracking().then((cleanup) => {
+      if (typeof cleanup !== 'function') return;
+      if (cancelled) {
+        cleanup();
+      } else {
+        trackingCleanup = cleanup;
+      }
+    });
 
     return () => {
-      if (cleanup) cleanup();
+      cancelled = true;
+      if (typeof trackingCleanup === 'function') {
+        trackingCleanup();
+      }
     };
   }, []);
 
@@ -316,22 +310,23 @@ const AINavigation = ({
   };
 
   return (
-    <div className="ai-navigation-container">
-      <div className="navigation-header">
+    <div className="ai-navigation-container homepage-shell taylor-shell">
+      <main className="navigation-page homepage-panel taylor-panel">
+      <header className="navigation-header taylor-header">
         <button className="back-button" onClick={onBack || (() => navigate(-1))}>
           ← Back
         </button>
         <div className="header-content">
-          <h1>ENTRANCE HALL Navigation</h1>
+          <h1>BULSU Research Innovation Unit</h1>
           <p>Interactive Exhibit Guide</p>
         </div>
-      </div>
+      </header>
 
       {navigationState && (
         <section className="indoor-navigation-status" data-testid="indoor-navigation-status">
           <div className="indoor-navigation-status__destination">
-            <strong>{String(navigationState.destination || selectedDestination).toUpperCase()}</strong>
-            <span>Navigation Active</span>
+            <strong>LIVE TRACKING ACTIVE</strong>
+            <span>Indoor position via confirmed camera recognition</span>
           </div>
           <label>
             Destination
@@ -340,15 +335,39 @@ const AINavigation = ({
               <option value="fablab">FABLAB</option>
               <option value="caesar">CAESAR</option>
               <option value="rio">RIO</option>
+              <option value="recon">RECON</option>
             </select>
           </label>
-          <div>Current: {formatLandmark(navigationState.current_landmark || navigationState.last_confirmed_landmark)}</div>
-          <div>Target floor: {navigationState.target_floor ?? 'Not set'}</div>
+          <div className="indoor-navigation-status__field">
+            <span>Current Location</span>
+            <strong>{confirmedLandmark ? confirmedLandmark.toUpperCase() : 'Searching for landmark...'}</strong>
+          </div>
+          <div className="indoor-navigation-status__field">
+            <span>Building</span>
+            <strong>College of Industrial Technology (CIT)</strong>
+          </div>
+          <div className="indoor-navigation-status__field">
+            <span>{confirmedLandmark ? 'Current Floor' : 'Target Floor'}</span>
+            <strong>{confirmedLandmark ? '4th Floor' : `${navigationState.target_floor}th Floor`}</strong>
+          </div>
+          <div className="indoor-navigation-status__field">
+            <span>Destination</span>
+            <strong>{String(navigationState.destination || selectedDestination).toUpperCase()}</strong>
+          </div>
+          {confirmedLandmark && (
+            <div className="indoor-navigation-status__recognition">Landmark Confirmed</div>
+          )}
           {navigationState.floor_transition_active && (
             <div>Next: {navigationState.target_floor}th Floor - {formatLandmark(navigationState.next_expected_landmark)}</div>
           )}
-          {!navigationState.floor_transition_active && navigationState.next_expected_landmark && (
+          {confirmedLandmark && !navigationState.floor_transition_active && navigationState.next_expected_landmark && (
             <div>Next: {formatLandmark(navigationState.next_expected_landmark)}</div>
+          )}
+          {!confirmedLandmark && !navigationState.floor_transition_active && (
+            <div>Next Landmark: Awaiting route data</div>
+          )}
+          {confirmedLandmark && !navigationState.floor_transition_active && !navigationState.next_expected_landmark && (
+            <div>Next Landmark: Awaiting route data</div>
           )}
           {navigationInstruction && (
             <div className="indoor-navigation-status__instruction">{navigationInstruction}</div>
@@ -372,7 +391,9 @@ const AINavigation = ({
       />
 
       <div className="map-section">
-        <h2>Map to Next Exhibit</h2>
+        <h2>BULSU CIT</h2>
+        <p className="geographic-context-label">College of Industrial Technology</p>
+        <p className="geographic-hierarchy">Bulacan State University &gt; College of Industrial Technology &gt; 4th Floor</p>
 
         {/* Live tracking status */}
         <div className="tracking-status">
@@ -381,32 +402,12 @@ const AINavigation = ({
           </span>
         </div>
 
-        {/* Map display - use LeafletMap for DWT and EAP, static images for others */}
+        {/* Geographic landmark context remains separate from indoor navigation. */}
         <div className="map-image-container">
-          {detectedExhibit?.zone === 'DWT' || detectedExhibit?.zone === 'EAP' ? (
-            <LeafletMap
-              currentExhibit={detectedExhibit}
-              onExhibitSelect={onExhibitSelect}
-              mapType={detectedExhibit.zone}
-            />
-          ) : (
-            <>
-              <img
-                src={getMapImageForExhibit(selectedExhibit?.key || 'laser_maze')}
-                alt="Exhibit map"
-                className="map-image"
-                onError={(e) => {
-                  console.log('Map image failed to load, using fallback');
-                  e.target.src = 'https://via.placeholder.com/400x300/e9ecef/6c757d?text=Exhibit+Map+Loading...';
-                }}
-              />
-              <div className="map-overlay">
-                <span className="map-label">
-                  {selectedExhibit ? selectedExhibit.name : 'Laser Maze Challenge'}
-                </span>
-              </div>
-            </>
-          )}
+          <LeafletMap
+            destination={navigationState?.destination_metadata}
+            isTracking={isTracking}
+          />
         </div>
       </div>
 
@@ -453,6 +454,7 @@ const AINavigation = ({
           </div>
         )}
       </div>
+      </main>
     </div>
   );
 };

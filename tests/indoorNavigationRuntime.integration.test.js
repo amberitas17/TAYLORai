@@ -56,4 +56,34 @@ const finalConfirmation = process('olcpd_office');
 assert.equal(finalConfirmation.navigation.state.next_expected_landmark, 'window_near_bathroom');
 assert.equal(spokenInstructions.length, 1);
 
+const liveTrackingRuntime = new IndoorNavigationRuntime({
+    navigationState: new IndoorNavigationState({
+        startFloor: 4,
+        targetFloor: 4,
+        destination: 'fablab',
+        requiresTargetFloor: false,
+    }),
+});
+
+const processLiveTracking = (landmark, confidence) => {
+    let result;
+    for (let index = 0; index < 3; index += 1) {
+        result = liveTrackingRuntime.processPrediction({ landmark, confidence });
+    }
+    return result;
+};
+
+const aricc = processLiveTracking('aricc', 0.95);
+assert.equal(aricc.confirmation.confirmed, true);
+assert.equal(aricc.navigation.state.current_landmark, 'ARICC');
+
+const weakUnknown = liveTrackingRuntime.processPrediction({ landmark: 'unknown', confidence: 0.6 });
+assert.equal(weakUnknown.navigation.state.current_landmark, 'ARICC');
+
+const recon = processLiveTracking('recon', 0.95);
+assert.equal(recon.confirmation.confirmed, true);
+assert.equal(recon.navigation.state.current_landmark, 'RECON');
+liveTrackingRuntime.navigationState.setDestination('caesar');
+assert.equal(liveTrackingRuntime.navigationState.getState().current_landmark, 'RECON');
+
 console.log('IndoorNavigationRuntime integration behavior passed');

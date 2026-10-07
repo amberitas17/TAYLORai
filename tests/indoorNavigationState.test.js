@@ -68,4 +68,32 @@ assert.deepEqual(customFloors.getFloorTransitionEdge(), {
 assert.equal(ELEVATOR_TO_FOURTH_FLOOR_EDGE.action, 'take_elevator');
 assert.equal(ELEVATOR_TO_FOURTH_FLOOR_EDGE.target_floor, 4);
 
+const transitions = [
+    ['ARICC', 'fablab'],
+    ['FABLAB', 'recon'],
+    ['RECON', 'caesar'],
+    ['CAESAR', 'rio'],
+];
+
+for (const [currentLandmark, destination] of transitions) {
+    const indoorNavigation = new IndoorNavigationState({
+        startFloor: 4,
+        targetFloor: 4,
+        destination,
+        requiresTargetFloor: false,
+    });
+    const result = indoorNavigation.confirmLandmark(currentLandmark);
+
+    assert.equal(result.state.building_code, 'CIT');
+    assert.equal(result.state.current_floor, 4);
+    assert.equal(result.state.current_landmark, currentLandmark);
+    assert.equal(result.state.current_landmark_metadata.destination, currentLandmark);
+    assert.equal(result.state.current_landmark_metadata.floor, 4);
+    assert.equal(result.state.next_expected_landmark, null);
+    assert.equal(result.state.route_data_status, 'pending');
+
+    indoorNavigation.setDestination('caesar');
+    assert.equal(indoorNavigation.getState().current_landmark, currentLandmark);
+}
+
 console.log('IndoorNavigationState behavior passed');

@@ -1,5 +1,21 @@
 const DEFAULT_TARGET_FLOOR = 4;
 const DEFAULT_NEXT_LANDMARK = 'olcpd_office';
+const CIT_BUILDING = 'College of Industrial Technology';
+const CIT_BUILDING_CODE = 'CIT';
+const CIT_FLOOR = 4;
+const CIT_FLOOR_DESTINATIONS = ['RIO', 'FABLAB', 'ARICC', 'RECON', 'CAESAR'];
+
+export const CIT_INDOOR_DESTINATIONS = Object.freeze(
+    CIT_FLOOR_DESTINATIONS.reduce((destinations, destination) => ({
+        ...destinations,
+        [destination.toLowerCase()]: Object.freeze({
+            building: CIT_BUILDING,
+            buildingCode: CIT_BUILDING_CODE,
+            floor: CIT_FLOOR,
+            destination,
+        }),
+    }), {})
+);
 
 export const ELEVATOR_TO_FOURTH_FLOOR_EDGE = Object.freeze({
     from: 'elevator_lower_floor',
@@ -18,6 +34,19 @@ function ordinalFloor(floor) {
         ? 'th'
         : ({ 1: 'st', 2: 'nd', 3: 'rd' }[floor % 10] || 'th');
     return `${floor}${suffix}`;
+}
+
+function normalizeIndoorLandmark(landmark) {
+    if (typeof landmark !== 'string') return null;
+    const normalized = landmark.trim().toUpperCase();
+    return CIT_FLOOR_DESTINATIONS.find((destination) => (
+        normalized === destination || normalized.includes(destination)
+    )) || null;
+}
+
+function getIndoorDestination(destination) {
+    if (typeof destination !== 'string') return null;
+    return CIT_INDOOR_DESTINATIONS[destination.trim().toLowerCase()] || null;
 }
 
 export class IndoorNavigationState {
@@ -41,6 +70,11 @@ export class IndoorNavigationState {
         return {
             current_floor: this.startFloor,
             target_floor: this.targetFloor,
+            building: CIT_BUILDING,
+            building_code: CIT_BUILDING_CODE,
+            current_landmark_metadata: null,
+            destination_metadata: getIndoorDestination(this.destination),
+            route_data_status: 'pending',
             floor_transition_active: false,
             last_confirmed_landmark: null,
             next_expected_landmark: 'elevator',
@@ -81,15 +115,28 @@ export class IndoorNavigationState {
         }
 
         if (landmark === 'unknown') {
-            this.state = {
-                ...this.state,
-                current_landmark: this.state.floor_transition_active ? null : 'unknown',
-            };
             return { state: this.getState(), instruction: null };
         }
 
         if (landmark === 'elevator') {
             return this.enterElevatorTransition();
+        }
+
+        const indoorLandmark = normalizeIndoorLandmark(landmark);
+        if (indoorLandmark) {
+            const metadata = CIT_INDOOR_DESTINATIONS[indoorLandmark.toLowerCase()];
+            this.state = {
+                ...this.state,
+                current_floor: CIT_FLOOR,
+                floor_transition_active: false,
+                current_landmark: indoorLandmark,
+                last_confirmed_landmark: indoorLandmark,
+                current_landmark_metadata: metadata,
+                next_expected_landmark: null,
+                route_data_status: 'pending',
+                pending_instruction: null,
+            };
+            return { state: this.getState(), instruction: null };
         }
 
         if (
@@ -124,6 +171,7 @@ export class IndoorNavigationState {
             ...this.state,
             current_landmark: landmark,
             last_confirmed_landmark: landmark,
+            current_landmark_metadata: null,
         };
         return { state: this.getState(), instruction: null };
     }
@@ -158,7 +206,18 @@ export class IndoorNavigationState {
     }
 
     setDestination(destination) {
-        this.state = { ...this.state, destination };
+        const currentLandmark = this.state.current_landmark;
+        this.state = {
+            ...this.state,
+            destination,
+            destination_metadata: getIndoorDestination(destination),
+            next_expected_landmark: normalizeIndoorLandmark(currentLandmark)
+                ? null
+                : this.state.next_expected_landmark,
+            route_data_status: normalizeIndoorLandmark(currentLandmark)
+                ? 'pending'
+                : this.state.route_data_status,
+        };
         this.destination = destination;
         return this.getState();
     }
@@ -171,6 +230,13 @@ export class IndoorNavigationState {
             ...this.state,
             destination,
             target_floor: this.targetFloor,
+            destination_metadata: getIndoorDestination(destination),
+            next_expected_landmark: normalizeIndoorLandmark(this.state.current_landmark)
+                ? null
+                : this.state.next_expected_landmark,
+            route_data_status: normalizeIndoorLandmark(this.state.current_landmark)
+                ? 'pending'
+                : this.state.route_data_status,
             pending_instruction: null,
         };
         return this.getState();
