@@ -12,6 +12,7 @@ const Hologram = lazy(() => import('./hologram.jsx'));
 import HomePage from './HomePage.jsx';
 import TaylorDashboard from './TaylorDashboard.jsx';
 import AINavigation from './components/AINavigation.jsx';
+import IndoorMapEditor from './components/IndoorMapEditor.jsx';
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -186,6 +187,10 @@ function LandingPage() {
   );
 }
 
+function NavigationRoute() {
+  return <AINavigation />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -194,7 +199,8 @@ export default function App() {
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/ai-text" element={<AiText />} />
       <Route path="/machine-vision" element={<AIVision />} />
-      <Route path="/ai-navigation" element={<AINavigation />} />
+      <Route path="/ai-navigation" element={<NavigationRoute />} />
+      <Route path="/ai-navigation-admin" element={<IndoorMapEditor onBack={() => window.history.back()} />} />
       <Route path="/machine-vision-exhibit" element={<AiExhibit classifierMode="recon" />} />
       <Route path="/machine-vision-recon" element={<AiExhibit classifierMode="recon" />} />
       <Route path="/machine-vision-exhibit-aricc" element={<AiExhibit classifierMode="aricc" />} />

@@ -22,6 +22,9 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ url }) => (
+              url.pathname === '/api/indoor-map/cit/published' ||
+              url.pathname.startsWith('/indoor-map-assets/') ||
+              url.pathname.startsWith('/indoor-evidence/') ||
               url.pathname.startsWith('/models/') ||
               url.pathname.includes('/ort/') ||
               url.pathname.endsWith('.wasm') ||
@@ -29,7 +32,7 @@ export default defineConfig({
             ),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'taylor-model-assets-v1',
+              cacheName: 'taylor-published-map-and-evidence-assets-v2',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 365

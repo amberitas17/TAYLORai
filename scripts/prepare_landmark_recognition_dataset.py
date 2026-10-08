@@ -48,6 +48,7 @@ CLASSES = (
     "unknown",
     "window_near_bathroom",
 )
+TRAINING_CLASSES = tuple(label for label in CLASSES if label != "unknown")
 REVIEW_FIELDS = (
     "frame_path",
     "source_video",
@@ -204,6 +205,8 @@ def build(args: argparse.Namespace) -> None:
     counts: dict[str, Counter[str]] = {"train": Counter(), "val": Counter()}
     sources: dict[str, dict[str, list[str]]] = {"train": defaultdict(list), "val": defaultdict(list)}
     for index, row in enumerate(rows):
+        if row["label"] == "unknown":
+            continue
         split = source_splits[row["source_video"]]
         source = DEFAULT_SOURCE / row["frame_path"]
         destination = dataset / split / row["label"] / f"{index:06d}_{source.name}"
@@ -216,12 +219,13 @@ def build(args: argparse.Namespace) -> None:
     for row in rows:
         timestamps_by_class[row["label"]][row["source_video"]].append(row["timestamp_seconds"])
     report = {
-        "ready_for_training": all(counts[split][label] > 0 for split in ("train", "val") for label in CLASSES),
-        "classes": list(CLASSES),
+        "ready_for_training": all(counts[split][label] > 0 for split in ("train", "val") for label in TRAINING_CLASSES),
+        "classes": list(TRAINING_CLASSES),
+        "excluded_unknown_frames": sum(1 for row in rows if row["label"] == "unknown"),
         "counts": {split: dict(sorted(value.items())) for split, value in counts.items()},
         "sources_by_split": {split: dict(sorted(value.items())) for split, value in sources.items()},
         "source_splits": dict(sorted(source_splits.items())),
-        "insufficient_classes": [label for label in CLASSES if counts["train"][label] < args.minimum_per_class or counts["val"][label] < 1],
+        "insufficient_classes": [label for label in TRAINING_CLASSES if counts["train"][label] < args.minimum_per_class or counts["val"][label] < 1],
         "timestamps_by_class": {
             label: dict(sorted(source_timestamps.items()))
             for label, source_timestamps in sorted(timestamps_by_class.items())
@@ -233,7 +237,7 @@ def build(args: argparse.Namespace) -> None:
         ],
         "manual_review_recommendations": [
             f"Review all {counts['train']['unknown'] + counts['val']['unknown']} unknown frames for consistent visual ambiguity.",
-            *[f"Collect or review more {label} frames." for label in CLASSES if counts["train"][label] < args.minimum_per_class],
+            *[f"Collect or review more {label} frames." for label in TRAINING_CLASSES if counts["train"][label] < args.minimum_per_class],
         ],
         "manifest": str(work / "review_manifest.csv"),
     }

@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import OpenAI from 'openai';
 import { getFacebookPageContextHint, indexFacebookKnowledgeBase, searchFacebookKnowledgeBase, shouldUseFacebookContext } from './scripts/facebookKnowledgeBase.mjs';
 import { BULSU_GROUNDED_SYSTEM_PROMPT, formatBulsuContext, isBulsuCenterQuestion, normalizeBulsuEntity, searchBulsuCenters } from './scripts/bulsuCentersKnowledgeBase.mjs';
@@ -12,7 +15,143 @@ const app = express();
 const port = process.env.PORT || 3033;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '30mb' }));
+
+function learningSyncAuthorized(req) {
+  if (req.user?.authenticated === true || req.user?.id) return true;
+  const configuredToken = process.env.TAYLOR_LEARNING_SYNC_TOKEN;
+  if (!configuredToken) return false;
+  const suppliedToken = (req.get('authorization') || '').replace(/^Bearer\s+/i, '') || req.get('x-taylor-sync-token') || '';
+  return suppliedToken.length === configuredToken.length && crypto.timingSafeEqual(Buffer.from(suppliedToken), Buffer.from(configuredToken));
+}
+
+const INDOOR_MAP_PATH = process.env.TAYLOR_INDOOR_MAP_PATH || path.join(process.cwd(), 'data', 'indoor-maps', 'cit.json');
+
+function defaultIndoorMap() {
+  return {
+    version: 1,
+    building: 'CIT',
+    status: 'draft',
+    floors: {
+      1: { floor: 1, floorPlan: null, landmarks: [], corridors: [] },
+      4: { floor: 4, floorPlan: null, landmarks: [], corridors: [] },
+    },
+    floorConnections: [],
+    destinations: [],
+    validation: { valid: false, errors: ['Both floor plans must be imported and calibrated.'], warnings: [] },
+    updatedAt: null,
+    publishedAt: null,
+  };
+}
+
+async function readIndoorMap() {
+  try {
+    return JSON.parse(await readFile(INDOOR_MAP_PATH, 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return defaultIndoorMap();
+    throw error;
+  }
+}
+
+async function writeIndoorMap(map) {
+  await mkdir(path.dirname(INDOOR_MAP_PATH), { recursive: true });
+  const temporaryPath = `${INDOOR_MAP_PATH}.tmp`;
+  await writeFile(temporaryPath, JSON.stringify(map, null, 2), 'utf8');
+  await rename(temporaryPath, INDOOR_MAP_PATH);
+}
+
+function adminMapAuthorized(req) {
+  const configuredToken = process.env.TAYLOR_INDOOR_MAP_ADMIN_TOKEN;
+  if (!configuredToken) return false;
+  const suppliedToken = (req.get('authorization') || '').replace(/^Bearer\s+/i, '') || req.get('x-taylor-admin-token') || '';
+  return suppliedToken.length === configuredToken.length && crypto.timingSafeEqual(Buffer.from(suppliedToken), Buffer.from(configuredToken));
+}
+
+function validateIndoorMap(map) {
+  const errors = [];
+  const warnings = [];
+  const floors = map?.floors || {};
+  for (const floor of [1, 4]) {
+    if (!floors[floor]?.floorPlan?.dataUrl) errors.push(`Floor ${floor} has no imported floor plan.`);
+  }
+  const landmarks = Object.values(floors).flatMap((floor) => floor.landmarks || []);
+  const landmarkIds = new Set(landmarks.map((landmark) => landmark.id));
+  for (const destination of map.destinations || []) {
+    if (!destination.landmarkId || !landmarkIds.has(destination.landmarkId)) errors.push(`Destination ${destination.name || destination.id} has no calibrated landmark.`);
+  }
+  const corridors = Object.values(floors).flatMap((floor) => floor.corridors || []);
+  for (const corridor of corridors) {
+    if (!Array.isArray(corridor.points) || corridor.points.length < 2) errors.push(`Corridor ${corridor.name || corridor.id} needs at least two points.`);
+    if (!corridor.fromLandmarkId || !corridor.toLandmarkId || !landmarkIds.has(corridor.fromLandmarkId) || !landmarkIds.has(corridor.toLandmarkId)) {
+      errors.push(`Corridor ${corridor.name || corridor.id} has disconnected endpoints.`);
+    }
+  }
+  const connections = map.floorConnections || [];
+  const elevatorConnections = connections.filter((connection) => connection.fromFloor === 1 && connection.toFloor === 4);
+  if (!elevatorConnections.some((connection) => connection.type === 'elevator')) errors.push('A 1st-floor to 4th-floor elevator connection is required.');
+  if (!map.destinations?.length) warnings.push('No destinations have been configured yet.');
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+app.get('/api/indoor-map/cit/published', async (_req, res) => {
+  const map = await readIndoorMap();
+  if (map.status !== 'published' || !map.validation?.valid) return res.status(404).json({ success: false, message: 'No validated indoor map has been published.' });
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ success: true, map });
+});
+
+app.get('/api/admin/indoor-map/cit', async (req, res) => {
+  if (!adminMapAuthorized(req)) return res.status(401).json({ success: false, message: 'Administrator authentication is required.' });
+  res.json({ success: true, map: await readIndoorMap() });
+});
+
+app.put('/api/admin/indoor-map/cit', async (req, res) => {
+  if (!adminMapAuthorized(req)) return res.status(401).json({ success: false, message: 'Administrator authentication is required.' });
+  const map = { ...req.body, building: 'CIT', status: 'draft', updatedAt: new Date().toISOString() };
+  map.validation = validateIndoorMap(map);
+  await writeIndoorMap(map);
+  res.json({ success: true, map });
+});
+
+app.post('/api/admin/indoor-map/cit/publish', async (req, res) => {
+  if (!adminMapAuthorized(req)) return res.status(401).json({ success: false, message: 'Administrator authentication is required.' });
+  const map = await readIndoorMap();
+  map.validation = validateIndoorMap(map);
+  if (!map.validation.valid) return res.status(422).json({ success: false, validation: map.validation });
+  map.status = 'published';
+  map.publishedAt = new Date().toISOString();
+  await writeIndoorMap(map);
+  res.json({ success: true, map });
+});
+
+app.post('/api/landmarks/sync', async (req, res) => {
+  if (!learningSyncAuthorized(req)) return res.status(401).json({ success: false, message: 'Learning sync authentication is required.' });
+  const examples = req.body?.examples;
+  if (!Array.isArray(examples) || examples.length > 120) return res.status(400).json({ success: false, message: 'examples must be an array of at most 120 records.' });
+  const validExamples = examples.filter((example) => (
+    example && typeof example.id === 'string' &&
+    ['confirmed', 'corrected'].includes(example.status) &&
+    typeof example.label === 'string' && /^[a-z0-9][a-z0-9_-]{0,79}$/i.test(example.label) &&
+    typeof example.imageDataUrl === 'string' && example.imageDataUrl.startsWith('data:image/')
+  ));
+  if (validExamples.length !== examples.length) return res.status(400).json({ success: false, message: 'Only validated confirmed/corrected image records are accepted.' });
+  const directory = process.env.TAYLOR_LEARNING_SYNC_DIR || path.join(process.cwd(), 'data', 'landmark-sync');
+  await mkdir(directory, { recursive: true });
+  const pathName = path.join(directory, 'verified-examples.jsonl');
+  const receivedAt = new Date().toISOString();
+  let existingIds = new Set();
+  try {
+    existingIds = new Set((await readFile(pathName, 'utf8')).split('\n').filter(Boolean));
+    existingIds = new Set([...existingIds].map((line) => {
+      try { return JSON.parse(line).id; } catch { return null; }
+    }).filter(Boolean));
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const newExamples = validExamples.filter((example) => !existingIds.has(example.id));
+  await appendFile(pathName, newExamples.map((example) => JSON.stringify({ ...example, receivedAt })).join('\n') + (newExamples.length ? '\n' : ''), 'utf8');
+  res.json({ success: true, accepted: validExamples.map((example) => example.id), batchId: crypto.randomUUID() });
+});
 
 app.post('/api/exhibit-explanation', async (req, res) => {
   try {
