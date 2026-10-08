@@ -9,6 +9,7 @@ const API_URL = (import.meta.env.VITE_NODEJS_API_URL || '').trim();
 const CHAT_ENDPOINT = API_URL && !/localhost|127\.0\.0\.1/i.test(API_URL)
   ? `${API_URL.replace(/\/$/, '')}/chat`
   : '/api/chat';
+const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
 
 const suggestionItems = [
   { key: 'bulsu', label: 'What is BulSU?', answer: 'Bulacan State University is a premier public university in the Philippines, known for academic excellence, innovation, and service to the community.' },
@@ -20,6 +21,44 @@ const suggestionItems = [
   { key: 'scholarships', label: 'Scholarships', answer: 'BulSU offers scholarship and financial assistance opportunities to support deserving students in their academic journey.' }
 ];
 
+const CENTER_PROMPTS = {
+  ARICC: [
+    'What is ARICC?',
+    'What services does ARICC offer?',
+    'What training and workshops are available?',
+    'What technical services does ARICC provide?',
+    "What are ARICC's objectives?"
+  ],
+  RIO: [
+    'What is RIO?',
+    'What services does RIO offer?',
+    'How does RIO support research?',
+    'How does RIO support innovation?',
+    'How can students or researchers work with RIO?'
+  ],
+  CAESAR: [
+    'What is CAESAR?',
+    'What services does CAESAR offer?',
+    'What research does CAESAR conduct?',
+    'What laboratory services are available?',
+    'How does CAESAR support communities?'
+  ],
+  FABLAB: [
+    'What is FABLAB?',
+    'What services does FABLAB offer?',
+    'What fabrication equipment is available?',
+    'What training does FABLAB provide?',
+    'Who can use FABLAB?'
+  ],
+  RECON: [
+    'What is RECON?',
+    'What services does RECON offer?',
+    "What are RECON's focus areas?",
+    'What projects does RECON work on?',
+    'How does RECON support disaster resilience and renewable energy?'
+  ]
+};
+
 const getSessionContext = () => {
   if (typeof window === 'undefined') return null;
   try {
@@ -30,10 +69,17 @@ const getSessionContext = () => {
   }
 };
 
+const getActiveEntity = () => {
+  if (typeof window === 'undefined') return '';
+  const saved = window.sessionStorage.getItem('taylorActiveEntity') || '';
+  return KNOWLEDGE_ENTITIES.has(saved) ? saved : '';
+};
+
 export default function TaylorDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sessionContext, setSessionContext] = useState(getSessionContext);
+  const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -48,6 +94,16 @@ export default function TaylorDashboard() {
   const [bootstrap, setBootstrap] = useState(() => ({ state: 'BOOTSTRAP_PENDING', completed: 0, total: 4 }));
 
   useEffect(() => subscribePwaBootstrap(setBootstrap), []);
+
+  useEffect(() => {
+    const handleActiveEntityChange = (event) => {
+      if (event.detail?.confirmed && event.detail.activeEntity) {
+        setActiveEntity(event.detail.activeEntity);
+      }
+    };
+    window.addEventListener('taylor-active-entity-change', handleActiveEntityChange);
+    return () => window.removeEventListener('taylor-active-entity-change', handleActiveEntityChange);
+  }, []);
 
   useEffect(() => {
     const stopListening = onSpeechStarted(() => setIsSpeaking(true));
@@ -168,7 +224,10 @@ export default function TaylorDashboard() {
       const response = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })) })
+        body: JSON.stringify({
+          messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })),
+          activeEntity,
+        })
       });
 
       const responseText = await response.text();
@@ -192,6 +251,10 @@ export default function TaylorDashboard() {
       }
 
       const reply = data.reply || 'I am sorry, I am having trouble responding right now. Please try again in a moment.';
+      if (data.activeEntity) {
+        setActiveEntity(data.activeEntity);
+        window.sessionStorage.setItem('taylorActiveEntity', data.activeEntity);
+      }
       setMessages((prev) => [...prev, { speaker: 'guide', text: reply }]);
       speakWithPreferredVoice(reply);
     } catch (error) {
@@ -207,6 +270,8 @@ export default function TaylorDashboard() {
   const handleSuggestion = (suggestion) => {
     handleSendMessage(suggestion.answer);
   };
+
+  const centerPrompts = CENTER_PROMPTS[activeEntity] || [];
 
   const handleKeyDown = (event) => {
     if (event.key === 'Enter') {
@@ -248,18 +313,31 @@ export default function TaylorDashboard() {
         )}
 
         <section className="guide-section">
+          {activeEntity && (
+            <section className="center-context" aria-live="polite">
+              <div className="center-context-label">✓ {activeEntity} Recognized</div>
+              <div className="center-context-prompt">Ask TAYLOR about this center</div>
+              <div className="center-context-actions">
+                {centerPrompts.map((prompt) => (
+                  <button key={prompt} className="suggestion-chip" onClick={() => handleSendMessage(prompt)}>
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           <div className="avatar-card">
             <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
               <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
             </Suspense>
           </div>
-          <div className="suggestion-row">
+          {!activeEntity && <div className="suggestion-row">
                 {suggestionItems.map((item) => (
                   <button key={item.key} className="suggestion-chip" onClick={() => handleSuggestion(item)}>
                     {item.label}
                   </button>
                 ))}
-              </div>
+              </div>}
             <div className="chat-log">
                 {messages.map((message, index) => (
                   <div key={`${message.speaker}-${index}`} className={`bubble ${message.speaker}`}>

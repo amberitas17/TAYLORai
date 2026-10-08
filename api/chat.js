@@ -1,9 +1,10 @@
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import { BULSU_GROUNDED_SYSTEM_PROMPT, formatBulsuContext, isBulsuCenterQuestion, normalizeBulsuEntity, searchBulsuCenters } from '../scripts/bulsuCentersKnowledgeBase.mjs';
 
 dotenv.config();
 
-const SYSTEM_PROMPT = 'You are TAYLOR, the official AI Hologram Guide of Bulacan State University (BulSU) and ARICC. You assist visitors with BulSU information, ARICC information, academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.';
+const SYSTEM_PROMPT = `${BULSU_GROUNDED_SYSTEM_PROMPT}\n\nYou assist visitors with academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.`;
 
 async function parseRequestBody(req) {
   if (req.body && typeof req.body === 'object') {
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
 
   try {
     const body = await parseRequestBody(req);
-    const { messages = [] } = body || {};
+    const { messages = [], activeEntity = '' } = body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       res.status(400).json({ success: false, errorType: 'backend-unavailable', message: 'messages array is required' });
@@ -88,16 +89,32 @@ export default async function handler(req, res) {
     }
 
     const openrouter = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+    const lastUserMessage = [...messages].reverse().find((message) => message?.role === 'user')?.content || '';
+    const requestedEntity = normalizeBulsuEntity(lastUserMessage);
+    const effectiveActiveEntity = requestedEntity || normalizeBulsuEntity(activeEntity);
+    const bulsuResults = isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity)
+      ? await searchBulsuCenters(lastUserMessage, { activeEntity: effectiveActiveEntity, topK: 5 })
+      : [];
+    const bulsuContext = formatBulsuContext(bulsuResults);
+    if (effectiveActiveEntity === 'RIO' && isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity) && !bulsuContext) {
+      const reply = 'I recognize this as RIO, but detailed RIO information is not yet available in my verified BulSU knowledge base.';
+      res.status(200).json({ success: true, reply, activeEntity: 'RIO', usedBulsuContext: false });
+      return;
+    }
     const completion = await openrouter.chat.completions.create({
-      model: 'meta-llama/llama-3.3-70b-instruct',
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-70b-instruct',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...(bulsuContext ? [{ role: 'system', content: `Answer center questions only from this official BulSU center context.\n\n${bulsuContext}` }] : []),
+        ...messages,
+      ],
       temperature: 0.7,
       max_tokens: 300,
     });
 
     const reply = completion.choices?.[0]?.message?.content?.trim() || 'I am TAYLOR and I am here to assist you.';
     console.info('[chat] success', { replyLength: reply.length });
-    res.status(200).json({ success: true, reply });
+    res.status(200).json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedBulsuContext: Boolean(bulsuContext) });
   } catch (error) {
     const errorInfo = classifyOpenRouterError(error);
     console.error('[chat] openrouter error', {

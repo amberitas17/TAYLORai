@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { getFacebookPageContextHint, indexFacebookKnowledgeBase, searchFacebookKnowledgeBase, shouldUseFacebookContext } from './scripts/facebookKnowledgeBase.mjs';
+import { BULSU_GROUNDED_SYSTEM_PROMPT, formatBulsuContext, isBulsuCenterQuestion, normalizeBulsuEntity, searchBulsuCenters } from './scripts/bulsuCentersKnowledgeBase.mjs';
+import { generateExhibitExplanation } from './scripts/exhibitExplanationService.mjs';
 
 dotenv.config();
 
@@ -11,6 +13,20 @@ const port = process.env.PORT || 3033;
 
 app.use(cors());
 app.use(express.json());
+
+app.post('/api/exhibit-explanation', async (req, res) => {
+  try {
+    const { center, recognitionLabel, displayName } = req.body || {};
+    if (!center || !displayName) {
+      return res.status(400).json({ success: false, message: 'center and displayName are required' });
+    }
+    const explanation = await generateExhibitExplanation({ center, recognitionLabel: recognitionLabel || displayName, displayName });
+    return res.json({ success: true, explanation });
+  } catch (error) {
+    console.error('[server] exhibit explanation error', error);
+    return res.status(503).json({ success: false, errorType: 'explanation-unavailable', message: 'The explanation service is temporarily unavailable.' });
+  }
+});
 
 function classifyOpenRouterError(error) {
   const status = error?.status || error?.response?.status;
@@ -40,7 +56,7 @@ app.post('/api/chat', async (req, res) => {
   console.info('[server] chat request', { method: req.method, url: req.originalUrl, body: req.body });
 
   try {
-    const { messages = [] } = req.body || {};
+    const { messages = [], activeEntity = '' } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ success: false, errorType: 'backend-unavailable', message: 'messages array is required' });
@@ -54,10 +70,19 @@ app.post('/api/chat', async (req, res) => {
     const openrouter = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' });
     const systemPrompt = {
       role: 'system',
-      content: 'You are TAYLOR, the official AI Hologram Guide of Bulacan State University (BulSU) and the Advanced Robotics and Intelligent Control Center (ARICC). You assist visitors with BulSU information, ARICC information, academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.'
+      content: `${BULSU_GROUNDED_SYSTEM_PROMPT}\n\nYou assist visitors with academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.`
     };
 
     const lastUserMessage = [...messages].reverse().find((message) => message?.role === 'user')?.content || '';
+    const requestedEntity = normalizeBulsuEntity(lastUserMessage);
+    const effectiveActiveEntity = requestedEntity || normalizeBulsuEntity(activeEntity);
+    const useBulsuContext = isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity);
+    const bulsuResults = useBulsuContext ? await searchBulsuCenters(lastUserMessage, { activeEntity: effectiveActiveEntity, topK: 5 }) : [];
+    const bulsuContext = formatBulsuContext(bulsuResults);
+    if (effectiveActiveEntity === 'RIO' && useBulsuContext && !bulsuContext) {
+      const reply = 'I recognize this as RIO, but detailed RIO information is not yet available in my verified BulSU knowledge base.';
+      return res.json({ success: true, reply, activeEntity: 'RIO', usedFacebookContext: false, usedBulsuContext: false });
+    }
     const useFacebookContext = shouldUseFacebookContext(lastUserMessage);
     const pageContextHint = getFacebookPageContextHint(lastUserMessage);
 
@@ -74,9 +99,12 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const completion = await openrouter.chat.completions.create({
-      model: 'meta-llama/llama-3.3-70b-instruct',
+      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-70b-instruct',
       messages: [
         systemPrompt,
+        ...(bulsuContext
+          ? [{ role: 'system', content: `Answer center questions only from this official BulSU center context.\n\n${bulsuContext}` }]
+          : []),
         ...(facebookContext
           ? [{ role: 'system', content: `Use the following Facebook-derived knowledge when relevant. If the answer is based on this content, clearly say it came from a Facebook announcement.\n\n${facebookContext}` }]
           : []),
@@ -87,8 +115,8 @@ app.post('/api/chat', async (req, res) => {
     });
 
     const reply = completion.choices?.[0]?.message?.content?.trim() || 'I am TAYLOR and I am here to assist you.';
-    console.info('[server] success', { replyLength: reply.length, usedFacebookContext: Boolean(facebookContext) });
-    res.json({ success: true, reply, usedFacebookContext: Boolean(facebookContext) });
+    console.info('[server] success', { replyLength: reply.length, usedFacebookContext: Boolean(facebookContext), usedBulsuContext: Boolean(bulsuContext) });
+    res.json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedFacebookContext: Boolean(facebookContext), usedBulsuContext: Boolean(bulsuContext) });
   } catch (error) {
     const errorInfo = classifyOpenRouterError(error);
     console.error('[server] openrouter error', {

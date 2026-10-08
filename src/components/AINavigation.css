@@ -179,6 +179,57 @@
   font-weight: 700;
 }
 
+.navigation-arrival {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 16px 0 0;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid rgba(255, 210, 108, 0.4);
+  border-radius: 20px;
+  background: rgba(42, 31, 15, 0.95);
+  color: #fff8e5;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+}
+
+.navigation-arrival__status {
+  color: #ffd66b;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.navigation-arrival h2,
+.navigation-arrival p {
+  margin: 0;
+}
+
+.navigation-arrival h2 {
+  font-size: clamp(1.4rem, 4vw, 2rem);
+}
+
+.navigation-arrival p {
+  color: #f3dfb0;
+}
+
+.navigation-arrival__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.navigation-arrival__actions button {
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 214, 107, 0.48);
+  border-radius: 10px;
+  background: rgba(255, 214, 107, 0.12);
+  color: #fff8e5;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .detect-button-container {
   display: flex;
   justify-content: center;

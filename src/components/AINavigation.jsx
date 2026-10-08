@@ -15,6 +15,13 @@ const AINavigation = ({
   landmarkClassifier,
 }) => {
   const navigate = useNavigate();
+  const TOUR_CENTERS = {
+    ARICC: { fullName: 'Advanced Robotics and Intelligent Control Center', location: 'CIT • 4th Floor', route: '/machine-vision-exhibit-aricc' },
+    RIO: { fullName: 'Research and Innovation Office', location: 'CIT • 4th Floor', route: '/machine-vision-rio' },
+    FABLAB: { fullName: 'Center for Fabrication and Manufacture', location: 'CIT • 4th Floor', route: '/machine-vision-fablab' },
+    CAESAR: { fullName: 'Center for Advanced Environmental Science and Agriculture Research', location: 'CIT • 4th Floor', route: '/machine-vision-caesar' },
+    RECON: { fullName: 'Resiliency Energy Continuity Center', location: 'CIT • 4th Floor', route: '/machine-vision-recon' },
+  };
   const formatLandmark = (landmark) => String(landmark || 'Unknown')
     .replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase());
@@ -309,6 +316,28 @@ const AINavigation = ({
     );
   };
 
+  const arrivalCenter = TOUR_CENTERS[String(selectedDestination).toUpperCase()];
+  const hasArrived = Boolean(
+    navigationState?.current_landmark &&
+    navigationState.current_landmark === String(selectedDestination).toUpperCase() &&
+    arrivalCenter
+  );
+
+  const exploreCenter = () => {
+    if (!arrivalCenter) return;
+    navigate(arrivalCenter.route, {
+      state: {
+        activeCenter: String(selectedDestination).toUpperCase(),
+        recognitionZone: String(selectedDestination).toLowerCase(),
+        tourMode: true,
+      },
+    });
+  };
+
+  const askTaylorAboutCenter = () => {
+    navigate('/taylor', { state: { activeEntity: String(selectedDestination).toUpperCase() } });
+  };
+
   return (
     <div className="ai-navigation-container homepage-shell taylor-shell">
       <main className="navigation-page homepage-panel taylor-panel">
@@ -372,6 +401,20 @@ const AINavigation = ({
           {navigationInstruction && (
             <div className="indoor-navigation-status__instruction">{navigationInstruction}</div>
           )}
+        </section>
+      )}
+
+      {hasArrived && (
+        <section className="navigation-arrival" aria-live="polite" data-testid="arrival-experience">
+          <div className="navigation-arrival__status">✓ You've Arrived</div>
+          <h2>{String(selectedDestination).toUpperCase()}</h2>
+          <p>{arrivalCenter.fullName}</p>
+          <p>{arrivalCenter.location}</p>
+          <div className="navigation-arrival__actions">
+            <button onClick={exploreCenter}>Explore {String(selectedDestination).toUpperCase()} Exhibits</button>
+            <button onClick={askTaylorAboutCenter}>Ask TAYLOR About {String(selectedDestination).toUpperCase()}</button>
+            <button onClick={onBack || (() => navigate(-1))}>End Navigation</button>
+          </div>
         </section>
       )}
 

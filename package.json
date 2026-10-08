@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "index:bulsu": "node scripts/indexBulsuCenters.mjs",
+    "verify:bulsu": "node scripts/verifyBulsuRag.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pinecone-database/pinecone": "^9.0.0",
     "@qdrant/js-client-rest": "^1.19.0",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",

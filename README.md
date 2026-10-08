@@ -70,6 +70,33 @@ Open the preview URL printed by Vite. To check code quality, run `npm run lint`.
 - The chat feature sends requests to `/api/chat`. In a Vercel deployment, this is handled by `api/chat.js` and requires the `OPENROUTER_API_KEY` environment variable.
 - Vercel serves the built static files from `dist`. The rewrite in `vercel.json` sends application routes such as `/face-api` back to `index.html` so React Router can load them.
 
+### BulSU Center Knowledge Base
+
+Official source-grounded records for ARICC, CAESAR, CBS, FABLAB, BARAS TBI, FIC, and RECON are stored in `data/bulsu-centers.records.json`. The ingestion pipeline uses `Xenova/bge-m3` embeddings and the Pinecone namespace `bulsu-centers`.
+
+Set `PINECONE_API_KEY` and `PINECONE_INDEX`, then run:
+
+```powershell
+npm run index:bulsu
+```
+
+The chat handlers retrieve up to five center chunks and filter by the confirmed recognition entity when available. Without Pinecone credentials, local lexical retrieval from the official records keeps development and tests deterministic. Set `OPENROUTER_MODEL` to override the default `meta-llama/llama-3.3-70b-instruct` model.
+
+### Offline Exhibit Explanations
+
+Confirmed ARICC, FABLAB, RECON, and CAESAR names render independently of the network. Verified explanations are cached in the browser IndexedDB store `taylor-exhibit-explanations` and displayed stale-while-revalidate. The structured refresh endpoint is `/api/exhibit-explanation` and requires `OPENROUTER_API_KEY`, Pinecone configuration, and `TAVILY_API_KEY`. Explanation generation defaults to `meta-llama/llama-3.3-70b-instruct`; set `OPENROUTER_MODEL` to override it. Responses are cached only when the generated source references match sources retrieved by the server.
+
+### Local SearXNG Search
+
+The explanation backend uses Tavily as its primary server-side search provider. SearXNG remains an optional provider when `SEARXNG_BASE_URL` is explicitly set, and is never called from the browser. The local Docker configuration binds SearXNG only to `127.0.0.1:8888` and persists its settings under `docker/searxng`:
+
+```powershell
+docker compose -f docker-compose.searxng.yml up -d
+Invoke-RestMethod "http://127.0.0.1:8888/search?q=3D+printer&format=json"
+```
+
+Set `SEARXNG_BASE_URL=http://127.0.0.1:8888` in the backend environment. Brave and Bing remain optional fallback providers when SearXNG is not configured.
+
 ## Train RECON Center Exhibit Data
 
 ### Add RECON/FABLAB Unknown Background Samples

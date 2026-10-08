@@ -1,10 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FiEye, FiArrowLeft, FiMapPin, FiChevronRight, FiNavigation } from 'react-icons/fi';
 import './ai-exhibit.css';
 import LeafletMap from './components/LeafletMap';
 import exhibitDetectionService, { EXHIBIT_MODEL_STATES } from './services/exhibitDetectionService.js';
+import { textToSpeech } from './services/speechAPI.js';
+import { getVerifiedExhibitInformation } from './services/exhibitInformation.js';
+import {
+  cacheExhibitExplanation,
+  getCachedExhibitExplanation,
+  requestExhibitExplanation,
+} from './services/exhibitExplanationCache.js';
 
 const width = window.innerWidth;
+const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
+
+const getKnowledgeEntity = (zone = '') => {
+  const normalizedZone = String(zone).trim().toUpperCase().replace(/[_-]+/g, ' ');
+  if (normalizedZone === 'BARAS' || normalizedZone === 'BARAS TBI') return 'BARAS TBI';
+  return KNOWLEDGE_ENTITIES.has(normalizedZone) ? normalizedZone : '';
+};
 // Complete exhibit database with all Science Centre exhibits
 const exhibitPath = [
   {
@@ -608,6 +623,10 @@ const exhibitPath = [
 ];
 
 export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tourMode = location.state?.tourMode === true;
+  const activeCenter = location.state?.activeCenter || classifierMode.toUpperCase();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [showCamera, setShowCamera] = useState(true);
@@ -615,6 +634,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [error, setError] = useState("");
   const [locationDetected, setLocationDetected] = useState(false);
   const [currentExhibit, setCurrentExhibit] = useState(null);
+  const [activeExhibit, setActiveExhibit] = useState(null);
   const [detectionService, setDetectionService] = useState(null);
   const detectionServiceRef = useRef(null);
   const [lastDetection, setLastDetection] = useState(null);
@@ -638,6 +658,16 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const pendingLabelCountRef = useRef(0);
   const lastAcceptedAtRef = useRef(0);
   const [recognitionDebug, setRecognitionDebug] = useState(null);
+  const [explanationState, setExplanationState] = useState({ status: 'idle', explanation: null, error: null });
+  const explanationRequestRef = useRef(null);
+
+  useEffect(() => {
+    if (!tourMode || typeof window === 'undefined') return;
+    window.sessionStorage.setItem('tourMode', 'true');
+    window.sessionStorage.setItem('activeCenter', activeCenter);
+    window.sessionStorage.setItem('recognitionZone', classifierMode.toUpperCase());
+    window.sessionStorage.removeItem('activeExhibit');
+  }, [activeCenter, classifierMode, tourMode]);
 
   const stopCameraStream = () => {
     const stream = cameraStreamRef.current;
@@ -803,6 +833,53 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       startRealTimeDetection();
     }
   }, [detectionService, recognitionState]);
+
+  useEffect(() => {
+    if (!activeExhibit) {
+      explanationRequestRef.current?.abort();
+      explanationRequestRef.current = null;
+      setExplanationState({ status: 'idle', explanation: null, error: null });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    explanationRequestRef.current?.abort();
+    explanationRequestRef.current = controller;
+    let current = true;
+
+    const loadExplanation = async () => {
+      const cached = await getCachedExhibitExplanation(activeCenter, activeExhibit);
+      if (!current || controller.signal.aborted) return;
+      setExplanationState({ status: cached ? 'ready' : 'loading', explanation: cached, error: null });
+      try {
+        const explanation = await requestExhibitExplanation({
+          center: activeCenter,
+          recognitionLabel: currentExhibit?.exhibitInfo?.code || activeExhibit,
+          displayName: activeExhibit,
+          signal: controller.signal,
+        });
+        if (!current || controller.signal.aborted) return;
+        await cacheExhibitExplanation(activeCenter, activeExhibit, explanation);
+        if (current) setExplanationState({ status: 'ready', explanation, error: null });
+      } catch (error) {
+        if (!current || controller.signal.aborted) return;
+        setExplanationState({
+          status: cached ? 'ready' : 'unavailable',
+          explanation: cached,
+          error: 'Connection is unstable.',
+        });
+      }
+    };
+
+    const retryWhenOnline = () => loadExplanation();
+    window.addEventListener('online', retryWhenOnline);
+    loadExplanation();
+    return () => {
+      current = false;
+      controller.abort();
+      window.removeEventListener('online', retryWhenOnline);
+    };
+  }, [activeCenter, activeExhibit, currentExhibit?.exhibitInfo?.code]);
 
   // Point-based navigation state (removed drawing system)
   const [currentPathway, setCurrentPathway] = useState('DWT_to_EAP');
@@ -1250,6 +1327,17 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       };
 
       setCurrentExhibit(exhibit);
+      setActiveExhibit(exhibit.name);
+      if (tourMode && typeof window !== 'undefined') {
+        window.sessionStorage.setItem('activeExhibit', exhibit.name);
+      }
+      const knowledgeEntity = getKnowledgeEntity(detectedZone);
+      if (knowledgeEntity && typeof window !== 'undefined') {
+        window.sessionStorage.setItem('taylorActiveEntity', knowledgeEntity);
+        window.dispatchEvent(new CustomEvent('taylor-active-entity-change', {
+          detail: { activeEntity: knowledgeEntity, confirmed: true }
+        }));
+      }
       setLocationDetected(true);
       setStableExhibitDetected(true);
       lastAcceptedAtRef.current = Date.now();
@@ -1539,10 +1627,87 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     setCurrentExhibit(next);
   };
 
+  const scanAnotherExhibit = () => {
+    setActiveExhibit(null);
+    setCurrentExhibit(null);
+    setLastDetection(null);
+    setStableExhibitDetected(false);
+    setLocationDetected(false);
+    pendingLabelRef.current = '';
+    pendingLabelCountRef.current = 0;
+    acceptStreakRef.current = 0;
+    rejectStreakRef.current = 0;
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem('activeExhibit');
+  };
+
   const navigationInfo = { distance: 120, steps: 160, direction: "North-East" };
+  const activeExhibitInformation = activeExhibit
+    ? explanationState.explanation || getVerifiedExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, activeExhibit)
+    : null;
+  const explanationText = activeExhibitInformation
+    ? `${activeExhibitInformation.whatIsIt} ${activeExhibitInformation.purpose}`
+    : '';
+
+  const listenToExplanation = () => {
+    if (explanationText) textToSpeech(explanationText, false, 'taylor', 'en');
+  };
 
   return (
     <div style={{ flex: 1, position: "relative", height: "100vh", overflow: "hidden" }}>
+      {tourMode && (
+        <>
+          <header className="exhibit-tour-header" data-testid="exhibit-tour-panel">
+            <button className="exhibit-tour-header__exit" onClick={() => navigate(-1)} aria-label="Exit tour">
+              <FiArrowLeft aria-hidden="true" />
+              <span>Exit Tour</span>
+            </button>
+            <div className="exhibit-tour-header__title">{activeCenter} EXHIBIT TOUR</div>
+            <div className={`exhibit-tour-header__state${activeExhibit ? ' is-recognized' : ''}`}>
+              <span aria-hidden="true">●</span> {activeExhibit ? 'Recognized' : 'Searching...'}
+            </div>
+          </header>
+          {!activeExhibit ? (
+            <div className="exhibit-tour-searching" aria-live="polite">
+              <div className="exhibit-tour-reticle" aria-hidden="true">⌾</div>
+              <strong>Aim at an exhibit</strong>
+              <span>Searching...</span>
+            </div>
+          ) : (
+            <section className="exhibit-tour-sheet" aria-live="polite">
+              <div className="exhibit-tour-sheet__handle" aria-hidden="true" />
+              <div className="exhibit-tour-panel__recognized">✓ EXHIBIT RECOGNIZED</div>
+              <h2>{activeExhibit}</h2>
+              {activeExhibitInformation ? (
+                <div className="exhibit-explanation" aria-live="polite">
+                  <strong>What is it?</strong>
+                  <p>{activeExhibitInformation.whatIsIt}</p>
+                  <strong>What is it used for?</strong>
+                  <p>{activeExhibitInformation.purpose}</p>
+                </div>
+              ) : explanationState.status === 'loading' ? (
+                <p className="exhibit-explanation__unavailable">
+                  TAYLOR is preparing your explanation. The exhibit has been identified successfully.
+                </p>
+              ) : (
+                <p className="exhibit-explanation__unavailable">
+                  TAYLOR could not retrieve verified exhibit details right now. Connection is unstable; the explanation will appear automatically when a connection becomes available.
+                </p>
+              )}
+              <div className="exhibit-tour-panel__actions">
+                {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
+                {activeExhibitInformation && (
+                  <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit } })}>
+                    Ask TAYLOR
+                  </button>
+                )}
+                {!activeExhibitInformation && <button onClick={() => window.dispatchEvent(new Event('online'))}>Retry Explanation</button>}
+                <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
+              </div>
+            </section>
+          )}
+          {!activeExhibit && <div className="exhibit-tour-search-status">Searching for an exhibit...</div>}
+        </>
+      )}
       {isLoading && (
         <div style={{ position: "absolute",
       top: 32,
@@ -1577,7 +1742,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     {statusMessage}
   </div>
 )}
-    {getStableExhibitLabel() && (
+    {!tourMode && getStableExhibitLabel() && (
   <div style={{
     position: "absolute",
     top: isLoading ? 120 : 32,
@@ -1685,7 +1850,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       </div>
     )}
       {/* Upload video for testing (replaces the live camera feed) */}
-      <div style={{
+      {!tourMode && <div style={{
         position: "absolute",
         top: 12,
         right: 12,
@@ -1708,7 +1873,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             style={{ display: "none" }}
           />
         </label>
-      </div>
+      </div>}
 
       {/* Video element now driven by an uploaded file instead of the live camera */}
       <video
