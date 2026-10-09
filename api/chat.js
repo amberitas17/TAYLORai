@@ -49,6 +49,20 @@ function formatBulsuContext(results = []) {
   ].join('\n')).join('\n\n');
 }
 
+function getDeploymentVersion() {
+  return process.env.VERCEL_GIT_COMMIT_SHA || 'local';
+}
+
+function getRetrievalConfig() {
+  return {
+    pineconeConfigured: Boolean(process.env.PINECONE_API_KEY),
+    hostedEmbeddingConfigured: Boolean(process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN),
+    embeddingModel: process.env.BULSU_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL,
+    dimension: BULSU_VECTOR_DIMENSION,
+    namespace: process.env.PINECONE_BULSU_NAMESPACE || 'bulsu-centers',
+  };
+}
+
 function normalizeVector(values) {
   const vector = values.map(Number);
   if (vector.length !== BULSU_VECTOR_DIMENSION || vector.some((value) => !Number.isFinite(value))) {
@@ -116,11 +130,12 @@ async function semanticSearchBulsuCenters(query, activeEntity = '') {
 async function retrieveBulsuCenters(query, activeEntity = '') {
   try {
     const semantic = await semanticSearchBulsuCenters(query, activeEntity);
-    return { results: semantic, retrievalMode: 'semantic' };
+    if (semantic.length > 0) return { results: semantic, retrievalMode: 'semantic' };
   } catch (error) {
     console.warn('[chat] semantic retrieval unavailable; using lexical fallback', error?.message || error);
-    return { results: searchBulsuCenters(query, activeEntity), retrievalMode: 'lexical-fallback' };
   }
+  const lexical = searchBulsuCenters(query, activeEntity);
+  return { results: lexical, retrievalMode: lexical.length > 0 ? 'lexical-fallback' : 'no-context' };
 }
 
 async function parseRequestBody(req) {
@@ -211,12 +226,12 @@ export default async function handler(req, res) {
     const effectiveActiveEntity = requestedEntity || normalizeBulsuEntity(activeEntity);
     const bulsuRetrieval = isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity)
       ? await retrieveBulsuCenters(lastUserMessage, effectiveActiveEntity)
-      : { results: [], retrievalMode: 'not-requested' };
+      : { results: [], retrievalMode: 'no-context' };
     const bulsuResults = bulsuRetrieval.results;
     const bulsuContext = formatBulsuContext(bulsuResults);
     if (effectiveActiveEntity === 'RIO' && isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity) && !bulsuContext) {
       const reply = 'I recognize this as RIO, but detailed RIO information is not yet available in my verified BulSU knowledge base.';
-      res.status(200).json({ success: true, reply, activeEntity: 'RIO', usedBulsuContext: false, retrievalMode: bulsuRetrieval.retrievalMode });
+      res.status(200).json({ success: true, reply, activeEntity: 'RIO', usedBulsuContext: false, retrievalMode: bulsuRetrieval.retrievalMode, deploymentVersion: getDeploymentVersion(), retrievalConfig: getRetrievalConfig() });
       return;
     }
     const completion = await openrouter.chat.completions.create({
@@ -232,7 +247,7 @@ export default async function handler(req, res) {
 
     const reply = completion.choices?.[0]?.message?.content?.trim() || 'I am TAYLOR and I am here to assist you.';
     console.info('[chat] success', { replyLength: reply.length });
-    res.status(200).json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedBulsuContext: Boolean(bulsuContext), retrievalMode: bulsuRetrieval.retrievalMode });
+    res.status(200).json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedBulsuContext: Boolean(bulsuContext), retrievalMode: bulsuRetrieval.retrievalMode, deploymentVersion: getDeploymentVersion(), retrievalConfig: getRetrievalConfig() });
   } catch (error) {
     const errorInfo = classifyOpenRouterError(error);
     console.error('[chat] openrouter error', {
