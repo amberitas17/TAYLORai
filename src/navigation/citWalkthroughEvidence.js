@@ -11,6 +11,15 @@ export const CIT_WALKTHROUGH_EVIDENCE = {
   'hallway-straight': { sourceVideo: 'IMG_4525.MOV', timestamp: '13.01s', photo: '/indoor-evidence/cit/ovprei.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'medium', previous: 'restroom-window', next: 'ovprei-office', turn: 'straight' },
   'ovprei-office': { sourceVideo: 'IMG_4638.MOV', timestamp: '10.01s', photo: '/indoor-evidence/cit/ovprei-sign.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'hallway-straight', next: 'aricc' },
   aricc: { sourceVideo: 'IMG_4525.MOV', timestamp: '34.03s', photo: '/indoor-evidence/cit/aricc.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'ovprei-office', next: null },
+  'recon-corridor': { sourceVideo: 'IMG_4637.MOV', timestamp: '12.01s', photo: '/indoor-evidence/cit/recon-corridor.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'elevator-4f', next: 'recon-turn' },
+  'recon-turn': { sourceVideo: 'IMG_4637.MOV', timestamp: '19.02s', photo: '/indoor-evidence/cit/recon-turn.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'recon-corridor', next: 'recon' },
+  recon: { sourceVideo: 'IMG_4637.MOV', timestamp: '22.02s', photo: '/indoor-evidence/cit/recon-entrance.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'recon-turn', next: null },
+  'rio-entrance': { sourceVideo: 'IMG_4640.MOV', timestamp: '0.00s', photo: '/indoor-evidence/cit/rio-entrance.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: null, next: 'rio-corridor' },
+  'rio-corridor': { sourceVideo: 'IMG_4640.MOV', timestamp: '12.01s', photo: '/indoor-evidence/cit/pot-after-rio.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'medium', previous: 'rio-entrance', next: 'fablab-entrance' },
+  'fablab-entrance': { sourceVideo: 'IMG_4640.MOV', timestamp: '19.02s', photo: '/indoor-evidence/cit/fablab-approach.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'rio-corridor', next: 'fablab-corridor' },
+  'fablab-corridor': { sourceVideo: 'IMG_4640.MOV', timestamp: '30.03s', photo: '/indoor-evidence/cit/fablab-to-rio-corridor.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'medium', previous: 'fablab-entrance', next: 'caesar-approach' },
+  'caesar-approach': { sourceVideo: 'IMG_4640.MOV', timestamp: '43.04s', photo: '/indoor-evidence/cit/caesar-approach.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'fablab-corridor', next: 'caesar' },
+  caesar: { sourceVideo: 'IMG_4640.MOV', timestamp: '49.04s', photo: '/indoor-evidence/cit/caesar-entrance.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'caesar-approach', next: null },
 };
 
 export function getCITWalkthroughEvidence(nodeId) {
