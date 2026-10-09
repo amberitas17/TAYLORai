@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
-import AiText from './ai-text.jsx';
+const AiText = lazy(() => import('./ai-text.jsx'));
 const AIVision = lazy(() => import('./components/AIVision.jsx'));
 const AiExhibit = lazy(() => import('./ai-exhibit.jsx'));
 const AiVisionTest = lazy(() => import('./ai-vision-test.jsx'));
@@ -9,8 +9,8 @@ const ClientSideAIInterface = lazy(() => import('./components/ClientSideAIInterf
 const FaceApiInterface = lazy(() => import('./components/FaceApiInterface.jsx'));
 const ClientSideFaceAnalysis = lazy(() => import('./ClientSideFaceAnalysis.jsx'));
 const Hologram = lazy(() => import('./hologram.jsx'));
-import HomePage from './HomePage.jsx';
-import TaylorDashboard from './TaylorDashboard.jsx';
+const HomePage = lazy(() => import('./HomePage.jsx'));
+const TaylorDashboard = lazy(() => import('./TaylorDashboard.jsx'));
 const AINavigation = lazy(() => import('./components/AINavigation.jsx'));
 const IndoorMapEditor = lazy(() => import('./components/IndoorMapEditor.jsx'));
 
@@ -20,6 +20,25 @@ function RouteLoading() {
       Loading TAYLOR...
     </div>
   );
+}
+
+class RouteErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <main className="route-loading" role="alert" aria-live="assertive">
+        <h1>TAYLOR</h1>
+        <p>The connection interrupted the app download.</p>
+        <button type="button" onClick={() => window.location.reload()}>Retry</button>
+      </main>
+    );
+  }
 }
 
 function LandingPage() {
@@ -201,8 +220,9 @@ function NavigationRoute() {
 
 export default function App() {
   return (
-    <Suspense fallback={<RouteLoading />}>
-      <Routes>
+    <RouteErrorBoundary>
+      <Suspense fallback={<RouteLoading />}>
+        <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/taylor" element={<TaylorDashboard />} />
         <Route path="/landing" element={<LandingPage />} />
@@ -222,7 +242,8 @@ export default function App() {
         <Route path="/face-api" element={<FaceApiInterface />} />
         <Route path="/client-side-face-analysis" element={<ClientSideFaceAnalysis />} />
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </RouteErrorBoundary>
   );
 }

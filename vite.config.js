@@ -18,8 +18,7 @@ export default defineConfig({
         'models/faceapi/face_expression_model-shard1',
         'models/faceapi/age_gender_model-weights_manifest.json',
         'models/faceapi/age_gender_model-shard1',
-        'sarah-avatar.glb',
-        'sarah-idle.glb'
+        'sarah-avatar.glb'
       ],
       manifest: false,
       workbox: {

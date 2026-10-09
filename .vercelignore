@@ -8,6 +8,8 @@ backend_faceapi/
 Documentation/
 scripts/
 *.pt
+public/wasm/
+public/ort-wasm-*.wasm
 requirements.txt
 train_yolo_tiny.py
 .git/

@@ -104,11 +104,9 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
   const smileRef = useRef(0.55);
   const debugArmBonesRef = useRef(null);
 
-  const modelPaths = assetPreset === 'auto'
-    ? ['/sarah-avatar.glb', '/sarah-idle.glb']
-    : [assetPreset === 'idle' ? '/sarah-idle.glb' : '/sarah-avatar.glb'];
+  const modelPaths = [assetPreset === 'avatar' ? '/sarah-avatar.glb' : '/sarah-idle.glb'];
   const loadedModels = useGLTF(modelPaths);
-  const selectedModel = assetPreset === 'auto' ? loadedModels[1] || loadedModels[0] : loadedModels[0];
+  const selectedModel = loadedModels[0];
   const displayScene = selectedModel.scene;
   const activeAnims = selectedModel.animations || [];
 
