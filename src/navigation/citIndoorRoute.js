@@ -14,7 +14,7 @@ export const CIT_ROUTE_NODES = [
   { id: 'elevator-1f', floor: 1, landmark: 'Elevator', instruction: 'Continue to the elevator on the 1st floor.', connections: ['elevator-4f'] },
   { id: 'elevator-4f', floor: 4, landmark: 'Elevator', instruction: 'Take the elevator to the 4th floor, then follow the angled approach toward OLCPD.', connections: ['olcpd-office'] },
   { id: 'olcpd-office', floor: 4, landmark: 'OLCPD', instruction: 'At OLCPD, turn right.', connections: ['restroom-window'] },
-  { id: 'restroom-window', floor: 4, landmark: 'Window near restroom', instruction: 'At the window near the restroom, turn right.', connections: ['hallway-straight'] },
+  { id: 'restroom-window', floor: 4, landmark: 'Window near restroom', instruction: 'At the window near the restroom, turn left.', connections: ['hallway-straight'] },
   { id: 'hallway-straight', floor: 4, landmark: 'Hallway', instruction: 'Continue straight along the hallway.', connections: ['ovprei-office'] },
   { id: 'ovprei-office', floor: 4, landmark: 'OVPREI Office', instruction: 'Pass the OVPREI Office.', connections: ['aricc'] },
   { id: 'aricc', floor: 4, landmark: 'ARICC', instruction: 'Arrive at ARICC.', connections: [] },
