@@ -22,29 +22,43 @@ for (const destination of destinations) {
             Object.fromEntries(Object.entries(evidence).filter(([key]) => key !== 'nodeId')),
             getCITWalkthroughEvidence(step.from),
         );
-        assert.equal(evidence.verified, true);
-        assert.match(evidence.sourceVideo, /^IMG_\d+\.MOV$/);
-        assert.match(evidence.photo, /^\/indoor-evidence\/cit\//);
+        if (evidence.verificationStatus === 'user-confirmed') {
+            assert.equal(evidence.verified, false);
+            assert.equal(evidence.sourceVideo, null);
+            assert.equal(evidence.photo, null);
+        } else {
+            assert.equal(evidence.verified, true);
+            assert.match(evidence.sourceVideo, /^IMG_\d+\.MOV$/);
+            assert.match(evidence.photo, /^\/indoor-evidence\/cit\//);
+        }
     }
 }
 
-assert.equal(getDestinationRoute('RIO').steps.length, 6);
+assert.equal(getDestinationRoute('RIO').steps.at(-1).from, 'rio-entrance');
+assert.equal(getDestinationRoute('FABLAB').steps.at(-1).from, 'fablab-entrance');
+assert.equal(getDestinationRoute('CAESAR').steps.at(-1).from, 'caesar');
 assert.equal(getDestinationRoute('ARICC').steps.length, 11);
 assert.equal(getDestinationRoute('ARICC').arrivalInstruction, 'Arrive at ARICC.');
 assert.equal(getDestinationRoute('RECON').complete, true);
 assert.equal(getDestinationRoute('RECON').arrivalInstruction, 'Arrive at RECON.');
-assert.equal(getDestinationRoute('RECON').steps.at(-1).to, 'recon');
+assert.equal(getDestinationRoute('RECON').steps.at(-1).from, 'recon');
+assert.equal(getDestinationRoute('RECON').steps.at(-1).instruction, 'Arrive at RECON.');
+assert.deepEqual(
+    getDestinationRoute('RECON').steps.slice(-5).map((step) => step.from),
+    ['recon-elevator', 'recon-corridor', 'recon-pot', 'recon-turn', 'recon'],
+);
 
 for (const destination of incompleteDestinations.filter((destination) => destination !== 'RECON')) {
     const route = getDestinationRoute(destination);
     assert.equal(route.complete, false);
     assert.equal(route.arrivalInstruction, null);
-    assert.equal(route.steps.at(-1).from, 'elevator-4f');
+    assert.equal(route.steps.some((step) => step.from === 'aricc'), true);
     assert.equal(route.missingSegments.length > 0, true);
-    assert.equal(route.steps.some((step) => step.from === destination.toLowerCase()), false);
     assert.equal(route.steps.some((step) => step.instruction.includes('Arrive at')), false);
 }
 
-assert.equal(getDestinationRoute('RIO').steps[0].instruction, getDestinationRoute('FABLAB').steps[0].instruction);
+assert.equal(getDestinationRoute('RIO').segments.find((segment) => segment.id === 'aricc-to-rio').status, 'user-confirmed');
+assert.equal(getDestinationRoute('FABLAB').segments.find((segment) => segment.id === 'rio-to-fablab').status, 'continuous-video-verified');
+assert.equal(getDestinationRoute('CAESAR').segments.find((segment) => segment.id === 'fablab-to-stairs-right-caesar').continuousVideoVerified, false);
 assert.equal(getDestinationRoute('RIO').steps.length !== getDestinationRoute('ARICC').steps.length, true);
 console.log('Destination route definitions passed');
