@@ -82,6 +82,18 @@ npm run index:bulsu
 
 The chat handlers retrieve up to five center chunks and filter by the confirmed recognition entity when available. Without Pinecone credentials, local lexical retrieval from the official records keeps development and tests deterministic. Set `OPENROUTER_MODEL` to override the default `meta-llama/llama-3.3-70b-instruct` model.
 
+### Offline-first local center knowledge
+
+The browser bundles the verified records in `data/bulsu-centers.records.json` through `src/services/localKnowledgeService.js`. The compact index stores:
+
+- `entity`, `fullName`, aliases, institution, category, and verified record count
+- source-backed record IDs, sections, content, source identifiers, source type, and available location fields
+- top-level `schemaVersion`, `knowledgeVersion`, `updatedAt`, and source metadata
+
+TAYLOR normalizes questions, recognizes center acronyms and aliases, ranks lexical matches, and filters answers by intent before contacting `/api/chat`. A high-confidence local answer is returned immediately while online or offline. If local evidence is insufficient, the existing backend is tried; when the backend is unavailable TAYLOR explicitly says the requested information is not available locally rather than guessing. IndexedDB store `taylor-local-knowledge` persists the versioned index under key `bulsu-centers` after initialization.
+
+To update the local knowledge, edit only source-backed records in `data/bulsu-centers.records.json`, update `LOCAL_KNOWLEDGE_VERSION` in `src/services/localKnowledgeService.js`, run `node --test tests/localKnowledgeService.test.js`, and run `npm run build`. A schema-version mismatch discards the persisted index and rebuilds it from the bundled baseline. RIO is intentionally listed as a supported alias but has no local record because `data/bulsu-rio.structure.json` is marked `awaiting_official_source`; TAYLOR will not invent RIO details offline.
+
 ### Offline Exhibit Explanations
 
 Confirmed ARICC, FABLAB, RECON, and CAESAR names render independently of the network. Verified explanations are cached in the browser IndexedDB store `taylor-exhibit-explanations` and displayed stale-while-revalidate. The structured refresh endpoint is `/api/exhibit-explanation` and requires `OPENROUTER_API_KEY`, Pinecone configuration, and `TAVILY_API_KEY`. Explanation generation defaults to `meta-llama/llama-3.3-70b-instruct`; set `OPENROUTER_MODEL` to override it. Responses are cached only when the generated source references match sources retrieved by the server.

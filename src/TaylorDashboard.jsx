@@ -3,6 +3,11 @@ import { useLocation } from 'react-router-dom';
 const Hologram = lazy(() => import('./hologram.jsx'));
 import { handleSpeechInteraction, onSpeechStarted, textToSpeech, getSpeechSupportState } from './services/speechAPI.js';
 import { subscribePwaBootstrap } from './services/pwaBootstrapService.js';
+import {
+  createKnowledgeIndex,
+  initializeLocalKnowledge,
+} from './services/localKnowledgeService.js';
+import { resolveLocalFirstChat } from './services/localKnowledgeChat.js';
 import './HomePage.css';
 
 const API_URL = (import.meta.env.VITE_NODEJS_API_URL || '').trim();
@@ -123,8 +128,19 @@ export default function TaylorDashboard() {
     return window.sessionStorage.getItem('taylorGreetingPlayed') === 'true';
   });
   const [bootstrap, setBootstrap] = useState(() => ({ state: 'BOOTSTRAP_PENDING', completed: 0, total: 4 }));
+  const [localKnowledge, setLocalKnowledge] = useState(createKnowledgeIndex);
 
   useEffect(() => subscribePwaBootstrap(setBootstrap), []);
+
+  useEffect(() => {
+    let mounted = true;
+    initializeLocalKnowledge()
+      .then((index) => {
+        if (mounted) setLocalKnowledge(index);
+      })
+      .catch((error) => console.warn('[taylor] local knowledge persistence unavailable', error));
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     const handleActiveEntityChange = (event) => {
@@ -250,15 +266,48 @@ export default function TaylorDashboard() {
     setIsThinking(true);
 
     try {
+      const resolution = await resolveLocalFirstChat({
+        query: text,
+        activeEntity,
+        index: localKnowledge,
+        requestBackend: (localResult) => {
+          console.info('[taylor] local knowledge insufficient; using backend', {
+            reason: localResult.reason,
+            entity: localResult.entity || null,
+            latencyMs: localResult.latencyMs,
+          });
+          return requestChat({
+            messages: nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText })),
+            activeEntity,
+          });
+        },
+      });
+
+      if (resolution.kind === 'local') {
+        const reply = resolution.result.match.text;
+        setMessages((prev) => [...prev, { speaker: 'guide', text: reply }]);
+        speakWithPreferredVoice(reply);
+        console.info('[taylor] local knowledge answer', {
+          entity: resolution.result.match.entity,
+          intent: resolution.result.match.intent,
+          sourceIds: resolution.result.match.sourceIds,
+          latencyMs: resolution.result.latencyMs,
+        });
+        return;
+      }
+
+      if (resolution.kind === 'unavailable') {
+        setMessages((prev) => [...prev, { speaker: 'guide', text: resolution.message }]);
+        speakWithPreferredVoice(resolution.message);
+        return;
+      }
+
       console.info('[taylor] chat request', {
         endpoint: CHAT_ENDPOINT,
         payload: { messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })) }
       });
 
-      const response = await requestChat({
-        messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })),
-        activeEntity,
-      });
+      const response = resolution.response;
 
       const responseText = await response.text();
       let data = {};
