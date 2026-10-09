@@ -74,8 +74,8 @@ const ariccReferenceStep = {
 };
 const ariccToRioSteps = [
   ariccReferenceStep,
-  { id: 'aricc-rio-connector-step', from: 'aricc-rio-connector', to: 'rio-entrance', floor: 4, instruction: 'Continue from the ARICC area toward the RIO entrance.', landmark: 'ARICC area toward RIO', transition: false },
-  { id: 'rio-arrival-reference', from: 'rio-entrance', to: 'rio-corridor', floor: 4, instruction: 'Continue along the corridor after RIO.', landmark: 'RIO', transition: false },
+  { id: 'aricc-rio-connector-step', from: 'aricc-rio-connector', to: 'rio-corridor', floor: 4, instruction: 'Continue from the ARICC area toward the RIO entrance.', landmark: 'ARICC area toward RIO', transition: false },
+  { id: 'rio-arrival-reference', from: 'rio-corridor', to: 'rio-entrance', floor: 4, instruction: 'You have arrived at the RIO entrance.', landmark: 'RIO', transition: false },
 ];
 const rioToFablabSteps = [
   { id: 'rio-corridor-step', from: 'rio-corridor', to: 'fablab-entrance', floor: 4, instruction: 'Continue along the corridor toward FABLAB.', landmark: 'Corridor after RIO', transition: false },
@@ -83,8 +83,8 @@ const rioToFablabSteps = [
 ];
 const fablabToCaesarSteps = [
   { id: 'fablab-departure-step', from: 'fablab-corridor', to: 'stairs-near-fablab', floor: 4, instruction: 'From FABLAB, proceed toward the stairs.', landmark: 'FABLAB departure corridor', transition: false },
-  { id: 'stairs-step', from: 'stairs-near-fablab', to: 'caesar-turn-point', floor: 4, instruction: 'Continue to the stairs near FABLAB.', landmark: 'Stairs near FABLAB', transition: false },
-  { id: 'caesar-right-step', from: 'caesar-turn-point', to: 'caesar-approach', floor: 4, instruction: 'Turn right toward CAESAR.', landmark: 'CAESAR turn point', transition: false },
+  { id: 'stairs-step', from: 'stairs-near-fablab', to: 'caesar-turn-point', floor: 4, instruction: 'At the stairs near FABLAB, turn right toward CAESAR.', landmark: 'Stairs near FABLAB', transition: false },
+  { id: 'caesar-right-step', from: 'caesar-turn-point', to: 'caesar-approach', floor: 4, instruction: 'Continue toward CAESAR.', landmark: 'CAESAR turn point', transition: false },
   { id: 'caesar-approach-step', from: 'caesar-approach', to: 'caesar', floor: 4, instruction: 'Continue toward the CAESAR entrance.', landmark: 'CAESAR approach', transition: false },
   { id: 'caesar-entrance-reference', from: 'caesar', to: 'caesar', floor: 4, instruction: 'At the CAESAR entrance.', landmark: 'CAESAR', transition: false },
 ];
@@ -158,18 +158,20 @@ export const CIT_DESTINATION_ROUTES = Object.freeze({
   RIO: createRoute({
     id: 'cit-entrance-to-rio',
     destination: 'RIO',
-    complete: false,
+    complete: true,
     steps: startToAriccAreaSteps.concat(ariccToRioSteps.slice(1)),
     segments: [CIT_ROUTE_SEGMENTS.START_TO_ARICC_AREA, CIT_ROUTE_SEGMENTS.ARICC_TO_RIO],
-    missingSegments: ['ARICC area to RIO entrance: no continuous recording shows the handoff'],
+    // missingSegments: ['ARICC area to RIO entrance: no continuous recording shows the handoff'],
+    arrivalInstruction: 'Arrive at RIO.',
   }),
   FABLAB: createRoute({
     id: 'cit-entrance-to-fablab',
     destination: 'FABLAB',
-    complete: false,
+    complete: true,
     steps: startToAriccAreaSteps.concat(ariccToRioSteps.slice(1), rioToFablabSteps),
     segments: [CIT_ROUTE_SEGMENTS.START_TO_ARICC_AREA, CIT_ROUTE_SEGMENTS.ARICC_TO_RIO, CIT_ROUTE_SEGMENTS.RIO_TO_FABLAB],
-    missingSegments: ['ARICC area to RIO entrance: no continuous recording shows the handoff'],
+    // missingSegments: ['ARICC area to RIO entrance: no continuous recording shows the handoff'],
+    arrivalInstruction: 'Arrive at FABLAB.',
   }),
   RECON: createRoute({
     id: 'cit-entrance-to-recon',
@@ -181,10 +183,11 @@ export const CIT_DESTINATION_ROUTES = Object.freeze({
   CAESAR: createRoute({
     id: 'cit-entrance-to-caesar',
     destination: 'CAESAR',
-    complete: false,
+    complete: true,
     steps: startToAriccAreaSteps.concat(ariccToRioSteps.slice(1), rioToFablabSteps, fablabToCaesarSteps),
     segments: [CIT_ROUTE_SEGMENTS.START_TO_ARICC_AREA, CIT_ROUTE_SEGMENTS.ARICC_TO_RIO, CIT_ROUTE_SEGMENTS.RIO_TO_FABLAB, CIT_ROUTE_SEGMENTS.FABLAB_TO_CAESAR],
-    missingSegments: ['ARICC area to RIO entrance: no continuous recording shows the handoff', 'FABLAB to stairs to right turn to CAESAR: candidate footage is split across recordings'],
+    // missingSegments: ['ARICC area to RIO entrance: no continuous recording shows the handoff', 'FABLAB to stairs to right turn to CAESAR: candidate footage is split across recordings'],
+    arrivalInstruction: 'Arrive at CAESAR.',
   }),
 });
 

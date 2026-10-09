@@ -738,6 +738,7 @@
 .navigation-avatar-status { margin: 0; color: #c9e8f9; font-size: .82rem; line-height: 1.4; }
 .navigation-avatar-panel.is-collapsed { padding-bottom: 10px; }
 .navigation-step-view { margin-top: 16px; overflow: hidden; touch-action: pan-y; }
+.navigation-step-view--rio .navigation-photo { object-position: center top; }
 .navigation-progress { display: grid; gap: 8px; padding: 16px 16px 0; color: #527080; font-size: .7rem; font-weight: 800; letter-spacing: .08em; }
 .navigation-progress div { display: flex; gap: 4px; }
 .navigation-progress i { flex: 1; height: 4px; border-radius: 99px; background: #d7e3e8; }
