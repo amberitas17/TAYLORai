@@ -238,7 +238,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const completion = await openrouter.chat.completions.create({
-      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-70b-instruct',
+      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
       messages: [
         systemPrompt,
         ...(bulsuContext

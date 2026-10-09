@@ -10,6 +10,7 @@ class ClientSideFaceAnalysisService {
     this.modelPath = '/models/faceapi';
     this.cacheName = 'taylor-faceapi-models-v1';
     this.modelTimeoutMs = 20000;
+    this.maxAttempts = 3;
     this.modelSource = 'NETWORK';
     this.modelsLoadTime = 0;
     this.lastError = '';
@@ -106,19 +107,30 @@ class ClientSideFaceAnalysisService {
       }
 
       this.state = 'FACE_DOWNLOADING';
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.modelTimeoutMs);
-      let response;
-      try {
-        response = await fetch(url, { cache: 'no-store', signal: controller.signal });
-      } finally {
-        clearTimeout(timeout);
+      let lastError;
+      for (let attempt = 0; attempt < this.maxAttempts; attempt += 1) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), this.modelTimeoutMs);
+        try {
+          const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+          if (!response.ok) {
+            const error = new Error(`${resource} returned HTTP ${response.status}`);
+            error.retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+            throw error;
+          }
+          await cache.put(url, response.clone());
+          if (!await cache.match(url)) throw new Error(`${resource} could not be verified in Cache Storage`);
+          this.resourceDiagnostics[resource] = { status: 'NETWORK', attempts: attempt + 1, duration: performance.now() - startedAt };
+          return 'NETWORK';
+        } catch (error) {
+          lastError = error;
+          if (attempt + 1 >= this.maxAttempts || error.retryable === false) throw error;
+          await new Promise((resolve) => setTimeout(resolve, 400 * (2 ** attempt)));
+        } finally {
+          clearTimeout(timeout);
+        }
       }
-      if (!response.ok) throw new Error(`${resource} returned HTTP ${response.status}`);
-      await cache.put(url, response.clone());
-      if (!await cache.match(url)) throw new Error(`${resource} could not be verified in Cache Storage`);
-      this.resourceDiagnostics[resource] = { status: 'NETWORK', duration: performance.now() - startedAt };
-      return 'NETWORK';
+      throw lastError;
     } catch (error) {
       const message = `${resource}: ${error.name === 'AbortError' ? 'timed out' : error.message}`;
       this.resourceDiagnostics[resource] = { status: 'ERROR', duration: performance.now() - startedAt, error: message };

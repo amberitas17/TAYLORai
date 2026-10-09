@@ -1,14 +1,17 @@
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 const Hologram = lazy(() => import('./hologram.jsx'));
 import { handleSpeechInteraction, onSpeechStarted, textToSpeech, getSpeechSupportState } from './services/speechAPI.js';
 import { subscribePwaBootstrap } from './services/pwaBootstrapService.js';
 import './HomePage.css';
 
 const API_URL = (import.meta.env.VITE_NODEJS_API_URL || '').trim();
-const CHAT_ENDPOINT = API_URL && !/localhost|127\.0\.0\.1/i.test(API_URL)
+const IS_LOCAL_BROWSER = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/i.test(window.location.hostname);
+const CHAT_ENDPOINT = API_URL && (!/localhost|127\.0\.0\.1/i.test(API_URL) || IS_LOCAL_BROWSER)
   ? `${API_URL.replace(/\/$/, '')}/chat`
   : '/api/chat';
+const CHAT_TIMEOUT_MS = 15000;
+const CHAT_MAX_ATTEMPTS = 2;
 const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
 
 const suggestionItems = [
@@ -75,8 +78,36 @@ const getActiveEntity = () => {
   return KNOWLEDGE_ENTITIES.has(saved) ? saved : '';
 };
 
+function isRetryableChatStatus(status) {
+  return [408, 425, 429, 502, 503, 504].includes(status);
+}
+
+async function requestChat(payload) {
+  let lastError;
+  for (let attempt = 1; attempt <= CHAT_MAX_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    try {
+      const response = await fetch(CHAT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      if (!isRetryableChatStatus(response.status) || attempt === CHAT_MAX_ATTEMPTS) return response;
+      lastError = new Error(`Chat service returned HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === CHAT_MAX_ATTEMPTS) throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 300 * attempt));
+  }
+  throw lastError || new Error('Chat request failed');
+}
+
 export default function TaylorDashboard() {
-  const navigate = useNavigate();
   const location = useLocation();
   const [sessionContext, setSessionContext] = useState(getSessionContext);
   const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
@@ -196,8 +227,11 @@ export default function TaylorDashboard() {
     if (message.includes('Rate limit') || message.includes('rate-limit')) {
       return 'The AI service is temporarily rate-limiting requests. Please try again soon.';
     }
-    if (message.includes('API not found') || message.includes('not found')) {
-      return 'The chat endpoint could not be found. Please try again in a moment.';
+    if (message.includes('API not found') || message.includes('endpoint could not be found')) {
+      return 'The chat service configuration is unavailable. Please contact the site administrator.';
+    }
+    if (message.includes('model') && message.includes('not found')) {
+      return 'The configured AI model is unavailable. Please contact the site administrator.';
     }
     if (message.includes('Network') || message.includes('network')) {
       return 'A network error prevented the chat request from completing.';
@@ -221,13 +255,9 @@ export default function TaylorDashboard() {
         payload: { messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })) }
       });
 
-      const response = await fetch(CHAT_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })),
-          activeEntity,
-        })
+      const response = await requestChat({
+        messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })),
+        activeEntity,
       });
 
       const responseText = await response.text();

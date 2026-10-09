@@ -1,5 +1,5 @@
 // Hologram.jsx
-import React, { Suspense, useEffect, useRef } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -329,9 +329,35 @@ function LoadingFallback() {
 }
 
 export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', onReady }) {
+  const [contextGeneration, setContextGeneration] = useState(0);
+  const [contextLost, setContextLost] = useState(false);
+  const canvasRef = useRef(null);
+  const lowMemoryDevice = typeof navigator !== 'undefined' && Number(navigator.deviceMemory || 8) <= 4;
+
+  const handleCreated = ({ gl }) => {
+    const canvas = gl.domElement;
+    if (canvasRef.current === canvas) return;
+    canvasRef.current = canvas;
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      setContextLost(true);
+    }, false);
+    canvas.addEventListener('webglcontextrestored', () => {
+      setContextLost(false);
+      setContextGeneration((generation) => generation + 1);
+    }, false);
+  };
+
   return (
     <div className="hologram-container">
-      <Canvas camera={{ position: [0, 1.3, 4.3], fov: 30 }} dpr={[1, 1.5]}>
+      <Canvas
+        key={contextGeneration}
+        camera={{ position: [0, 1.3, 4.3], fov: 30 }}
+        dpr={lowMemoryDevice ? 1 : [1, 1.25]}
+        gl={{ antialias: false, powerPreference: 'low-power', preserveDrawingBuffer: false }}
+        performance={{ min: 0.5, max: 1, debounce: 200 }}
+        onCreated={handleCreated}
+      >
         <PerspectiveCamera makeDefault position={[0, 1.35, 2.9]} fov={30} />
         <ambientLight intensity={1.2} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
@@ -342,6 +368,7 @@ export default function Hologram({ emotion, isAnimating = false, spokenText = ''
         </Suspense>
         <OrbitControls enableZoom={false} enablePan={false} target={[0, 1.18, 0]} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
       </Canvas>
+      {contextLost && <div className="avatar-placeholder" role="status">Restoring TAYLOR display...</div>}
     </div>
   );
 }

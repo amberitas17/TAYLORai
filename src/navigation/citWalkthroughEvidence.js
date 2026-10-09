@@ -9,7 +9,7 @@ export const CIT_WALKTHROUGH_EVIDENCE = {
   'olcpd-office': { sourceVideo: 'IMG_4525.MOV', timestamp: '0.00s', photo: '/indoor-evidence/cit/olcpd-office.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'elevator-4f', next: 'restroom-window', turn: 'right' },
   'restroom-window': { sourceVideo: 'IMG_4525.MOV', timestamp: '8.01s', photo: '/indoor-evidence/cit/window-near-bathroom.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'olcpd-office', next: 'hallway-straight', turn: 'right' },
   'hallway-straight': { sourceVideo: 'IMG_4525.MOV', timestamp: '13.01s', photo: '/indoor-evidence/cit/ovprei.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'medium', previous: 'restroom-window', next: 'ovprei-office', turn: 'straight' },
-  'ovprei-office': { sourceVideo: 'IMG_4525.MOV', timestamp: '13.01s', photo: '/indoor-evidence/cit/ovprei.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'hallway-straight', next: 'aricc' },
+  'ovprei-office': { sourceVideo: 'IMG_4638.MOV', timestamp: '10.01s', photo: '/indoor-evidence/cit/ovprei-sign.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'hallway-straight', next: 'aricc' },
   aricc: { sourceVideo: 'IMG_4525.MOV', timestamp: '34.03s', photo: '/indoor-evidence/cit/aricc.jpg', verified: true, verificationStatus: 'reviewed', confidence: 'high', previous: 'ovprei-office', next: null },
 };
 

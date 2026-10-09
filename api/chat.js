@@ -1,10 +1,46 @@
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
-import { BULSU_GROUNDED_SYSTEM_PROMPT, formatBulsuContext, isBulsuCenterQuestion, normalizeBulsuEntity, searchBulsuCenters } from '../scripts/bulsuCentersKnowledgeBase.mjs';
+import bulsuRecords from '../data/bulsu-centers.records.json' with { type: 'json' };
 
 dotenv.config();
 
+const BULSU_GROUNDED_SYSTEM_PROMPT = `You are TAYLOR, an AI assistant for Bulacan State University.\n\nFor questions about BulSU centers, use the supplied knowledge-base context as the factual source. Do not invent services, facilities, locations, contact information, research programs, or organizational details that are absent from the supplied context.`;
 const SYSTEM_PROMPT = `${BULSU_GROUNDED_SYSTEM_PROMPT}\n\nYou assist visitors with academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.`;
+const BULSU_ENTITIES = ['ARICC', 'RIO', 'CAESAR', 'CBS', 'FABLAB', 'BARAS TBI', 'FIC', 'RECON'];
+
+function normalizeBulsuEntity(value = '') {
+  const text = String(value).toLowerCase();
+  return BULSU_ENTITIES.find((entity) => text.includes(entity.toLowerCase())) || '';
+}
+
+function isBulsuCenterQuestion(message = '', activeEntity = '') {
+  return Boolean(normalizeBulsuEntity(message) || normalizeBulsuEntity(activeEntity) || /bulsu|bulacan state university|center|research|innovation/i.test(message));
+}
+
+function searchBulsuCenters(query, activeEntity = '') {
+  const entity = normalizeBulsuEntity(query) || normalizeBulsuEntity(activeEntity);
+  const terms = String(query).toLowerCase().split(/\s+/).filter((term) => term.length > 2);
+  return bulsuRecords
+    .filter((record) => !entity || record.entity === entity)
+    .map((record) => {
+      const haystack = `${record.entity} ${(record.aliases || []).join(' ')} ${record.full_name} ${record.section} ${record.content}`.toLowerCase();
+      const score = terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0) + (entity && record.entity === entity ? 3 : 0);
+      return { score, ...record };
+    })
+    .filter((record) => record.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+}
+
+function formatBulsuContext(results = []) {
+  return results.map((item) => [
+    `Entity: ${item.entity}`,
+    `Full name: ${item.full_name}`,
+    `Section: ${item.section}`,
+    `Source: ${item.source}`,
+    `Content: ${item.content}`,
+  ].join('\n')).join('\n\n');
+}
 
 async function parseRequestBody(req) {
   if (req.body && typeof req.body === 'object') {
@@ -88,12 +124,12 @@ export default async function handler(req, res) {
       return;
     }
 
-    const openrouter = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+    const openrouter = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1', timeout: 15000, maxRetries: 0 });
     const lastUserMessage = [...messages].reverse().find((message) => message?.role === 'user')?.content || '';
     const requestedEntity = normalizeBulsuEntity(lastUserMessage);
     const effectiveActiveEntity = requestedEntity || normalizeBulsuEntity(activeEntity);
     const bulsuResults = isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity)
-      ? await searchBulsuCenters(lastUserMessage, { activeEntity: effectiveActiveEntity, topK: 5 })
+      ? searchBulsuCenters(lastUserMessage, effectiveActiveEntity)
       : [];
     const bulsuContext = formatBulsuContext(bulsuResults);
     if (effectiveActiveEntity === 'RIO' && isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity) && !bulsuContext) {
@@ -102,7 +138,7 @@ export default async function handler(req, res) {
       return;
     }
     const completion = await openrouter.chat.completions.create({
-      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.1-70b-instruct',
+      model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         ...(bulsuContext ? [{ role: 'system', content: `Answer center questions only from this official BulSU center context.\n\n${bulsuContext}` }] : []),

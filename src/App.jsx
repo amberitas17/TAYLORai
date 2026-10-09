@@ -2,17 +2,25 @@ import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
 import AiText from './ai-text.jsx';
-import AIVision from './components/AIVision.jsx'; // New web-compatible AI Vision component
-import AiExhibit from './ai-exhibit.jsx';
-import AiVisionTest from './ai-vision-test.jsx';
-import ClientSideAIInterface from './components/ClientSideAIInterface.jsx';
-import FaceApiInterface from './components/FaceApiInterface.jsx';
-import ClientSideFaceAnalysis from './ClientSideFaceAnalysis.jsx';
+const AIVision = lazy(() => import('./components/AIVision.jsx'));
+const AiExhibit = lazy(() => import('./ai-exhibit.jsx'));
+const AiVisionTest = lazy(() => import('./ai-vision-test.jsx'));
+const ClientSideAIInterface = lazy(() => import('./components/ClientSideAIInterface.jsx'));
+const FaceApiInterface = lazy(() => import('./components/FaceApiInterface.jsx'));
+const ClientSideFaceAnalysis = lazy(() => import('./ClientSideFaceAnalysis.jsx'));
 const Hologram = lazy(() => import('./hologram.jsx'));
 import HomePage from './HomePage.jsx';
 import TaylorDashboard from './TaylorDashboard.jsx';
-import AINavigation from './components/AINavigation.jsx';
-import IndoorMapEditor from './components/IndoorMapEditor.jsx';
+const AINavigation = lazy(() => import('./components/AINavigation.jsx'));
+const IndoorMapEditor = lazy(() => import('./components/IndoorMapEditor.jsx'));
+
+function RouteLoading() {
+  return (
+    <div className="route-loading" role="status" aria-live="polite">
+      Loading TAYLOR...
+    </div>
+  );
+}
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -193,26 +201,28 @@ function NavigationRoute() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/taylor" element={<TaylorDashboard />} />
-      <Route path="/landing" element={<LandingPage />} />
-      <Route path="/ai-text" element={<AiText />} />
-      <Route path="/machine-vision" element={<AIVision />} />
-      <Route path="/ai-navigation" element={<NavigationRoute />} />
-      <Route path="/ai-navigation-admin" element={<IndoorMapEditor onBack={() => window.history.back()} />} />
-      <Route path="/machine-vision-exhibit" element={<AiExhibit classifierMode="recon" />} />
-      <Route path="/machine-vision-recon" element={<AiExhibit classifierMode="recon" />} />
-      <Route path="/machine-vision-exhibit-aricc" element={<AiExhibit classifierMode="aricc" />} />
-      <Route path="/machine-vision-aricc" element={<AiExhibit classifierMode="aricc" />} />
-      <Route path="/machine-vision-fablab" element={<AiExhibit classifierMode="fablab" />} />
-      <Route path="/machine-vision-caesar" element={<AiExhibit classifierMode="caesar" />} />
-      <Route path="/machine-vision-rio" element={<AiExhibit classifierMode="rio" />} />
-      <Route path="/test" element={<AiVisionTest />} />
-      <Route path="/client-ai" element={<ClientSideAIInterface />} />
-      <Route path="/face-api" element={<FaceApiInterface />} />
-      <Route path="/client-side-face-analysis" element={<ClientSideFaceAnalysis />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<RouteLoading />}>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/taylor" element={<TaylorDashboard />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/ai-text" element={<AiText />} />
+        <Route path="/machine-vision" element={<AIVision />} />
+        <Route path="/ai-navigation" element={<NavigationRoute />} />
+        <Route path="/ai-navigation-admin" element={<IndoorMapEditor onBack={() => window.history.back()} />} />
+        <Route path="/machine-vision-exhibit" element={<AiExhibit classifierMode="recon" />} />
+        <Route path="/machine-vision-recon" element={<AiExhibit classifierMode="recon" />} />
+        <Route path="/machine-vision-exhibit-aricc" element={<AiExhibit classifierMode="aricc" />} />
+        <Route path="/machine-vision-aricc" element={<AiExhibit classifierMode="aricc" />} />
+        <Route path="/machine-vision-fablab" element={<AiExhibit classifierMode="fablab" />} />
+        <Route path="/machine-vision-caesar" element={<AiExhibit classifierMode="caesar" />} />
+        <Route path="/machine-vision-rio" element={<AiExhibit classifierMode="rio" />} />
+        <Route path="/test" element={<AiVisionTest />} />
+        <Route path="/client-ai" element={<ClientSideAIInterface />} />
+        <Route path="/face-api" element={<FaceApiInterface />} />
+        <Route path="/client-side-face-analysis" element={<ClientSideFaceAnalysis />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

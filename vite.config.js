@@ -11,7 +11,15 @@ export default defineConfig({
       includeAssets: [
         'manifest.json',
         'icons/icon-192.svg',
-        'icons/icon-512.svg'
+        'icons/icon-512.svg',
+        'models/faceapi/tiny_face_detector_model-weights_manifest.json',
+        'models/faceapi/tiny_face_detector_model-shard1',
+        'models/faceapi/face_expression_model-weights_manifest.json',
+        'models/faceapi/face_expression_model-shard1',
+        'models/faceapi/age_gender_model-weights_manifest.json',
+        'models/faceapi/age_gender_model-shard1',
+        'sarah-avatar.glb',
+        'sarah-idle.glb'
       ],
       manifest: false,
       workbox: {

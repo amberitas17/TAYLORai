@@ -1,6 +1,7 @@
 const AVATAR_CACHE_NAME = 'taylor-avatar-assets-v1';
 const AVATAR_ASSETS = ['/sarah-avatar.glb'];
 const AVATAR_TIMEOUT_MS = 30000;
+const AVATAR_MAX_ATTEMPTS = 3;
 
 class AvatarAssetService {
   constructor() {
@@ -52,22 +53,32 @@ class AvatarAssetService {
 
       this.state = 'AVATAR_DOWNLOADING';
       this.cacheMisses += 1;
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), AVATAR_TIMEOUT_MS);
-      try {
-        const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
-        if (!response.ok) throw new Error(`${asset} returned HTTP ${response.status}`);
-        await cache.put(url, response.clone());
-        if (!await cache.match(url)) throw new Error(`${asset} could not be verified in Cache Storage`);
-        this.resources[asset] = { source: 'NETWORK', duration: performance.now() - assetStartedAt };
-        return 'NETWORK';
-      } catch (error) {
-        const reason = error.name === 'AbortError' ? 'timed out' : error.message;
-        this.resources[asset] = { source: 'ERROR', duration: performance.now() - assetStartedAt, error: reason };
-        throw new Error(`Avatar asset ${asset} failed: ${reason}`);
-      } finally {
-        window.clearTimeout(timeoutId);
+      let lastError;
+      for (let attempt = 0; attempt < AVATAR_MAX_ATTEMPTS; attempt += 1) {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), AVATAR_TIMEOUT_MS);
+        try {
+          const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+          if (!response.ok) {
+            const error = new Error(`${asset} returned HTTP ${response.status}`);
+            error.retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+            throw error;
+          }
+          await cache.put(url, response.clone());
+          if (!await cache.match(url)) throw new Error(`${asset} could not be verified in Cache Storage`);
+          this.resources[asset] = { source: 'NETWORK', attempts: attempt + 1, duration: performance.now() - assetStartedAt };
+          return 'NETWORK';
+        } catch (error) {
+          lastError = error;
+          if (attempt + 1 >= AVATAR_MAX_ATTEMPTS || error.retryable === false) break;
+          await new Promise((resolve) => window.setTimeout(resolve, 500 * (2 ** attempt)));
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
       }
+      const reason = lastError?.name === 'AbortError' ? 'timed out' : lastError?.message || 'network request failed';
+      this.resources[asset] = { source: 'ERROR', attempts: AVATAR_MAX_ATTEMPTS, duration: performance.now() - assetStartedAt, error: reason };
+      throw new Error(`Avatar asset ${asset} failed: ${reason}`);
     }));
 
     this.source = sources.every((source) => source === 'CACHE') ? 'CACHE' : 'NETWORK';

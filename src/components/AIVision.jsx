@@ -88,6 +88,7 @@ export default function AIVision() {
 
   useEffect(() => {
     startEntertainmentSequence();
+    scheduleFaceInitialization();
     initializeAvatar();
 
     return () => {
@@ -110,7 +111,6 @@ export default function AIVision() {
       setAvatarState('AVATAR_ERROR');
       setAvatarDiagnostics(avatarAssetService.getDiagnostics());
       console.error('Avatar initialization failed:', error);
-      scheduleFaceInitialization();
     }
   };
 
