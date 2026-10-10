@@ -186,6 +186,59 @@ export async function captureExhibitRetrainingCandidate({ frame, zone, modelVers
   return { saved: true, record };
 }
 
+// Explicit corrections are eligible for review even when the classifier was confident.
+// The corrected label remains UNVERIFIED until a trusted reviewer approves it.
+export async function captureCorrectedExhibitCandidate({ frame, zone, modelVersion, predictedLabel, correctedLabel, confidence, source = {} }) {
+  if (!getExhibitRetrainingConsent()) return { saved: false, reason: 'consent_required' };
+  if (!frame || !zone || !modelVersion || !predictedLabel || !correctedLabel || predictedLabel === correctedLabel) {
+    return { saved: false, reason: 'invalid_correction' };
+  }
+  const config = getExhibitRetrainingConfig();
+  const normalizedZone = String(zone).toUpperCase();
+  const records = await listRecords();
+  const now = Date.now();
+  if (records.some((record) => record.zone === normalizedZone && record.source?.sessionId === source.sessionId &&
+      record.prediction?.top1?.class === predictedLabel && record.proposedLabel === correctedLabel &&
+      now - record.createdAt < config.captureCooldownMs)) {
+    return { saved: false, reason: 'duplicate_correction' };
+  }
+  if (records.filter((record) => record.zone === normalizedZone).length >= config.maxRecordsPerZone ||
+      records.filter((record) => record.zone === normalizedZone && record.classKey === predictedLabel).length >= config.maxRecordsPerClass) {
+    return { saved: false, reason: 'capture_budget_exhausted' };
+  }
+  const quality = frameQuality(frame);
+  if (!quality.qualityAccepted) return { saved: false, reason: 'poor_frame_quality', quality };
+  const record = {
+    id: id(),
+    status: 'UNVERIFIED',
+    zone: normalizedZone,
+    classKey: String(predictedLabel),
+    proposedLabel: String(correctedLabel),
+    modelVersion,
+    prediction: { top1: { class: String(predictedLabel), confidence: Number(confidence) || 0 }, top2: null },
+    temporalPredictions: [],
+    reasons: ['USER_REPORTED_MISCLASSIFICATION'],
+    evidence: { frameCount: 1, uncertainFrames: 0, distinctLabels: 1, sufficient: false, userCorrection: true },
+    quality,
+    source: { type: source.type || 'user_correction', sessionId: source.sessionId || null, video: source.video || null },
+    createdAt: now,
+    consented: true,
+    independentlyVerified: false,
+    syncedAt: null,
+    image: await frameBlob(frame),
+  };
+  const database = await openDatabase();
+  try {
+    const transaction = database.transaction(CANDIDATE_STORE, 'readwrite');
+    transaction.objectStore(CANDIDATE_STORE).put(record);
+    await transactionComplete(transaction);
+  } finally {
+    database.close();
+  }
+  await enforceStorageLimit();
+  return { saved: true, record };
+}
+
 export async function listExhibitRetrainingCandidates() {
   return listRecords();
 }
