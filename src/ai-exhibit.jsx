@@ -20,6 +20,7 @@ import {
   setLandmarkLearningConsent,
 } from './services/landmarkLearningStore.js';
 import { notifyReconLearningObserver } from './services/reconLearningObserver.js';
+import { confidenceRetrainingQueue } from './services/confidenceRetrainingQueue.js';
 
 const width = window.innerWidth;
 const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
@@ -788,6 +789,13 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         modelVersion: MODEL_ASSET_VERSION,
         sessionId: getAnonymousSessionId(),
       });
+      if (feedbackType === 'CORRECT' || correctedLabel) {
+        confidenceRetrainingQueue.markLatestVerified({
+          zone: zoneLabel,
+          predictedLabel: feedbackPredictedLabel,
+          verifiedLabel: correctedLabel || feedbackPredictedLabel
+        }).catch(() => {});
+      }
       setFeedbackStatus(result.duplicate ? 'Feedback already saved on this device.' : 'Feedback saved offline.');
       setFeedbackMode(null);
       setFeedbackCorrectionLabel('');
@@ -1389,6 +1397,15 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     }
     const detection = await detectionService.detectHierarchical(video);
     setLastDetection(detection);
+    confidenceRetrainingQueue.observe({
+      zone: classifierMode,
+      detection,
+      video,
+      modelVersion: MODEL_ASSET_VERSION,
+      sourceSession: learningSessionRef.current
+    }).catch((captureError) => {
+      console.warn('Confidence retraining observer skipped:', captureError.message);
+    });
     try {
       captureReconLearningCandidate(detection);
     } catch (observerError) {
