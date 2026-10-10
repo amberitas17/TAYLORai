@@ -1240,7 +1240,10 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   // Upload a video file for testing instead of using the live camera
   const handleVideoUpload = (event) => {
     const file = event.target.files?.[0];
-    if (!file || !videoRef.current) return;
+    if (!file || !videoRef.current || !file.type.startsWith('video/')) {
+      setError('Please select a video file.');
+      return;
+    }
 
     cameraReadyResolveRef.current?.();
     setShowCamera(false);
@@ -1252,13 +1255,19 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     setError("");
     if (uploadedObjectUrlRef.current) URL.revokeObjectURL(uploadedObjectUrlRef.current);
     const objectUrl = URL.createObjectURL(file);
-    if (!objectUrl.startsWith('blob:')) {
+    let safeObjectUrl;
+    try {
+      safeObjectUrl = new URL(objectUrl);
+    } catch {
+      safeObjectUrl = null;
+    }
+    if (!safeObjectUrl || safeObjectUrl.protocol !== 'blob:') {
       URL.revokeObjectURL(objectUrl);
       setError('The selected video could not be loaded.');
       return;
     }
-    uploadedObjectUrlRef.current = objectUrl;
-    video.src = objectUrl;
+    uploadedObjectUrlRef.current = safeObjectUrl.href;
+    video.src = safeObjectUrl.href;
     video.loop = true;
     video.muted = true;
     video.onloadedmetadata = () => {
