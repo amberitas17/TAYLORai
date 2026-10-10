@@ -1942,6 +1942,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   };
 
   const renderFeedbackCard = () => (
+    <>
     {feedbackVisible && (
       <div style={{
         position: "relative",
@@ -2020,6 +2021,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         {feedbackStatus && <div style={{ fontSize: 11, marginTop: 7 }} aria-live="polite">{feedbackStatus}</div>}
       </div>
     )}
+    </>
   );
 
   return (
