@@ -23,6 +23,7 @@ import { notifyReconLearningObserver } from './services/reconLearningObserver.js
 import {
   getExhibitRetrainingConsent,
   setExhibitRetrainingConsent,
+  captureCorrectedExhibitCandidate,
   syncExhibitRetrainingQueue,
 } from './services/exhibitRetrainingStore.js';
 
@@ -801,7 +802,31 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         modelVersion: MODEL_ASSET_VERSION,
         sessionId: getAnonymousSessionId(),
       });
-      setFeedbackStatus(result.duplicate ? 'Feedback already saved on this device.' : 'Feedback saved offline.');
+      // Save the correction immediately; network access is never required for this action.
+      // A camera image is collected only when the visitor opted into retraining.
+      let message = result.duplicate ? 'Feedback already saved on this device.' : 'Feedback saved on this device.';
+      if (feedbackType === 'WRONG_EXHIBIT' && !result.duplicate && exhibitRetrainingConsent) {
+        try {
+          const sample = await captureCorrectedExhibitCandidate({
+            frame: videoRef.current,
+            zone: zoneLabel,
+            modelVersion: MODEL_ASSET_VERSION,
+            predictedLabel: feedbackPredictedLabel,
+            correctedLabel,
+            confidence: feedbackConfidence,
+            source: { type: uploadedVideoRef.current ? 'uploaded_video' : 'camera', sessionId: getAnonymousSessionId() },
+          });
+          message = sample.saved
+            ? 'Correction and image saved offline for review. Upload will retry when connected.'
+            : `Correction saved offline; image not captured (${sample.reason}).`;
+        } catch (captureError) {
+          console.warn('Optional correction image capture failed:', captureError);
+          message = 'Correction saved offline; image could not be captured.';
+        }
+      } else if (feedbackType === 'WRONG_EXHIBIT' && !exhibitRetrainingConsent) {
+        message = 'Correction saved offline. Enable exhibit learning consent to include camera images.';
+      }
+      setFeedbackStatus(message);
       setFeedbackMode(null);
       setFeedbackCorrectionLabel('');
       if (tentativeRecognition) {
