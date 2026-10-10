@@ -7,7 +7,7 @@ let fallbackSessionId = null;
 const normalize = (value = '') => value == null ? '' : String(value).trim().replace(/\s+/g, ' ');
 
 function createId() {
-  return globalThis.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return globalThis.crypto?.randomUUID?.() || `session-${Date.now().toString(36)}`;
 }
 
 export function getAnonymousSessionId() {

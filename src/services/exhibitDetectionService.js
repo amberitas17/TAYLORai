@@ -158,7 +158,7 @@ class ExhibitDetectionService {
         this.rejectedFrameLogLimit = 50;
         this.candidateSourceContext = {
             type: null,
-            sessionId: `exhibit-session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            sessionId: `exhibit-session-${globalThis.crypto?.randomUUID?.() || Date.now().toString(36)}`,
             video: null
         };
         this.candidateTemporalHistory = new Map();
