@@ -1121,6 +1121,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       });
     };
 
+    video.onerror = () => setError('The selected video could not be loaded.');
+  };
+
     const captureReconLearningCandidate = (detection) => {
       if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
       const top1 = detection?.top1 || { class: detection?.exhibit || 'UNKNOWN', confidence: detection?.exhibitConfidence || 0 };
@@ -1157,8 +1160,6 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         console.warn('RECON learning capture failed:', captureError.message);
       });
     };
-    video.onerror = () => setError('The selected video could not be loaded.');
-  };
 
   // Start real-time detection
   const startRealTimeDetection = () => {
