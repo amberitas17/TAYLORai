@@ -1258,6 +1258,46 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
     video.onerror = () => setError('The selected video could not be loaded.');
   };
+<<<<<<< HEAD
+=======
+
+    const captureReconLearningCandidate = (detection) => {
+      if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
+      const top1 = detection?.top1 || { class: detection?.exhibit || 'UNKNOWN', confidence: detection?.exhibitConfidence || 0 };
+      const top2 = detection?.top2 || { class: 'UNKNOWN', confidence: 0 };
+      const confidence = Number(top1.confidence || 0);
+      const margin = Number.isFinite(Number(detection?.specificConfidenceGap))
+        ? Number(detection.specificConfidenceGap)
+        : confidence - Number(top2.confidence || 0);
+      const reasons = [];
+      if (confidence < 0.8) reasons.push('LOW_CONFIDENCE');
+      if (margin < 0.15) reasons.push('LOW_MARGIN');
+      if (!detection?.success) reasons.push(detection?.reason || 'REJECTED');
+      if (reasons.length === 0 || Date.now() - lastLearningCaptureAtRef.current < 5000) return;
+
+      lastLearningCaptureAtRef.current = Date.now();
+      captureLandmarkCandidate({
+        video: videoRef.current,
+        prediction: {
+          top1: top1.class || 'UNKNOWN',
+          top2: top2.class || 'UNKNOWN',
+          rawScores: detection?.rawScores || null,
+          confidence,
+        },
+        sourceSession: learningSessionRef.current,
+        modelVersion: '20261004-recon-unified-v1',
+        trigger: 'recon_low_confidence_camera',
+        reasons,
+      }).then((result) => {
+        if (result.saved) {
+          setLearningCaptureStatus('Low-confidence frame saved for review');
+          window.setTimeout(() => setLearningCaptureStatus(''), 1800);
+        }
+      }).catch((captureError) => {
+        console.warn('RECON learning capture failed:', captureError.message);
+      });
+    };
+>>>>>>> 0c6b3b5250025cbe486d8fe6b3d15fe95b8e78fe
 
   const saveReconCorrection = () => {
     if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current || !lastDetection) return;
