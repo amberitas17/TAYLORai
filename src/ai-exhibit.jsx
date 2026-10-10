@@ -705,8 +705,15 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   useEffect(() => {
     const sync = () => syncExhibitRetrainingQueue().catch((error) => console.warn('Exhibit retraining sync deferred:', error.message));
     sync();
+    const onVisibility = () => { if (document.visibilityState === 'visible' && navigator.onLine) sync(); };
     window.addEventListener('online', sync);
-    return () => window.removeEventListener('online', sync);
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('online', sync);
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   useEffect(() => {
