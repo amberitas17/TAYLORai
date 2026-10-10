@@ -5,12 +5,17 @@ import './ai-exhibit.css';
 import LeafletMap from './components/LeafletMap';
 import exhibitDetectionService, { EXHIBIT_MODEL_STATES } from './services/exhibitDetectionService.js';
 import { textToSpeech } from './services/speechAPI.js';
-import { getVerifiedExhibitInformation } from './services/exhibitInformation.js';
+import { getOfflineExhibitInformation, getVerifiedExhibitInformation } from './services/exhibitInformation.js';
 import {
   cacheExhibitExplanation,
   getCachedExhibitExplanation,
   requestExhibitExplanation,
 } from './services/exhibitExplanationCache.js';
+import {
+  captureLandmarkCandidate,
+  getLandmarkLearningConsent,
+  setLandmarkLearningConsent,
+} from './services/landmarkLearningStore.js';
 
 const width = window.innerWidth;
 const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
@@ -626,6 +631,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const location = useLocation();
   const navigate = useNavigate();
   const tourMode = location.state?.tourMode === true;
+  const specialistRoute = /^\/machine-vision(?:-exhibit)?-(?:aricc|fablab|caesar|recon)$/.test(location.pathname);
   const activeCenter = location.state?.activeCenter || classifierMode.toUpperCase();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -645,6 +651,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const cameraStreamRef = useRef(null);
   const uploadedVideoRef = useRef(null);
   const uploadedObjectUrlRef = useRef(null);
+  const learningSessionRef = useRef(globalThis.crypto?.randomUUID?.() || `recon-session-${Date.now()}`);
+  const lastLearningCaptureAtRef = useRef(0);
   const cameraReadyResolveRef = useRef(null);
   const cameraReadySignalRef = useRef(null);
   if (!cameraReadySignalRef.current) {
@@ -658,6 +666,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const pendingLabelCountRef = useRef(0);
   const lastAcceptedAtRef = useRef(0);
   const [recognitionDebug, setRecognitionDebug] = useState(null);
+  const [learningConsent, setLearningConsent] = useState(() => getLandmarkLearningConsent());
+  const [learningCaptureStatus, setLearningCaptureStatus] = useState('');
   const [explanationState, setExplanationState] = useState({ status: 'idle', explanation: null, error: null });
   const explanationRequestRef = useRef(null);
 
@@ -726,8 +736,10 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     return `Rejected: ${detection.reason || "not exhibit"}${confidence}`;
   };
 
+  const formatRecognitionLabel = (label = '') => String(label).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+
   const getStableExhibitLabel = () => {
-    if (currentExhibit?.name && currentExhibit.name !== "Exhibit detected") return currentExhibit.name;
+    if (currentExhibit?.name && currentExhibit.name !== "Exhibit detected") return formatRecognitionLabel(currentExhibit.name);
     if (currentExhibit?.zone) return currentExhibit.zone;
     if (
       lastDetection?.success &&
@@ -735,7 +747,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       lastDetection.exhibitInfo?.code !== "EXHIBIT" &&
       lastDetection.exhibitInfo?.displayName
     ) {
-      return lastDetection.exhibitInfo.displayName;
+      return formatRecognitionLabel(lastDetection.exhibitInfo.displayName);
     }
     return "";
   };
@@ -850,7 +862,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     const loadExplanation = async () => {
       const cached = await getCachedExhibitExplanation(activeCenter, activeExhibit);
       if (!current || controller.signal.aborted) return;
-      setExplanationState({ status: cached ? 'ready' : 'loading', explanation: cached, error: null });
+      const localExplanation = getOfflineExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, activeExhibit);
+      setExplanationState({ status: cached || localExplanation ? 'ready' : 'loading', explanation: cached || localExplanation, error: null });
       try {
         const explanation = await requestExhibitExplanation({
           center: activeCenter,
@@ -864,8 +877,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       } catch (error) {
         if (!current || controller.signal.aborted) return;
         setExplanationState({
-          status: cached ? 'ready' : 'unavailable',
-          explanation: cached,
+          status: localExplanation ? 'offline' : (cached ? 'ready' : 'unavailable'),
+          explanation: cached || localExplanation,
           error: 'Connection is unstable.',
         });
       }
@@ -1107,6 +1120,43 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         setError(`Video playback failed: ${playError.message}`);
       });
     };
+
+    const captureReconLearningCandidate = (detection) => {
+      if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
+      const top1 = detection?.top1 || { class: detection?.exhibit || 'UNKNOWN', confidence: detection?.exhibitConfidence || 0 };
+      const top2 = detection?.top2 || { class: 'UNKNOWN', confidence: 0 };
+      const confidence = Number(top1.confidence || 0);
+      const margin = Number.isFinite(Number(detection?.specificConfidenceGap))
+        ? Number(detection.specificConfidenceGap)
+        : confidence - Number(top2.confidence || 0);
+      const reasons = [];
+      if (confidence < 0.8) reasons.push('LOW_CONFIDENCE');
+      if (margin < 0.15) reasons.push('LOW_MARGIN');
+      if (!detection?.success) reasons.push(detection?.reason || 'REJECTED');
+      if (reasons.length === 0 || Date.now() - lastLearningCaptureAtRef.current < 5000) return;
+
+      lastLearningCaptureAtRef.current = Date.now();
+      captureLandmarkCandidate({
+        video: videoRef.current,
+        prediction: {
+          top1: top1.class || 'UNKNOWN',
+          top2: top2.class || 'UNKNOWN',
+          rawScores: detection?.rawScores || null,
+          confidence,
+        },
+        sourceSession: learningSessionRef.current,
+        modelVersion: '20261004-recon-unified-v1',
+        trigger: 'recon_low_confidence_camera',
+        reasons,
+      }).then((result) => {
+        if (result.saved) {
+          setLearningCaptureStatus('Low-confidence frame saved for review');
+          window.setTimeout(() => setLearningCaptureStatus(''), 1800);
+        }
+      }).catch((captureError) => {
+        console.warn('RECON learning capture failed:', captureError.message);
+      });
+    };
     video.onerror = () => setError('The selected video could not be loaded.');
   };
 
@@ -1210,6 +1260,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     }
     const detection = await detectionService.detectHierarchical(video);
     setLastDetection(detection);
+    captureReconLearningCandidate(detection);
     console.log("✅ Hierarchical detection completed:", detection);
 
     if (!detection.success) {
@@ -1315,7 +1366,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       confirmationCount: pendingLabelCountRef.current
     });
 
-    if (pendingLabelCountRef.current >= 3) {
+    if (pendingLabelCountRef.current >= 1) {
       const exhibit = {
         id: detection.exhibitInfo?.number || '00',
         name: detectedName,
@@ -1408,6 +1459,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           setLocationDetected(true);
           setShowCamera(false);
           setCurrentExhibit(hierarchicalExhibit);
+          setActiveExhibit(hierarchicalExhibit.name);
           console.log(`✅ Manual detection: ${detection.zone} → ${detection.exhibitInfo.displayName} (${(detection.combinedConfidence * 100).toFixed(1)}%)`);
         } else {
           setLocationDetected(false);
@@ -1676,7 +1728,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             <section className="exhibit-tour-sheet" aria-live="polite">
               <div className="exhibit-tour-sheet__handle" aria-hidden="true" />
               <div className="exhibit-tour-panel__recognized">✓ EXHIBIT RECOGNIZED</div>
-              <h2>{activeExhibit}</h2>
+              <h2>{formatRecognitionLabel(activeExhibit)}</h2>
               {activeExhibitInformation ? (
                 <div className="exhibit-explanation" aria-live="polite">
                   <strong>What is it?</strong>
@@ -1695,11 +1747,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
               )}
               <div className="exhibit-tour-panel__actions">
                 {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
-                {activeExhibitInformation && (
-                  <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit } })}>
-                    Ask TAYLOR
-                  </button>
-                )}
+                <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
+                  Ask TAYLOR
+                </button>
                 {!activeExhibitInformation && <button onClick={() => window.dispatchEvent(new Event('online'))}>Retry Explanation</button>}
                 <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
               </div>
@@ -1707,6 +1757,31 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           )}
           {!activeExhibit && <div className="exhibit-tour-search-status">Searching for an exhibit...</div>}
         </>
+      )}
+      {!tourMode && specialistRoute && activeExhibit && (
+        <section className="exhibit-tour-sheet exhibit-direct-information" aria-live="polite">
+          <div className="exhibit-tour-panel__recognized">EXHIBIT RECOGNIZED</div>
+          <h2>{formatRecognitionLabel(activeExhibit)}</h2>
+          {activeExhibitInformation ? (
+            <div className="exhibit-explanation" aria-live="polite">
+              <strong>What is it?</strong>
+              <p>{activeExhibitInformation.whatIsIt}</p>
+              <strong>What is it used for?</strong>
+              <p>{activeExhibitInformation.purpose}</p>
+            </div>
+          ) : (
+            <p className="exhibit-explanation__unavailable">
+              TAYLOR is preparing your explanation. The exhibit has been identified successfully.
+            </p>
+          )}
+          <div className="exhibit-tour-panel__actions">
+            {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
+            <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
+              Ask TAYLOR
+            </button>
+            <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
+          </div>
+        </section>
       )}
       {isLoading && (
         <div style={{ position: "absolute",
@@ -1855,7 +1930,44 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         top: 12,
         right: 12,
         zIndex: 1300,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-end",
+        gap: 8,
       }}>
+        {classifierMode.toLowerCase() === 'recon' && (
+          <label style={{
+            background: "rgba(0,0,0,0.72)",
+            color: "#fff",
+            borderRadius: 8,
+            padding: "8px 12px",
+            fontSize: 12,
+            cursor: "pointer",
+          }}>
+            <input
+              type="checkbox"
+              checked={learningConsent}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setLearningConsent(enabled);
+                setLandmarkLearningConsent(enabled);
+              }}
+              style={{ marginRight: 7 }}
+            />
+            Improve RECON from uncertain camera frames
+          </label>
+        )}
+        {learningCaptureStatus && (
+          <div style={{
+            background: "rgba(18, 92, 58, 0.9)",
+            color: "#fff",
+            borderRadius: 8,
+            padding: "7px 10px",
+            fontSize: 12,
+          }}>
+            {learningCaptureStatus}
+          </div>
+        )}
         <label style={{
           background: "rgba(0,0,0,0.72)",
           color: "#fff",

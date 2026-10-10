@@ -128,7 +128,7 @@
   padding: 10px 16px 14px;
   border: 1px solid rgba(116, 213, 255, 0.45);
   border-radius: 16px;
-  background: rgba(8, 20, 35, 0.9);
+  background: #416cba;
   backdrop-filter: blur(10px);
   transform: translateX(-50%);
   color: #ffffff;
@@ -182,7 +182,7 @@
 
 .exhibit-tour-panel__recognized {
   margin-top: 12px;
-  color: #7ef0b2;
+  color: #ffffff;
   font-weight: 800;
 }
 

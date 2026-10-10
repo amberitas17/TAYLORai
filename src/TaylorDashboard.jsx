@@ -346,6 +346,11 @@ export default function TaylorDashboard() {
     }
   };
 
+  useEffect(() => {
+    const prompt = String(location.state?.initialPrompt || '').trim();
+    if (prompt) setInputText(prompt);
+  }, [location.state?.initialPrompt]);
+
   const handleSuggestion = (suggestion) => {
     handleSendMessage(suggestion.answer);
   };
