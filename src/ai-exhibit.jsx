@@ -884,8 +884,33 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   };
 
   const confirmTentativeRecognition = async () => {
+    if (!tentativeRecognition?.label) return;
+    const proposedLabel = tentativeRecognition.label;
+    // Applies to every zone/class: user confirmation is feedback, not model acceptance.
+    // The label stays unverified and the 80%/15-point acceptance gate remains intact.
     await submitFeedback('CORRECT');
-    promoteTentativeRecognition();
+    if (exhibitRetrainingConsent) {
+      try {
+        const capture = await captureCorrectedExhibitCandidate({
+          frame: videoRef.current,
+          zone: zoneLabel,
+          modelVersion: MODEL_ASSET_VERSION,
+          predictedLabel: proposedLabel,
+          correctedLabel: proposedLabel,
+          confidence: tentativeRecognition.confidence,
+          source: { type: 'user_confirmed_tentative', sessionId: getAnonymousSessionId() },
+        });
+        setFeedbackStatus(capture.saved
+          ? 'User confirmation and image saved offline for independent review.'
+          : `User confirmation saved offline; image not captured (${capture.reason}).`);
+      } catch (error) {
+        console.warn('Tentative confirmation image capture failed:', error);
+        setFeedbackStatus('User confirmation saved offline; image could not be captured.');
+      }
+    } else {
+      setFeedbackStatus('User confirmation saved offline; pending verification.');
+    }
+    // Do not promote tentative results to recognized exhibits.
   };
 
   const getStableExhibitLabel = () => {
