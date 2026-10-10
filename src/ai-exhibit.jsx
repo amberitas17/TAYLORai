@@ -1243,8 +1243,14 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     stopCameraStream();
     setError("");
     if (uploadedObjectUrlRef.current) URL.revokeObjectURL(uploadedObjectUrlRef.current);
-    uploadedObjectUrlRef.current = URL.createObjectURL(file);
-    video.src = uploadedObjectUrlRef.current;
+    const objectUrl = URL.createObjectURL(file);
+    if (!objectUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(objectUrl);
+      setError('The selected video could not be loaded.');
+      return;
+    }
+    uploadedObjectUrlRef.current = objectUrl;
+    video.src = objectUrl;
     video.loop = true;
     video.muted = true;
     video.onloadedmetadata = () => {
