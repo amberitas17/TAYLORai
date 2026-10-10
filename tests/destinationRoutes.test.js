@@ -3,8 +3,6 @@ import { CIT_DESTINATION_ROUTES, getDestinationRoute } from '../src/navigation/c
 import { getCITWalkthroughEvidence } from '../src/navigation/citWalkthroughEvidence.js';
 
 const destinations = ['ARICC', 'RIO', 'FABLAB', 'RECON', 'CAESAR'];
-const incompleteDestinations = destinations.filter((destination) => destination !== 'ARICC');
-
 assert.deepEqual(Object.keys(CIT_DESTINATION_ROUTES).sort(), [...destinations].sort());
 assert.equal(new Set(destinations.map((destination) => getDestinationRoute(destination).id)).size, destinations.length);
 
@@ -48,14 +46,16 @@ assert.deepEqual(
     ['recon-elevator', 'recon-corridor', 'recon-pot', 'recon-turn', 'recon'],
 );
 
-for (const destination of incompleteDestinations.filter((destination) => destination !== 'RECON')) {
-    const route = getDestinationRoute(destination);
-    assert.equal(route.complete, false);
-    assert.equal(route.arrivalInstruction, null);
-    assert.equal(route.steps.some((step) => step.from === 'aricc'), true);
-    assert.equal(route.missingSegments.length > 0, true);
-    assert.equal(route.steps.some((step) => step.instruction.includes('Arrive at')), false);
-}
+for (const destination of destinations) assert.equal(getDestinationRoute(destination).complete, true);
+
+const rioToFablab = getDestinationRoute('FABLAB').steps;
+assert.deepEqual(rioToFablab.slice(-4).map((step) => step.from), ['rio-entrance', 'rio-corridor', 'fablab-corridor', 'fablab-entrance']);
+assert.equal(rioToFablab.find((step) => step.from === 'rio-entrance').instruction, 'You have reached RIO. Continue straight along the corridor toward FABLAB.');
+assert.equal(rioToFablab.find((step) => step.from === 'rio-corridor').instruction, 'Continue straight toward FABLAB.');
+assert.equal(rioToFablab.find((step) => step.from === 'rio-corridor').reference, 'White plant pot');
+assert.equal(rioToFablab.find((step) => step.from === 'fablab-corridor').landmark, 'Corridor windows');
+assert.equal(rioToFablab.find((step) => step.from === 'fablab-entrance').instruction, 'Continue to the FABLAB entrance.');
+assert.equal(getDestinationRoute('CAESAR').steps.some((step) => step.instruction.includes('You have arrived at FABLAB.')), false);
 
 assert.equal(getDestinationRoute('RIO').segments.find((segment) => segment.id === 'aricc-to-rio').status, 'user-confirmed');
 assert.equal(getDestinationRoute('FABLAB').segments.find((segment) => segment.id === 'rio-to-fablab').status, 'continuous-video-verified');

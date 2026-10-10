@@ -84,6 +84,7 @@ export default function AINavigation({ onBack }) {
   const [selectedDestination, setSelectedDestination] = useState('ARICC');
   const [manualLocation, setManualLocation] = useState('manual-cit-entrance');
   const [currentStep, setCurrentStep] = useState(1);
+  const [destinationConfirmed, setDestinationConfirmed] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [avatarExpanded, setAvatarExpanded] = useState(true);
   const [avatarMuted, setAvatarMuted] = useState(false);
@@ -95,17 +96,22 @@ export default function AINavigation({ onBack }) {
   const step = route.steps[currentStep - 1];
   const node = getNode(step?.from);
   const evidence = getCITWalkthroughEvidence(node.id);
-  const direction = route.complete && currentStep === route.steps.length ? 'arrival' : (step?.transition || node.id.startsWith('elevator-') ? 'elevator' : evidence.turn || 'straight');
+  const direction = destinationConfirmed && currentStep === route.steps.length
+    ? 'arrival'
+    : (step?.transition || node.id.startsWith('elevator-') ? 'elevator' : evidence.turn || 'straight');
+  const instruction = destinationConfirmed && currentStep === route.steps.length
+    ? route.arrivalInstruction || step?.instruction
+    : step?.instruction;
   const destination = TOUR_CENTERS[selectedDestination];
 
   useEffect(() => {
     navigationStateRef.current = new IndoorNavigationState({ destination: selectedDestination, startFloor: location.floor, targetFloor: 4 });
     setCurrentStep(1);
+    setDestinationConfirmed(false);
     setNavigationEvent('START');
   }, [selectedDestination, location.floor]);
 
   const getNavigationEvent = (nextDirection, nextStep) => {
-    if (route.complete && nextStep === route.steps.length) return 'ARRIVED';
     if (nextDirection === 'left') return 'TURN_LEFT';
     if (nextDirection === 'right') return 'TURN_RIGHT';
     if (nextDirection === 'elevator') return 'WALK_FORWARD';
@@ -118,14 +124,15 @@ export default function AINavigation({ onBack }) {
     const nextRouteStep = route.steps[bounded - 1];
     const nextNode = getNode(nextRouteStep?.from);
     const nextEvidence = getCITWalkthroughEvidence(nextNode.id);
-    const nextDirection = route.complete && bounded === route.steps.length ? 'arrival' : (nextRouteStep?.transition || nextNode.id.startsWith('elevator-') ? 'elevator' : nextEvidence.turn || 'straight');
-    setNavigationEvent(route.complete && bounded === route.steps.length ? 'ARRIVED' : getNavigationEvent(nextDirection, bounded));
+    const nextDirection = destinationConfirmed && bounded === route.steps.length ? 'arrival' : (nextRouteStep?.transition || nextNode.id.startsWith('elevator-') ? 'elevator' : nextEvidence.turn || 'straight');
+    setNavigationEvent(getNavigationEvent(nextDirection, bounded));
   }
 
   function updateLocation(event) {
     const next = LOCATION_OPTIONS.find((option) => option.value === event.target.value) || LOCATION_OPTIONS[0];
     setManualLocation(next.value);
     setCurrentStep(next.step);
+    setDestinationConfirmed(false);
     navigationStateRef.current?.recoverNavigation();
     setNavigationEvent('UNCERTAIN');
   }
@@ -141,16 +148,27 @@ export default function AINavigation({ onBack }) {
   }
 
   const confirmCurrentLandmark = () => {
-    const confirmation = navigationStateRef.current?.confirmLandmark(node.id === 'elevator-1f' ? 'elevator' : node.id === 'aricc' ? selectedDestination : node.id);
-    setNavigationEvent(confirmation?.state?.current_landmark === selectedDestination ? 'ARRIVED' : 'LANDMARK_CONFIRMED');
+    const confirmedLandmark = node.id === 'elevator-1f' ? 'elevator' : node.landmark;
+    const confirmation = navigationStateRef.current?.confirmLandmark(confirmedLandmark);
+    const isDestination = confirmation?.state?.current_landmark === selectedDestination;
+    if (isDestination) {
+      setDestinationConfirmed(true);
+      setNavigationEvent('ARRIVED');
+      return;
+    }
+    if (confirmation?.state?.last_confirmed_landmark && currentStep < route.steps.length) {
+      goToStep(currentStep + 1);
+    } else {
+      setNavigationEvent('UNCERTAIN');
+    }
   };
 
   return <div className="ai-navigation-container navigation-mobile-shell">
     <main className="navigation-mobile-page">
       <header className="navigation-mobile-header"><button className="navigation-icon-button" onClick={onBack || (() => navigate(-1))} aria-label="Go back">‹</button><div><span className="navigation-kicker">TAYLOR AI</span><h1>Indoor directions</h1></div><button className="navigation-map-button" onClick={() => setMapOpen((open) => !open)}>{mapOpen ? 'Steps' : 'Map'}</button></header>
       <section className="navigation-route-picker"><label>Starting point<select value={manualLocation} onChange={updateLocation}>{LOCATION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><label>Destination<select value={selectedDestination} onChange={(event) => { setSelectedDestination(event.target.value); setCurrentStep(1); }}><option>ARICC</option><option>RIO</option><option>FABLAB</option><option>CAESAR</option><option>RECON</option></select></label><div className="navigation-route-summary"><div><span>Starting from</span><strong>{location.label}</strong></div><div><span>Going to</span><strong>{selectedDestination}</strong></div></div></section>
-      <NavigationAvatar event={navigationEvent} instruction={step?.instruction} muted={avatarMuted} onMute={() => setAvatarMuted((muted) => !muted)} expanded={avatarExpanded} onToggle={() => setAvatarExpanded((expanded) => !expanded)} />
-      {mapOpen ? <section className="navigation-published-map" aria-label="Geographic CIT map"><LeafletMap destination={{ destination: selectedDestination }} isTracking /></section> : <section className={`navigation-step-view ${['RIO', 'ARICC', 'OVPREI', 'FABLAB', 'CAESAR'].includes(selectedDestination) ? 'navigation-step-view--rio' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-live="polite"><div className="navigation-progress"><span>STEP {currentStep} OF {route.steps.length}</span><div>{route.steps.map((item, index) => <i className={index + 1 <= currentStep ? 'is-complete' : ''} key={item.id} />)}</div></div><StepPhoto evidence={evidence} landmark={node.landmark} /><div className="navigation-step-content"><div className={`navigation-direction navigation-direction--${direction}`}><strong>{directionIcon[direction]}</strong><span>{direction === 'arrival' ? 'Arrive' : direction === 'elevator' ? 'Floor change' : direction}</span></div><div className="navigation-step-meta"><span>{CIT_FLOOR_LABELS[step.floor]}</span><span>{evidence.verified ? `${evidence.sourceVideo} · ${evidence.timestamp}` : 'Evidence pending review'}</span></div><h2>{node.landmark}</h2><p>{step.instruction}</p><small className="navigation-confidence">{evidence.verified ? `Verified walkthrough evidence · ${evidence.confidence} confidence` : 'Neutral step retained until a walkthrough frame is verified.'}</small>{!route.complete && <small className="navigation-route-incomplete">Route to {route.destination} is incomplete after this verified step. Arrival is not reported.</small>}</div></section>}
+      <NavigationAvatar event={navigationEvent} instruction={instruction} muted={avatarMuted} onMute={() => setAvatarMuted((muted) => !muted)} expanded={avatarExpanded} onToggle={() => setAvatarExpanded((expanded) => !expanded)} />
+      {mapOpen ? <section className="navigation-published-map" aria-label="Geographic CIT map"><LeafletMap destination={{ destination: selectedDestination }} isTracking /></section> : <section className={`navigation-step-view ${['RIO', 'ARICC', 'OVPREI', 'FABLAB', 'CAESAR'].includes(selectedDestination) ? 'navigation-step-view--rio' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-live="polite"><div className="navigation-progress"><span>STEP {currentStep} OF {route.steps.length}</span><div>{route.steps.map((item, index) => <i className={index + 1 <= currentStep ? 'is-complete' : ''} key={item.id} />)}</div></div><StepPhoto evidence={evidence} landmark={node.landmark} /><div className="navigation-step-content"><div className={`navigation-direction navigation-direction--${direction}`}><strong>{directionIcon[direction]}</strong><span>{direction === 'arrival' ? 'Arrive' : direction === 'elevator' ? 'Floor change' : direction}</span></div><div className="navigation-step-meta"><span>{CIT_FLOOR_LABELS[step.floor]}</span><span>{evidence.verified ? `${evidence.sourceVideo} · ${evidence.timestamp}` : 'Evidence pending review'}</span></div><h2>{node.landmark}</h2><p>{instruction}</p><small className="navigation-confidence">{evidence.verified ? `Verified walkthrough evidence · ${evidence.confidence} confidence` : 'Neutral step retained until a walkthrough frame is verified.'}</small>{!route.complete && <small className="navigation-route-incomplete">Route to {route.destination} is incomplete after this verified step. Arrival is not reported.</small>}</div></section>}
       <nav className="navigation-step-controls"><button type="button" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 1}>Previous</button><button type="button" onClick={confirmCurrentLandmark}>Confirm landmark</button><button type="button" className="navigation-next-button" onClick={() => goToStep(currentStep + 1)} disabled={currentStep === route.steps.length}>{route.complete && currentStep === route.steps.length ? 'Arrived' : 'Next'}</button></nav>
       <footer className="navigation-footer"><span>Manual navigation · no GPS or camera</span><button type="button" onClick={() => navigate(destination.route, { state: { activeCenter: selectedDestination, tourMode: true } })}>Explore {selectedDestination}</button></footer>
     </main>

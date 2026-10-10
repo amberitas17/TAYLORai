@@ -1,5 +1,5 @@
 {
-  "model_name": "recon_unified_v1",
+  "model_name": "recon_unified_mobilenet_v2",
   "displayNames": [
     "charcoal_oven_machine",
     "festo_solar_wind_training_system",
@@ -7,7 +7,7 @@
     "fluke_355_clamp_meter",
     "fluke_922_air_flow_meter",
     "fluke_930_non_contact_tachometer",
-    "fluke_941_temperature_humidity_meter",
+    "fluke_971_temperature_humidity_meter",
     "ip_display_area",
     "quadruple_suction_single_discharge_cooking_oil_transfer_device",
     "root_crop_slicing_machine",
@@ -15,8 +15,21 @@
     "testo_440_air_velocity_iaq",
     "unmanned_aerial_system"
   ],
-  "source_dataset": "E:\\TAYLORai\\runs\\recon_unified_dataset",
-  "source_manifest_report": "E:\\TAYLORai\\runs\\recon_unified_dataset\\unified_manifest_report.json",
+  "class_to_index": {
+    "charcoal_oven_machine": 0,
+    "festo_solar_wind_training_system": 1,
+    "fluke_2042_cable_tracer": 2,
+    "fluke_355_clamp_meter": 3,
+    "fluke_922_air_flow_meter": 4,
+    "fluke_930_non_contact_tachometer": 5,
+    "fluke_971_temperature_humidity_meter": 6,
+    "ip_display_area": 7,
+    "quadruple_suction_single_discharge_cooking_oil_transfer_device": 8,
+    "root_crop_slicing_machine": 9,
+    "testo_420_volume_flow_hood": 10,
+    "testo_440_air_velocity_iaq": 11,
+    "unmanned_aerial_system": 12
+  },
   "input_shape": [
     1,
     3,
@@ -30,14 +43,321 @@
   "output_type": "logits",
   "preprocessing": {
     "mean": [
-      0.0,
-      0.0,
-      0.0
+      0.485,
+      0.456,
+      0.406
     ],
     "std": [
-      1.0,
-      1.0,
-      1.0
+      0.229,
+      0.224,
+      0.225
     ]
-  }
+  },
+  "evaluation": {
+    "accuracy": 0.9035532994923858,
+    "macro_precision": 0.9481989247311827,
+    "macro_recall": 0.886456278763971,
+    "macro_f1": 0.8909106590688877,
+    "per_class": {
+      "charcoal_oven_machine": {
+        "precision": 0.6774193548387096,
+        "recall": 1.0,
+        "f1": 0.8076923076923077,
+        "support": 21
+      },
+      "festo_solar_wind_training_system": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 25
+      },
+      "fluke_2042_cable_tracer": {
+        "precision": 0.92,
+        "recall": 1.0,
+        "f1": 0.9583333333333334,
+        "support": 23
+      },
+      "fluke_355_clamp_meter": {
+        "precision": 1.0,
+        "recall": 0.9444444444444444,
+        "f1": 0.9714285714285714,
+        "support": 18
+      },
+      "fluke_922_air_flow_meter": {
+        "precision": 0.9166666666666666,
+        "recall": 1.0,
+        "f1": 0.9565217391304348,
+        "support": 11
+      },
+      "fluke_930_non_contact_tachometer": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 6
+      },
+      "fluke_971_temperature_humidity_meter": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 7
+      },
+      "ip_display_area": {
+        "precision": 1.0,
+        "recall": 0.6153846153846154,
+        "f1": 0.761904761904762,
+        "support": 13
+      },
+      "quadruple_suction_single_discharge_cooking_oil_transfer_device": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 9
+      },
+      "root_crop_slicing_machine": {
+        "precision": 1.0,
+        "recall": 0.23076923076923078,
+        "f1": 0.375,
+        "support": 13
+      },
+      "testo_420_volume_flow_hood": {
+        "precision": 1.0,
+        "recall": 0.8,
+        "f1": 0.888888888888889,
+        "support": 10
+      },
+      "testo_440_air_velocity_iaq": {
+        "precision": 1.0,
+        "recall": 0.9333333333333333,
+        "f1": 0.9655172413793104,
+        "support": 15
+      },
+      "unmanned_aerial_system": {
+        "precision": 0.8125,
+        "recall": 1.0,
+        "f1": 0.896551724137931,
+        "support": 26
+      }
+    },
+    "confusion_matrix": [
+      [
+        21,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        25,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        23,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        17,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        11,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        6,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        0,
+        0,
+        0,
+        5
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        9,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        10,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        14,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        26
+      ]
+    ],
+    "confidence_distribution": {
+      "mean": 0.9626153758939753,
+      "median": 0.9995346069335938,
+      "p10": 0.8851492762565613,
+      "p90": 0.9999918699264526,
+      "correct_mean": 0.9750515393326792,
+      "incorrect_mean": 0.8461081605208548
+    },
+    "classes": [
+      "charcoal_oven_machine",
+      "festo_solar_wind_training_system",
+      "fluke_2042_cable_tracer",
+      "fluke_355_clamp_meter",
+      "fluke_922_air_flow_meter",
+      "fluke_930_non_contact_tachometer",
+      "fluke_971_temperature_humidity_meter",
+      "ip_display_area",
+      "quadruple_suction_single_discharge_cooking_oil_transfer_device",
+      "root_crop_slicing_machine",
+      "testo_420_volume_flow_hood",
+      "testo_440_air_velocity_iaq",
+      "unmanned_aerial_system"
+    ]
+  },
+  "source_manifest_report": "E:\\TAYLORai\\runs\\recon_unified_dataset\\unified_manifest_report.json"
 }

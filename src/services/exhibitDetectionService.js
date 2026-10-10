@@ -25,7 +25,7 @@ export const EXHIBIT_ZONE_STATES = Object.freeze({
     CAESAR_READY: 'CAESAR_READY'
 });
 
-const MODEL_ASSET_VERSION = '20261004-recon-unified-v1';
+export const MODEL_ASSET_VERSION = '20261010-recon-13class-v1';
 const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
 const MODEL_REQUEST_TIMEOUT_MS = 8000;
 const MODEL_RETRY_DELAYS_MS = [500, 1500, 3500];
@@ -59,8 +59,8 @@ const SHARED_RESOURCES = [
     ['/models/exhibit_gate/exhibit_gate.onnx', 'exhibit_gate.onnx'],
     ['/models/exhibit_gate/exhibit_gate_metadata.json', 'exhibit_gate_metadata.json'],
     ['/models/exhibit_gate/gate_similarity_index.json', 'gate_similarity_index.json'],
-    ['/models/tiny_face_detector_model-weights_manifest.json', 'tiny_face_detector_model-weights_manifest.json'],
-    ['/models/tiny_face_detector_model-shard1.bin', 'tiny_face_detector_model-shard1.bin']
+    ['/models/faceapi/tiny_face_detector_model-weights_manifest.json', 'tiny_face_detector_model-weights_manifest.json'],
+    ['/models/faceapi/tiny_face_detector_model-shard1', 'tiny_face_detector_model-shard1']
 ];
 
 // Configure ORT-Web to use matching WASM files (OpenAI solution)
@@ -167,6 +167,8 @@ class ExhibitDetectionService {
         this.initializedMode = null;
         this.faceDetectorReady = false;
         this.faceDetectorLoad = null;
+        this.faceDetectorStatus = 'UNAVAILABLE';
+        this.faceDetectorError = null;
         this.firstInferenceLogged = false;
         this.modelState = EXHIBIT_MODEL_STATES.CAMERA_READY;
         this.modelLoadStartedAt = 0;
@@ -330,7 +332,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 await this.loadExhibitGateModel();
             }
 
-            await this.loadFaceDetector();
+            await this.loadFaceDetector(requestedMode);
 
             if (requestedMode === 'recon') {
                 await this.loadReconModel();
@@ -495,33 +497,52 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         return this.prefetchPromise;
     }
 
-    async loadFaceDetector() {
+    async loadFaceDetector(diagnosticZone = this.classifierMode) {
         if (this.faceDetectorReady) return;
+        this.faceDetectorStatus = 'LOADING';
+        this.faceDetectorError = null;
         if (!this.faceDetectorLoad) {
-            this.faceDetectorLoad = faceapi.nets.tinyFaceDetector.loadFromUri('/models')
+            this.faceDetectorLoad = faceapi.nets.tinyFaceDetector.loadFromUri('/models/faceapi')
                 .then(() => {
                     this.faceDetectorReady = true;
-                    console.log('✅ Tiny face detector loaded for UNKNOWN person rejection');
+                    this.faceDetectorStatus = 'READY';
+                    this.recordZoneDiagnostic(diagnosticZone, 'FACE_DETECTOR_READY', { status: this.faceDetectorStatus });
+                    console.log('✅ Tiny face detector loaded for person rejection');
                 })
                 .catch(error => {
                     this.faceDetectorLoad = null;
-                        console.warn('⚠️ Tiny face detector unavailable; person rejection is disabled:', error.message);
+                    this.faceDetectorReady = false;
+                    this.faceDetectorStatus = 'UNAVAILABLE';
+                    this.faceDetectorError = error.message;
+                    this.recordZoneDiagnostic(diagnosticZone, 'FACE_DETECTOR_UNAVAILABLE', {
+                        status: this.faceDetectorStatus,
+                        message: error.message
+                    });
+                    console.warn('⚠️ Tiny face detector unavailable; person rejection is disabled:', error.message);
                 });
         }
         await this.faceDetectorLoad;
     }
 
     async detectPersonOnlyFrame(imageElement) {
-        if (!this.faceDetectorReady) return false;
+        if (!this.faceDetectorReady) {
+            return { detected: false, available: false };
+        }
         try {
             const detections = await faceapi.detectAllFaces(
                 imageElement,
                 new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.6 })
             );
-            return detections.length > 0;
+            return { detected: detections.length > 0, available: true };
         } catch (error) {
-            console.warn('⚠️ Person frame check failed; continuing with exhibit gate:', error.message);
-            return false;
+            this.faceDetectorStatus = 'UNAVAILABLE';
+            this.faceDetectorError = error.message;
+            this.recordZoneDiagnostic(this.classifierMode, 'FACE_DETECTOR_UNAVAILABLE', {
+                status: this.faceDetectorStatus,
+                message: error.message
+            });
+            console.warn('⚠️ Person frame check failed; person rejection is disabled:', error.message);
+            return { detected: false, available: false };
         }
     }
 
@@ -730,6 +751,17 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         this.caesarModel = await this.createCachedONNXSession(modelPath, sessionOptions);
         this.caesarMetadata = await this.fetchModelJson(metadataPath);
         console.log('CAESAR classifier loaded:', this.caesarMetadata.displayNames);
+    }
+
+    getApprovedLabels(zone = this.classifierMode) {
+        const metadata = {
+            aricc: this.ariccMetadata,
+            recon: this.reconMetadata,
+            fablab: this.fablabMetadata,
+            caesar: this.caesarMetadata
+        }[String(zone).toLowerCase()];
+        const labels = metadata?.displayNames || metadata?.display_names || metadata?.classes || metadata?.class_names || [];
+        return [...new Set(labels.map((label) => String(label).trim()).filter(Boolean))];
     }
 
     async loadExhibitGateModel() {
@@ -1477,8 +1509,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.log('⏭️ Skipping clarity gate - proceeding to confidence filter');
             }
 
-            const personDetected = await this.detectPersonOnlyFrame(imageElement);
-            if (personDetected) {
+            const personCheck = await this.detectPersonOnlyFrame(imageElement);
+            if (personCheck.detected) {
                 await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
                     classifier: this.classifierMode,
                     reason: 'person_detected'
@@ -1491,7 +1523,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                         : this.classifierMode === 'fablab' ? 'FABLAB' : 'RECON',
                     exhibit: 'Unknown / Unrecognized Exhibit',
                     message: 'No exhibit detected',
-                    classifier: this.classifierMode
+                    classifier: this.classifierMode,
+                    personDetector: personCheck
                 };
             }
 
@@ -1603,6 +1636,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                         exhibit: 'Unknown / Unrecognized Exhibit',
                         exhibitConfidence: reconResult.confidence,
                         specificConfidenceGap: reconResult.confidenceGap,
+                        top1: reconResult.top1,
+                        top2: reconResult.top2,
                         message: 'Exhibit is outside the confident RECON classes',
                         gate: gateResult,
                         classifier: 'recon'
@@ -1651,6 +1686,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                         exhibit: 'Unknown / Unrecognized Exhibit',
                         exhibitConfidence: ariccResult.confidence,
                         specificConfidenceGap: ariccResult.confidenceGap,
+                        top1: ariccResult.top1,
+                        top2: ariccResult.top2,
                         message: 'Exhibit is outside the confident ARICC classes',
                         gate: gateResult,
                         classifier: 'aricc'
@@ -1697,6 +1734,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                         exhibit: 'Unknown / Unrecognized Equipment',
                         exhibitConfidence: fablabResult.confidence,
                         specificConfidenceGap: fablabResult.confidenceGap,
+                        top1: fablabResult.top1,
+                        top2: fablabResult.top2,
                         message: 'Frame is outside the confident FABLAB classes',
                         gate: gateResult,
                         classifier: 'fablab'
@@ -1736,6 +1775,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                         exhibit: 'Unknown / Unrecognized Equipment',
                         exhibitConfidence: caesarResult.confidence,
                         specificConfidenceGap: caesarResult.confidenceGap,
+                        top1: caesarResult.top1,
+                        top2: caesarResult.top2,
                         message: 'Equipment is outside the confident CAESAR classes',
                         gate: gateResult,
                         classifier: 'caesar'
@@ -1924,7 +1965,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 top1: specificResult.top1 || mainResult.top1,
                 top2: specificResult.top2 || mainResult.top2,
                 processingTime: (mainResult.processingTime || 0) + (specificResult.processingTime || 0),
-                gate: gateResult
+                gate: gateResult,
+                personDetector: personCheck
             };
 
         } catch (error) {
@@ -2869,7 +2911,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
         return {
             exhibit,
-            displayName: isRecognized ? (displayNames[predictedIdx] || exhibit) : 'UNKNOWN',
+            displayName: displayNames[predictedIdx] || exhibit,
             classCode: zone === 'RECON' ? `RECON-${predictedIdx + 1}` : classNames[predictedIdx],
             confidence,
             isLikelyBackground,

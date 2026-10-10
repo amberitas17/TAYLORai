@@ -20,9 +20,9 @@ export const CIT_ROUTE_NODES = [
   { id: 'aricc', floor: 4, landmark: 'ARICC', instruction: 'Arrive at ARICC.', connections: [] },
   { id: 'aricc-rio-connector', floor: 4, landmark: 'ARICC area toward RIO', instruction: 'Use ARICC as the nearest reference landmark, then continue toward RIO.', connections: ['rio-entrance'] },
   { id: 'rio-entrance', floor: 4, landmark: 'RIO', instruction: 'Continue to the RIO entrance.', connections: ['rio-corridor'] },
-  { id: 'rio-corridor', floor: 4, landmark: 'Corridor after RIO', instruction: 'Continue along the corridor toward FABLAB.', connections: ['fablab-entrance'] },
-  { id: 'fablab-entrance', floor: 4, landmark: 'FABLAB', instruction: 'Continue to the FABLAB entrance.', connections: ['fablab-corridor'] },
-  { id: 'fablab-corridor', floor: 4, landmark: 'FABLAB departure corridor', instruction: 'From FABLAB, continue toward the stairs.', connections: ['stairs-near-fablab'] },
+  { id: 'rio-corridor', floor: 4, landmark: 'Corridor after RIO', instruction: 'Continue straight toward FABLAB.', connections: ['fablab-corridor'] },
+  { id: 'fablab-corridor', floor: 4, landmark: 'Corridor windows', instruction: 'Continue straight toward FABLAB.', connections: ['fablab-entrance'] },
+  { id: 'fablab-entrance', floor: 4, landmark: 'FABLAB', instruction: 'Continue to the FABLAB entrance.', connections: ['stairs-near-fablab'] },
   { id: 'stairs-near-fablab', floor: 4, landmark: 'Stairs near FABLAB', instruction: 'Proceed toward the stairs near FABLAB.', connections: ['caesar-turn-point'] },
   { id: 'caesar-turn-point', floor: 4, landmark: 'CAESAR turn point', instruction: 'Turn right toward CAESAR.', connections: ['caesar-approach'] },
   { id: 'caesar-approach', floor: 4, landmark: 'CAESAR approach', instruction: 'Continue toward the CAESAR entrance.', connections: ['caesar'] },
@@ -75,14 +75,15 @@ const ariccReferenceStep = {
 const ariccToRioSteps = [
   ariccReferenceStep,
   { id: 'aricc-rio-connector-step', from: 'aricc-rio-connector', to: 'rio-corridor', floor: 4, instruction: 'Continue from the ARICC area toward the RIO entrance.', landmark: 'ARICC area toward RIO', transition: false },
-  { id: 'rio-arrival-reference', from: 'rio-corridor', to: 'rio-entrance', floor: 4, instruction: 'You have arrived at the RIO entrance.', landmark: 'RIO', transition: false },
+  { id: 'rio-arrival-reference', from: 'rio-entrance', to: 'rio-corridor', floor: 4, instruction: 'You have reached RIO. Continue straight along the corridor toward FABLAB.', landmark: 'RIO', transition: false },
 ];
 const rioToFablabSteps = [
-  { id: 'rio-corridor-step', from: 'rio-corridor', to: 'fablab-entrance', floor: 4, instruction: 'Continue along the corridor toward FABLAB.', landmark: 'Corridor after RIO', transition: false },
-  { id: 'fablab-arrival-reference', from: 'fablab-entrance', to: 'fablab-corridor', floor: 4, instruction: 'Continue to the FABLAB entrance.', landmark: 'FABLAB', transition: false },
+  { id: 'rio-corridor-step', from: 'rio-corridor', to: 'fablab-corridor', floor: 4, instruction: 'Continue straight toward FABLAB.', landmark: 'Corridor after RIO', reference: 'White plant pot', transition: false },
+  { id: 'corridor-windows-step', from: 'fablab-corridor', to: 'fablab-entrance', floor: 4, instruction: 'Continue straight toward FABLAB.', landmark: 'Corridor windows', transition: false },
+  { id: 'fablab-arrival-reference', from: 'fablab-entrance', to: 'fablab-entrance', floor: 4, instruction: 'Continue to the FABLAB entrance.', landmark: 'FABLAB', transition: false },
 ];
 const fablabToCaesarSteps = [
-  { id: 'fablab-departure-step', from: 'fablab-corridor', to: 'stairs-near-fablab', floor: 4, instruction: 'From FABLAB, proceed toward the stairs.', landmark: 'FABLAB departure corridor', transition: false },
+  { id: 'fablab-departure-step', from: 'fablab-entrance', to: 'stairs-near-fablab', floor: 4, instruction: 'From FABLAB, proceed toward the stairs.', landmark: 'FABLAB', transition: false },
   { id: 'stairs-step', from: 'stairs-near-fablab', to: 'caesar-turn-point', floor: 4, instruction: 'At the stairs near FABLAB, turn right toward CAESAR.', landmark: 'Stairs near FABLAB', transition: false },
   { id: 'caesar-right-step', from: 'caesar-turn-point', to: 'caesar-approach', floor: 4, instruction: 'Continue toward CAESAR.', landmark: 'CAESAR turn point', transition: false },
   { id: 'caesar-approach-step', from: 'caesar-approach', to: 'caesar', floor: 4, instruction: 'Continue toward the CAESAR entrance.', landmark: 'CAESAR approach', transition: false },

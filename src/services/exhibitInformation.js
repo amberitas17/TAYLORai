@@ -45,7 +45,6 @@ const OFFLINE_EXHIBIT_MEANINGS = Object.freeze({
   'fluke 355 clamp meter': 'A clamp meter used to measure electrical current without disconnecting the conductor, along with other electrical values.',
   'fluke 922 air flow meter': 'An instrument used to measure air velocity, air volume flow, and pressure in ventilation systems.',
   'fluke 930 non contact tachometer': 'A non-contact instrument that measures the rotational speed of a moving shaft or other object.',
-  'fluke 941 temperature humidity meter': 'A handheld instrument that measures temperature and relative humidity in the surrounding air.',
   'ip display area': 'A designated display area for presenting information, instructions, or project content to visitors.',
   'quadruple suction single discharge cooking oil transfer device': 'A food-processing device that uses multiple suction points and one discharge path to transfer cooking oil.',
   'root crop slicing machine': 'A food-processing machine that cuts root crops into slices or other consistent pieces.',

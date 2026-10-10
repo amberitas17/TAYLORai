@@ -154,7 +154,7 @@ export async function getLandmarkLearningDiagnostics() {
   };
 }
 
-export async function captureLandmarkCandidate({ video, prediction, sourceSession, modelVersion, modelEmbedding = null, embeddingModelVersion = null, trigger = 'uncertain', reasons = [] }) {
+export async function captureLandmarkCandidate({ video, prediction, sourceSession, modelVersion, modelEmbedding = null, embeddingModelVersion = null, trigger = 'uncertain', reasons = [], proposedLabel = null }) {
   if (!consentEnabled()) return { saved: false, reason: 'consent_required' };
   const { blob, visualHash, embedding } = await frameBlobAndHash(video);
   const records = (await Promise.all(EXAMPLE_STORES.map(allRecords))).flat();
@@ -177,6 +177,7 @@ export async function captureLandmarkCandidate({ video, prediction, sourceSessio
     embedding,
     modelEmbedding: Array.isArray(modelEmbedding) ? modelEmbedding : null,
     embeddingModelVersion: embeddingModelVersion || null,
+    proposedLabel: proposedLabel || null,
     label: null,
     consented: true,
   };
@@ -192,7 +193,7 @@ export async function captureLandmarkCandidate({ video, prediction, sourceSessio
   return { saved: true, record };
 }
 
-export async function captureCorrectedLandmarkCandidate({ video, prediction, sourceSession, modelVersion }) {
+export async function captureCorrectedLandmarkCandidate({ video, prediction, sourceSession, modelVersion, correctedLabel }) {
   return captureLandmarkCandidate({
     video,
     prediction,
@@ -200,6 +201,7 @@ export async function captureCorrectedLandmarkCandidate({ video, prediction, sou
     modelVersion,
     trigger: 'user_correction',
     reasons: ['user_correction'],
+    proposedLabel: correctedLabel || null,
   });
 }
 
