@@ -1663,6 +1663,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     exhibit: reconResult.exhibit,
                     exhibitConfidence: reconResult.confidence,
                     combinedConfidence: reconResult.confidence,
+                    // Presentation requires top-1/top-2 evidence; omitting these made
+                    // successful RECON detections appear "unknown" in the UI.
+                    top1: reconResult.top1 || { class: reconResult.exhibit, confidence: reconResult.confidence },
+                    top2: reconResult.top2 || { class: 'UNKNOWN', confidence: Math.max(0, reconResult.confidence - reconResult.confidenceGap) },
                     exhibitInfo: { displayName, code, number: code.replace('RECON-', '') },
                     coordinates: this.getExhibitCoordinates(code, 'default'),
                     detectionTime: new Date().toISOString(),
