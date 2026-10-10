@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import OpenAI from 'openai';
 import { getFacebookPageContextHint, indexFacebookKnowledgeBase, searchFacebookKnowledgeBase, shouldUseFacebookContext } from './scripts/facebookKnowledgeBase.mjs';
 import { BULSU_GROUNDED_SYSTEM_PROMPT, formatBulsuContext, isBulsuCenterQuestion, normalizeBulsuEntity, searchBulsuCenters } from './scripts/bulsuCentersKnowledgeBase.mjs';
@@ -23,6 +24,49 @@ function learningSyncAuthorized(req) {
   if (!configuredToken) return false;
   const suppliedToken = (req.get('authorization') || '').replace(/^Bearer\s+/i, '') || req.get('x-taylor-sync-token') || '';
   return suppliedToken.length === configuredToken.length && crypto.timingSafeEqual(Buffer.from(suppliedToken), Buffer.from(configuredToken));
+}
+
+const EXHIBIT_RETRAINING_ZONES = new Set(['ARICC', 'RECON', 'FABLAB', 'CAESAR']);
+const EXHIBIT_RETRAINING_MIN_VERIFIED = Number(process.env.TAYLOR_EXHIBIT_RETRAIN_MIN_VERIFIED || 24);
+const EXHIBIT_RETRAINING_COOLDOWN_MS = Number(process.env.TAYLOR_EXHIBIT_RETRAIN_COOLDOWN_MS || 7 * 24 * 60 * 60 * 1000);
+
+function validateExhibitRetrainingRecord(record) {
+  const zone = String(record?.zone || '').toUpperCase();
+  const verified = record?.status === 'VERIFIED';
+  return Boolean(
+    record && typeof record.id === 'string' && record.id.length <= 120 && EXHIBIT_RETRAINING_ZONES.has(zone) &&
+    record.consented === true && typeof record.imageDataUrl === 'string' && record.imageDataUrl.startsWith('data:image/') &&
+    ['UNVERIFIED', 'VERIFIED'].includes(record.status) &&
+    (!verified || (record.independentlyVerified === true && typeof record.label === 'string' && record.label.trim() && record.verificationSource !== 'model'))
+  );
+}
+
+async function readExhibitRetrainingRecords(recordsPath) {
+  try {
+    return (await readFile(recordsPath, 'utf8')).split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+async function triggerExhibitRetraining(directory, verifiedCount) {
+  const triggerPath = path.join(directory, 'latest-trigger.json');
+  let previousTrigger = null;
+  try { previousTrigger = JSON.parse(await readFile(triggerPath, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  if (previousTrigger?.triggeredAt && Date.now() - Date.parse(previousTrigger.triggeredAt) < EXHIBIT_RETRAINING_COOLDOWN_MS) {
+    return { triggered: false, reason: 'cooldown' };
+  }
+  const trigger = { triggerId: crypto.randomUUID(), triggeredAt: new Date().toISOString(), verifiedCount, status: 'candidate_only', productionModelChanged: false };
+  await writeFile(triggerPath, JSON.stringify(trigger, null, 2), 'utf8');
+  await appendFile(path.join(directory, 'training-log.jsonl'), JSON.stringify(trigger) + '\n', 'utf8');
+  const recordsPath = path.join(directory, 'candidate-records.jsonl');
+  const outputDirectory = path.join(directory, 'jobs', trigger.triggerId);
+  const python = process.env.TAYLOR_RETRAIN_PYTHON || (process.platform === 'win32' ? '.venv\\Scripts\\python.exe' : 'python3');
+  const command = process.env.TAYLOR_EXHIBIT_RETRAIN_COMMAND || `${python} scripts/run_exhibit_retraining.py --records "${recordsPath}" --output "${outputDirectory}"`;
+  const child = spawn(command, { cwd: process.cwd(), shell: true, detached: true, stdio: 'ignore', env: { ...process.env, TAYLOR_EXHIBIT_RETRAIN_TRIGGER_ID: trigger.triggerId } });
+  child.unref();
+  return { triggered: true, status: 'started', triggerId: trigger.triggerId };
 }
 
 const INDOOR_MAP_PATH = process.env.TAYLOR_INDOOR_MAP_PATH || path.join(process.cwd(), 'data', 'indoor-maps', 'cit.json');
@@ -151,6 +195,26 @@ app.post('/api/landmarks/sync', async (req, res) => {
   const newExamples = validExamples.filter((example) => !existingIds.has(example.id));
   await appendFile(pathName, newExamples.map((example) => JSON.stringify({ ...example, receivedAt })).join('\n') + (newExamples.length ? '\n' : ''), 'utf8');
   res.json({ success: true, accepted: validExamples.map((example) => example.id), batchId: crypto.randomUUID() });
+});
+
+app.post('/api/exhibit-retraining/sync', async (req, res) => {
+  if (!learningSyncAuthorized(req)) return res.status(401).json({ success: false, message: 'Learning sync authentication is required.' });
+  const records = req.body?.records;
+  if (!Array.isArray(records) || records.length > 60) return res.status(400).json({ success: false, message: 'records must be an array of at most 60 records.' });
+  if (!records.every(validateExhibitRetrainingRecord)) return res.status(400).json({ success: false, message: 'Only consented exhibit records with independent verification metadata are accepted.' });
+  const directory = process.env.TAYLOR_EXHIBIT_RETRAINING_DIR || path.join(process.cwd(), 'data', 'exhibit-retraining');
+  await mkdir(directory, { recursive: true });
+  const recordsPath = path.join(directory, 'candidate-records.jsonl');
+  const existing = await readExhibitRetrainingRecords(recordsPath);
+  const existingIds = new Set(existing.map((record) => record.id));
+  const newRecords = records.filter((record) => !existingIds.has(record.id)).map((record) => ({ ...record, receivedAt: new Date().toISOString() }));
+  if (newRecords.length) await appendFile(recordsPath, newRecords.map((record) => JSON.stringify(record)).join('\n') + '\n', 'utf8');
+  const allRecords = [...existing, ...newRecords];
+  const verifiedCount = allRecords.filter((record) => record.status === 'VERIFIED' && record.independentlyVerified === true).length;
+  const trigger = verifiedCount >= EXHIBIT_RETRAINING_MIN_VERIFIED
+    ? await triggerExhibitRetraining(directory, verifiedCount)
+    : { triggered: false, reason: 'insufficient_verified_samples' };
+  return res.json({ success: true, accepted: newRecords.map((record) => record.id), verifiedCount, minimumVerified: EXHIBIT_RETRAINING_MIN_VERIFIED, trigger });
 });
 
 app.post('/api/exhibit-explanation', async (req, res) => {

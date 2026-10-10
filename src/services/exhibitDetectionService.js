@@ -7,6 +7,7 @@ import * as tf from '@tensorflow/tfjs';
 import * as ort from 'onnxruntime-web';
 import * as faceapi from 'face-api.js';
 import { exhibitImprovementCandidateStore } from './exhibitImprovementCandidateStore.js';
+import { captureExhibitRetrainingCandidate, getExhibitRetrainingConsent } from './exhibitRetrainingStore.js';
 
 export const EXHIBIT_MODEL_STATES = Object.freeze({
     CAMERA_READY: 'CAMERA_READY',
@@ -1446,6 +1447,18 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 candidateReasons: reasons,
                 source: this.candidateSourceContext
             });
+            if (getExhibitRetrainingConsent()) {
+                captureExhibitRetrainingCandidate({
+                    frame: imageElement,
+                    zone,
+                    modelVersion: MODEL_ASSET_VERSION,
+                    top1,
+                    top2,
+                    temporalPredictions,
+                    reasons,
+                    source: this.candidateSourceContext
+                }).catch(error => console.warn('Exhibit retraining candidate capture failed:', error.message));
+            }
         } catch (error) {
             console.warn('Improvement candidate observation failed:', error.message);
         }

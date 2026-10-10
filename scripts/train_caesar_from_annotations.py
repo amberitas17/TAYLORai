@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import re
 import shutil
 from pathlib import Path
 
 import cv2
+
+from retraining_memory import configure_cpu_threads, memory_snapshot
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -307,22 +310,29 @@ def main() -> None:
     parser.add_argument("--imgsz", type=int, default=224)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--run-name", default="caesar_annotated_v1")
+    parser.add_argument("--reuse-dataset", action="store_true")
     parser.add_argument(
         "--filename-labels",
         action="store_true",
         help="Use each filename stem as its class label, ignoring trailing recording numbers.",
     )
     args = parser.parse_args()
+    configure_cpu_threads()
+    memory_log = Path(os.environ["TAYLOR_MEMORY_LOG"]) if os.environ.get("TAYLOR_MEMORY_LOG") else None
+    memory_snapshot("training_start", memory_log)
     if not args.source.is_dir():
         raise FileNotFoundError(f"Source directory not found: {args.source}")
     if not args.filename_labels and not args.annotations.exists():
         raise FileNotFoundError(f"Create the annotation file first: {args.annotations}")
-    summary = build_filename_dataset(args) if args.filename_labels else build_dataset(args)
+    summary = {"reused": True, "dataset": str(args.output)} if args.reuse_dataset else (
+        build_filename_dataset(args) if args.filename_labels else build_dataset(args)
+    )
     print(json.dumps(summary, indent=2))
     if args.train:
         if args.device == "auto":
             args.device = "0" if __import__("torch").cuda.is_available() else "cpu"
         print(json.dumps({"onnx": train_model(args, summary)}, indent=2))
+    memory_snapshot("training_complete", memory_log)
 
 
 if __name__ == "__main__":

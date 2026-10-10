@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import random
 import shutil
 import stat
@@ -16,6 +17,8 @@ from pathlib import Path
 
 import cv2
 from ultralytics import YOLO
+
+from retraining_memory import configure_cpu_threads, memory_snapshot
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -273,6 +276,9 @@ def main() -> None:
     )
     parser.add_argument("--deploy", action="store_true")
     args = parser.parse_args()
+    configure_cpu_threads()
+    memory_log = Path(os.environ["TAYLOR_MEMORY_LOG"]) if os.environ.get("TAYLOR_MEMORY_LOG") else None
+    memory_snapshot("training_start", memory_log)
     WORK_DIR = args.dataset_dir
 
     summary = {"reused": True, "dataset": str(WORK_DIR)} if args.reuse_dataset else build_dataset(
@@ -291,7 +297,9 @@ def main() -> None:
         summary["removed_training_images"] = removed_images
         (WORK_DIR / "dataset_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(json.dumps(summary, indent=2))
-    print(json.dumps(train(args), indent=2))
+    result = train(args)
+    memory_snapshot("training_complete", memory_log)
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

@@ -61,6 +61,16 @@ npm run preview
 
 Open the preview URL printed by Vite. To check code quality, run `npm run lint`.
 
+### Exhibit Retraining Safety Pipeline
+
+The ARICC, RECON, FABLAB, and CAESAR recognizers retain their existing 80% confidence and 15-point margin acceptance rules. With the camera consent checkbox enabled, repeated low-confidence, low-margin, or unstable predictions can add bounded, quality-checked frames to IndexedDB. Records remain `UNVERIFIED` until an independent human review assigns a label; model predictions are never used as ground truth.
+
+The backend endpoint `/api/exhibit-retraining/sync` stores consented records and writes a candidate-only training trigger after `TAYLOR_EXHIBIT_RETRAIN_MIN_VERIFIED` verified samples (default 24). Configure `TAYLOR_LEARNING_SYNC_TOKEN`, `TAYLOR_EXHIBIT_RETRAIN_COMMAND`, and `TAYLOR_EXHIBIT_RETRAINING_DIR` before enabling the background runner. The trigger has a seven-day cooldown by default and never promotes a model.
+
+The runner copies the original train/validation trees into a job directory, adds only independently verified examples to the copied train split, trains the zone adapter, and evaluates the resulting ONNX model against the deployed ONNX model on the copied validation split. Evaluation reproduces the browser's metadata-driven RGB preprocessing, NCHW `224x224` input, softmax handling, and `0.80` confidence / `0.15` margin acceptance thresholds. Reports include model hashes, class mappings, per-class precision/recall/F1, confusion matrices, false acceptance rates, coverage, and regression deltas. A passing candidate is marked `READY_FOR_REVIEW`; automatic deployment remains disabled. `npm run promote:exhibit-candidate` is a separate manual operation that preserves a rollback copy.
+
+Every held-out class must meet the evaluator's minimum coverage. The current CAESAR `val` tree is missing 12 of 19 deployed classes, so CAESAR candidates are rejected until a complete fixed evaluation set is restored; the evaluator does not silently score incomplete coverage.
+
 ### How TAYLOR Runs
 
 - Vite serves the React application during development.

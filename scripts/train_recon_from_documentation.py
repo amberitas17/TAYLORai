@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import shutil
 import stat
@@ -11,6 +12,8 @@ from pathlib import Path
 
 import cv2
 from ultralytics import YOLO
+
+from retraining_memory import configure_cpu_threads, memory_snapshot
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -193,17 +196,23 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--run-name", default="recon_documentation_v1")
+    parser.add_argument("--reuse-dataset", action="store_true")
     parser.add_argument("--deploy", action="store_true")
     parser.add_argument("--ocr-manifest", type=Path, default=OCR_MANIFEST)
     parser.add_argument("--dataset-dir", type=Path, default=WORK_DIR)
     parser.add_argument("--unknown-background-dir", type=Path, default=UNKNOWN_BACKGROUND_DIR)
     args = parser.parse_args()
+    configure_cpu_threads()
+    memory_log = Path(os.environ["TAYLOR_MEMORY_LOG"]) if os.environ.get("TAYLOR_MEMORY_LOG") else None
+    memory_snapshot("training_start", memory_log)
     device = args.device
     if device == "auto":
         device = "0" if __import__("torch").cuda.is_available() else "cpu"
     OCR_MANIFEST = args.ocr_manifest
     WORK_DIR = args.dataset_dir if args.dataset_dir.is_absolute() else ROOT / args.dataset_dir
-    summary = build_dataset(args.seed, args.validation_ratio, args.frame_step, args.max_frames, args.unknown_background_dir)
+    summary = {"reused": True, "dataset": str(WORK_DIR)} if args.reuse_dataset else build_dataset(
+        args.seed, args.validation_ratio, args.frame_step, args.max_frames, args.unknown_background_dir
+    )
     print(json.dumps(summary, indent=2))
     model = YOLO(args.model)
     model.train(task="classify", data=str(WORK_DIR), epochs=args.epochs, imgsz=args.imgsz, batch=args.batch,
@@ -229,6 +238,7 @@ def main() -> None:
         DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
         shutil.copy2(onnx, DEPLOY_DIR / "recon_classifier.onnx")
         shutil.copy2(metadata_path, DEPLOY_DIR / "recon_classifier_metadata.json")
+    memory_snapshot("training_complete", memory_log)
     print(json.dumps({"best_pt": str(best), "onnx": str(onnx), "metadata": str(metadata_path)}, indent=2))
 
 

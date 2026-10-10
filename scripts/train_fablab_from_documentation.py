@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import shutil
 import stat
@@ -11,6 +12,8 @@ from pathlib import Path
 
 import cv2
 from ultralytics import YOLO
+
+from retraining_memory import configure_cpu_threads, memory_snapshot
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -172,16 +175,22 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--run-name", default="fablab_documentation_v1")
+    parser.add_argument("--reuse-dataset", action="store_true")
     parser.add_argument("--dataset-dir", type=Path, default=WORK_DIR)
     parser.add_argument("--unknown-background-dir", type=Path, default=UNKNOWN_BACKGROUND_DIR)
     parser.add_argument("--deploy", action="store_true")
     args = parser.parse_args()
+    configure_cpu_threads()
+    memory_log = Path(os.environ["TAYLOR_MEMORY_LOG"]) if os.environ.get("TAYLOR_MEMORY_LOG") else None
+    memory_snapshot("training_start", memory_log)
     WORK_DIR = args.dataset_dir if args.dataset_dir.is_absolute() else ROOT / args.dataset_dir
     device = args.device
     if device == "auto":
         device = "0" if __import__("torch").cuda.is_available() else "cpu"
 
-    summary = build_dataset(args.seed, args.validation_ratio, args.frame_step, args.max_frames, args.unknown_background_dir)
+    summary = {"reused": True, "dataset": str(WORK_DIR)} if args.reuse_dataset else build_dataset(
+        args.seed, args.validation_ratio, args.frame_step, args.max_frames, args.unknown_background_dir
+    )
     print(json.dumps(summary, indent=2))
     model = YOLO(args.model)
     model.train(
@@ -215,6 +224,7 @@ def main() -> None:
         shutil.copy2(onnx, DEPLOY_DIR / "fablab_classifier.onnx")
         shutil.copy2(metadata_path, DEPLOY_DIR / "fablab_classifier_metadata.json")
         result["deployed_to"] = str(DEPLOY_DIR)
+    memory_snapshot("training_complete", memory_log)
     print(json.dumps(result, indent=2))
 
 

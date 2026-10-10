@@ -20,6 +20,11 @@ import {
   setLandmarkLearningConsent,
 } from './services/landmarkLearningStore.js';
 import { notifyReconLearningObserver } from './services/reconLearningObserver.js';
+import {
+  getExhibitRetrainingConsent,
+  setExhibitRetrainingConsent,
+  syncExhibitRetrainingQueue,
+} from './services/exhibitRetrainingStore.js';
 
 const width = window.innerWidth;
 const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
@@ -690,10 +695,18 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const lastAcceptedAtRef = useRef(0);
   const [recognitionDebug, setRecognitionDebug] = useState(null);
   const [learningConsent, setLearningConsent] = useState(() => getLandmarkLearningConsent());
+  const [exhibitRetrainingConsent, setExhibitRetrainingConsentState] = useState(() => getExhibitRetrainingConsent());
   const [learningCaptureStatus, setLearningCaptureStatus] = useState('');
   const [correctionLabel, setCorrectionLabel] = useState('');
   const [explanationState, setExplanationState] = useState({ status: 'idle', explanation: null, error: null });
   const explanationRequestRef = useRef(null);
+
+  useEffect(() => {
+    const sync = () => syncExhibitRetrainingQueue().catch((error) => console.warn('Exhibit retraining sync deferred:', error.message));
+    sync();
+    window.addEventListener('online', sync);
+    return () => window.removeEventListener('online', sync);
+  }, []);
 
   useEffect(() => {
     if (!tourMode || typeof window === 'undefined') return;
@@ -1258,47 +1271,6 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
     video.onerror = () => setError('The selected video could not be loaded.');
   };
-<<<<<<< HEAD
-=======
-
-    const captureReconLearningCandidate = (detection) => {
-      if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
-      const top1 = detection?.top1 || { class: detection?.exhibit || 'UNKNOWN', confidence: detection?.exhibitConfidence || 0 };
-      const top2 = detection?.top2 || { class: 'UNKNOWN', confidence: 0 };
-      const confidence = Number(top1.confidence || 0);
-      const margin = Number.isFinite(Number(detection?.specificConfidenceGap))
-        ? Number(detection.specificConfidenceGap)
-        : confidence - Number(top2.confidence || 0);
-      const reasons = [];
-      if (confidence < 0.8) reasons.push('LOW_CONFIDENCE');
-      if (margin < 0.15) reasons.push('LOW_MARGIN');
-      if (!detection?.success) reasons.push(detection?.reason || 'REJECTED');
-      if (reasons.length === 0 || Date.now() - lastLearningCaptureAtRef.current < 5000) return;
-
-      lastLearningCaptureAtRef.current = Date.now();
-      captureLandmarkCandidate({
-        video: videoRef.current,
-        prediction: {
-          top1: top1.class || 'UNKNOWN',
-          top2: top2.class || 'UNKNOWN',
-          rawScores: detection?.rawScores || null,
-          confidence,
-        },
-        sourceSession: learningSessionRef.current,
-        modelVersion: '20261004-recon-unified-v1',
-        trigger: 'recon_low_confidence_camera',
-        reasons,
-      }).then((result) => {
-        if (result.saved) {
-          setLearningCaptureStatus('Low-confidence frame saved for review');
-          window.setTimeout(() => setLearningCaptureStatus(''), 1800);
-        }
-      }).catch((captureError) => {
-        console.warn('RECON learning capture failed:', captureError.message);
-      });
-    };
->>>>>>> 0c6b3b5250025cbe486d8fe6b3d15fe95b8e78fe
-
   const saveReconCorrection = () => {
     if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current || !lastDetection) return;
     const label = correctionLabel || lastDetection.exhibit || lastDetection.top1?.class;
@@ -2305,6 +2277,26 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         alignItems: "flex-end",
         gap: 8,
       }}>
+        <label style={{
+          background: "rgba(0,0,0,0.72)",
+          color: "#fff",
+          borderRadius: 8,
+          padding: "8px 12px",
+          fontSize: 12,
+          cursor: "pointer",
+        }}>
+          <input
+            type="checkbox"
+            checked={exhibitRetrainingConsent}
+            onChange={(event) => {
+              const enabled = event.target.checked;
+              setExhibitRetrainingConsentState(enabled);
+              setExhibitRetrainingConsent(enabled);
+            }}
+            style={{ marginRight: 7 }}
+          />
+          Share uncertain exhibit frames for review
+        </label>
         {classifierMode.toLowerCase() === 'recon' && (
           <label style={{
             background: "rgba(0,0,0,0.72)",
