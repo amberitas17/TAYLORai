@@ -1,12 +1,49 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FiEye, FiArrowLeft, FiMapPin, FiChevronRight, FiNavigation } from 'react-icons/fi';
 import './ai-exhibit.css';
-import AINavigation from './components/AINavigation';
 import LeafletMap from './components/LeafletMap';
-import aiNavigationService from './services/aiNavigationService';
-import exhibitDetectionService from './services/exhibitDetectionService.js';
+import exhibitDetectionService, { EXHIBIT_MODEL_STATES, MODEL_ASSET_VERSION } from './services/exhibitDetectionService.js';
+import { textToSpeech } from './services/speechAPI.js';
+import { classifyRecognitionPresentation } from './services/recognitionPresentation.js';
+import { getAnonymousSessionId, saveExhibitFeedback } from './services/exhibitFeedbackStore.js';
+import { getOfflineExhibitInformation, getVerifiedExhibitInformation } from './services/exhibitInformation.js';
+import {
+  cacheExhibitExplanation,
+  getCachedExhibitExplanation,
+  requestExhibitExplanation,
+} from './services/exhibitExplanationCache.js';
+import {
+  captureLandmarkCandidate,
+  captureCorrectedLandmarkCandidate,
+  getLandmarkLearningConsent,
+  setLandmarkLearningConsent,
+} from './services/landmarkLearningStore.js';
+import { notifyReconLearningObserver } from './services/reconLearningObserver.js';
 
 const width = window.innerWidth;
+const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
+const RECON_CORRECTION_LABELS = [
+  'charcoal_oven_machine',
+  'festo_solar_wind_training_system',
+  'fluke_2042_cable_tracer',
+  'fluke_355_clamp_meter',
+  'fluke_922_air_flow_meter',
+  'fluke_930_non_contact_tachometer',
+  'fluke_971_temperature_humidity_meter',
+  'ip_display_area',
+  'quadruple_suction_single_discharge_cooking_oil_transfer_device',
+  'root_crop_slicing_machine',
+  'testo_420_volume_flow_hood',
+  'testo_440_air_velocity_iaq',
+  'unmanned_aerial_system',
+];
+
+const getKnowledgeEntity = (zone = '') => {
+  const normalizedZone = String(zone).trim().toUpperCase().replace(/[_-]+/g, ' ');
+  if (normalizedZone === 'BARAS' || normalizedZone === 'BARAS TBI') return 'BARAS TBI';
+  return KNOWLEDGE_ENTITIES.has(normalizedZone) ? normalizedZone : '';
+};
 // Complete exhibit database with all Science Centre exhibits
 const exhibitPath = [
   {
@@ -609,7 +646,12 @@ const exhibitPath = [
   },
 ];
 
-export default function CameraToNavigationScreenPWA() {
+export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tourMode = location.state?.tourMode === true;
+  const specialistRoute = /^\/machine-vision(?:-exhibit)?-(?:aricc|fablab|caesar|recon)$/.test(location.pathname);
+  const activeCenter = location.state?.activeCenter || classifierMode.toUpperCase();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [showCamera, setShowCamera] = useState(true);
@@ -617,17 +659,60 @@ export default function CameraToNavigationScreenPWA() {
   const [error, setError] = useState("");
   const [locationDetected, setLocationDetected] = useState(false);
   const [currentExhibit, setCurrentExhibit] = useState(null);
+  const [activeExhibit, setActiveExhibit] = useState(null);
   const [detectionService, setDetectionService] = useState(null);
+  const detectionServiceRef = useRef(null);
   const [lastDetection, setLastDetection] = useState(null);
   const [stableExhibitDetected, setStableExhibitDetected] = useState(false);
   const [stayOnCamera, setStayOnCamera] = useState(true); // Keep camera active by default
-  const [showNavigation, setShowNavigation] = useState(false);
   const detectionIntervalRef = useRef(null);
   const detectionInFlightRef = useRef(false);
+  const cameraStreamRef = useRef(null);
+  const uploadedVideoRef = useRef(null);
+  const uploadedObjectUrlRef = useRef(null);
+  const learningSessionRef = useRef(globalThis.crypto?.randomUUID?.() || `recon-session-${Date.now()}`);
+  const lastLearningCaptureAtRef = useRef(0);
+  const cameraReadyResolveRef = useRef(null);
+  const cameraReadySignalRef = useRef(null);
+  if (!cameraReadySignalRef.current) {
+    cameraReadySignalRef.current = new Promise((resolve) => {
+      cameraReadyResolveRef.current = resolve;
+    });
+  }
   const acceptStreakRef = useRef(0);
   const rejectStreakRef = useRef(0);
   const pendingLabelRef = useRef("");
   const pendingLabelCountRef = useRef(0);
+  const tentativeLabelRef = useRef("");
+  const tentativeLabelCountRef = useRef(0);
+  const tentativePromptAtRef = useRef(0);
+  const tentativePromptKeyRef = useRef("");
+  const lastAcceptedAtRef = useRef(0);
+  const [recognitionDebug, setRecognitionDebug] = useState(null);
+  const [learningConsent, setLearningConsent] = useState(() => getLandmarkLearningConsent());
+  const [learningCaptureStatus, setLearningCaptureStatus] = useState('');
+  const [correctionLabel, setCorrectionLabel] = useState('');
+  const [explanationState, setExplanationState] = useState({ status: 'idle', explanation: null, error: null });
+  const explanationRequestRef = useRef(null);
+
+  useEffect(() => {
+    if (!tourMode || typeof window === 'undefined') return;
+    window.sessionStorage.setItem('tourMode', 'true');
+    window.sessionStorage.setItem('activeCenter', activeCenter);
+    window.sessionStorage.setItem('recognitionZone', classifierMode.toUpperCase());
+    window.sessionStorage.removeItem('activeExhibit');
+  }, [activeCenter, classifierMode, tourMode]);
+
+  const stopCameraStream = () => {
+    const stream = cameraStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      cameraStreamRef.current = null;
+    }
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject = null;
+    }
+  };
 
   // Live tracking state
   const [stepCount, setStepCount] = useState(0);
@@ -640,6 +725,27 @@ export default function CameraToNavigationScreenPWA() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState('Loading models...');
   const [statusMessage, setStatusMessage] = useState("");
+  const [tentativeRecognition, setTentativeRecognition] = useState(null);
+  const [feedbackMode, setFeedbackMode] = useState(null);
+  const [feedbackCorrectionLabel, setFeedbackCorrectionLabel] = useState('');
+  const [feedbackStatus, setFeedbackStatus] = useState('');
+  const [recognitionState, setRecognitionState] = useState(EXHIBIT_MODEL_STATES.CAMERA_READY);
+  const [diagnosticsTick, setDiagnosticsTick] = useState(0);
+  const diagnosticsEnabled = new URLSearchParams(window.location.search).has('recognitionDebug');
+  const currentZoneKey = classifierMode.toLowerCase();
+  const zoneLabel = classifierMode.toUpperCase();
+  const loadedFeedbackLabels = exhibitDetectionService.getApprovedLabels(classifierMode);
+  const approvedFeedbackLabels = loadedFeedbackLabels.length > 0
+    ? loadedFeedbackLabels
+    : currentZoneKey === 'recon' ? RECON_CORRECTION_LABELS : [];
+  const zoneReadyState = exhibitDetectionService.zoneStates?.[currentZoneKey] || 'MODEL_LOADING';
+  const cameraReady = Boolean(videoRef.current?.srcObject || uploadedVideoRef.current);
+  const currentResourceDiagnostics = Object.entries(exhibitDetectionService.resourceDiagnostics || {})
+    .filter(([resource]) => resource.includes(`/${currentZoneKey}/`) || resource.includes('/exhibit_gate/') || resource.includes('/ort/'));
+  const currentZoneResources = Object.entries(exhibitDetectionService.resourceDiagnostics || {})
+    .filter(([resource]) => resource.includes(`/${currentZoneKey}/`));
+  const currentZoneSource = currentZoneResources.length > 0 &&
+    currentZoneResources.every(([, diagnostic]) => diagnostic.source === 'CACHE') ? 'CACHE' : 'NETWORK';
 
   const formatDetectionStatus = (detection) => {
     if (!detection) return "";
@@ -662,38 +768,228 @@ export default function CameraToNavigationScreenPWA() {
     return `Rejected: ${detection.reason || "not exhibit"}${confidence}`;
   };
 
-  const getStableExhibitLabel = () => {
-    if (currentExhibit?.name && currentExhibit.name !== "Exhibit detected") return currentExhibit.name;
-    if (currentExhibit?.zone) return currentExhibit.zone;
-    if (
-      lastDetection?.success &&
-      !lastDetection.gateOnly &&
-      lastDetection.exhibitInfo?.code !== "EXHIBIT" &&
-      lastDetection.exhibitInfo?.displayName
-    ) {
-      return lastDetection.exhibitInfo.displayName;
+  const formatRecognitionLabel = (label = '') => String(label).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const feedbackVisible = Boolean(currentExhibit || tentativeRecognition);
+  const feedbackPredictedLabel = tentativeRecognition?.label || lastDetection?.top1?.exhibit || lastDetection?.top1?.class ||
+    currentExhibit?.name || '';
+  const feedbackConfidence = Number(lastDetection?.top1?.confidence || lastDetection?.exhibitConfidence ||
+    tentativeRecognition?.confidence || currentExhibit?.confidence || 0);
+
+  const submitFeedback = async (feedbackType, correctedLabel = null) => {
+    if (!feedbackPredictedLabel) return;
+    try {
+      const result = await saveExhibitFeedback({
+        predictedLabel: feedbackPredictedLabel,
+        correctedLabel,
+        feedbackType,
+        confidence: feedbackConfidence,
+        zone: zoneLabel,
+        modelVersion: MODEL_ASSET_VERSION,
+        sessionId: getAnonymousSessionId(),
+      });
+      setFeedbackStatus(result.duplicate ? 'Feedback already saved on this device.' : 'Feedback saved offline.');
+      setFeedbackMode(null);
+      setFeedbackCorrectionLabel('');
+      if (tentativeRecognition) {
+        tentativePromptAtRef.current = Date.now();
+        setTentativeRecognition(null);
+        tentativeLabelRef.current = '';
+        tentativeLabelCountRef.current = 0;
+      }
+    } catch (feedbackError) {
+      setFeedbackStatus(feedbackError.message || 'Feedback could not be saved.');
     }
+  };
+
+  const handleWrongExhibit = () => {
+    setFeedbackMode('wrong');
+    setFeedbackStatus('');
+    setFeedbackCorrectionLabel('');
+  };
+
+  const promoteTentativeRecognition = () => {
+    if (!tentativeRecognition?.candidate) return;
+    const exhibit = tentativeRecognition.candidate;
+    setCurrentExhibit(exhibit);
+    setActiveExhibit(exhibit.name);
+    setTentativeRecognition(null);
+    setFeedbackMode(null);
+    setLocationDetected(true);
+    setStableExhibitDetected(true);
+    lastAcceptedAtRef.current = Date.now();
+    if (tourMode && typeof window !== 'undefined') window.sessionStorage.setItem('activeExhibit', exhibit.name);
+    const knowledgeEntity = getKnowledgeEntity(exhibit.zone);
+    if (knowledgeEntity && typeof window !== 'undefined') {
+      window.sessionStorage.setItem('taylorActiveEntity', knowledgeEntity);
+      window.dispatchEvent(new CustomEvent('taylor-active-entity-change', {
+        detail: { activeEntity: knowledgeEntity, confirmed: false, userConfirmed: true }
+      }));
+    }
+  };
+
+  const continueScanning = () => {
+    tentativePromptAtRef.current = Date.now();
+    tentativePromptKeyRef.current = tentativeRecognition?.label || '';
+    setTentativeRecognition(null);
+    setFeedbackMode(null);
+    setFeedbackStatus('');
+    tentativeLabelRef.current = '';
+    tentativeLabelCountRef.current = 0;
+  };
+
+  const confirmTentativeRecognition = async () => {
+    await submitFeedback('CORRECT');
+    promoteTentativeRecognition();
+  };
+
+  const getStableExhibitLabel = () => {
+    if (currentExhibit?.name && currentExhibit.name !== "Exhibit detected") return formatRecognitionLabel(currentExhibit.name);
+    if (currentExhibit?.zone) return currentExhibit.zone;
     return "";
   };
 
-  // Update your initialization effect:
   useEffect(() => {
+    let cancelled = false;
+    const initializationTimeoutMs = 12000;
     const initService = async () => {
+      const startedAt = performance.now();
       try {
         setIsLoading(true);
-        setLoadingMessage('Initializing exhibit detection service...');
-        await exhibitDetectionService.initialize();
-        setDetectionService(exhibitDetectionService);
-        window.exhibitDetectionService = exhibitDetectionService;
-        setIsLoading(false);
+        setLoadingMessage(`Preparing ${zoneLabel} recognition...`);
+        setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOADING);
+
+        await cameraReadySignalRef.current;
+        if (cancelled) return;
+        const initializePromise = exhibitDetectionService.initialize({ classifier: classifierMode });
+        initializePromise.then(() => {
+          if (cancelled) return;
+          console.log(`⏱️ Recognition service ready in ${(performance.now() - startedAt).toFixed(0)}ms`);
+          detectionServiceRef.current = exhibitDetectionService;
+          setDetectionService(exhibitDetectionService);
+          setRecognitionState(exhibitDetectionService.modelState);
+          window.exhibitDetectionService = exhibitDetectionService;
+          setIsLoading(false);
+          setLoadingMessage('');
+          setStatusMessage(`${zoneLabel} recognition ready.`);
+          window.setTimeout(() => setStatusMessage(''), 1200);
+        }).catch((error) => {
+          if (cancelled) return;
+          console.error('❌ Background recognition initialization failed:', error);
+          if (diagnosticsEnabled) {
+            setRecognitionDebug((previous) => ({
+              ...previous,
+              initializationError: exhibitDetectionService.initializationDiagnostics
+            }));
+          }
+          setRecognitionState(exhibitDetectionService.modelState);
+          setIsLoading(false);
+          setLoadingMessage('');
+          setStatusMessage(exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+            ? `${zoneLabel} needs a one-time connection to prepare recognition.`
+            : `${zoneLabel} recognition could not initialize. The camera remains available.`);
+        });
+
+        await Promise.race([
+          initializePromise,
+          new Promise((resolve) => window.setTimeout(resolve, initializationTimeoutMs))
+        ]);
+        if (!cancelled && !exhibitDetectionService.isInitialized) {
+          console.warn(`⏱️ Recognition initialization exceeded ${initializationTimeoutMs}ms; camera remains available`);
+          setLoadingMessage(`Preparing ${zoneLabel} recognition...`);
+        }
       } catch (error) {
+        if (cancelled) return;
+        const recognitionState = exhibitDetectionService.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+          ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+          : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
         setIsLoading(false);
-        setError(`Detection service initialization failed: ${error.message}`);
+        setLoadingMessage('');
+        setRecognitionState(recognitionState);
+        setStatusMessage(recognitionState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+          ? `${zoneLabel} needs a one-time connection to prepare recognition.`
+          : `${zoneLabel} recognition could not initialize. The camera remains available.`);
+        console.error(`❌ Recognition initialization failed after ${(performance.now() - startedAt).toFixed(0)}ms:`, error);
       }
     };
 
     initService();
+    exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'ROUTE_MOUNT');
+    return () => {
+      cancelled = true;
+      cameraReadyResolveRef.current?.();
+    };
+  }, [classifierMode]);
+
+  useEffect(() => () => {
+    stopRealTimeDetection();
+    stopCameraStream();
+    if (uploadedObjectUrlRef.current) {
+      URL.revokeObjectURL(uploadedObjectUrlRef.current);
+      uploadedObjectUrlRef.current = null;
+    }
   }, []);
+
+  useEffect(() => {
+    if (!diagnosticsEnabled) return undefined;
+    const timer = window.setInterval(() => setDiagnosticsTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [diagnosticsEnabled]);
+
+  useEffect(() => {
+    if (detectionService && videoRef.current && !detectionIntervalRef.current &&
+        (uploadedVideoRef.current || videoRef.current.srcObject)) {
+      startRealTimeDetection();
+    }
+  }, [detectionService, recognitionState]);
+
+  useEffect(() => {
+    if (!activeExhibit) {
+      explanationRequestRef.current?.abort();
+      explanationRequestRef.current = null;
+      setExplanationState({ status: 'idle', explanation: null, error: null });
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    explanationRequestRef.current?.abort();
+    explanationRequestRef.current = controller;
+    let current = true;
+
+    const loadExplanation = async () => {
+      const cached = await getCachedExhibitExplanation(activeCenter, activeExhibit);
+      if (!current || controller.signal.aborted) return;
+      const localExplanation = getOfflineExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, activeExhibit);
+      setExplanationState({ status: cached || localExplanation ? 'ready' : 'loading', explanation: cached || localExplanation, error: null });
+      try {
+        const explanation = await requestExhibitExplanation({
+          center: activeCenter,
+          recognitionLabel: currentExhibit?.exhibitInfo?.code || activeExhibit,
+          displayName: activeExhibit,
+          signal: controller.signal,
+        });
+        if (!current || controller.signal.aborted) return;
+        await cacheExhibitExplanation(activeCenter, activeExhibit, explanation);
+        if (current) setExplanationState({ status: 'ready', explanation, error: null });
+      } catch (error) {
+        if (!current || controller.signal.aborted) return;
+        setExplanationState({
+          status: localExplanation ? 'offline' : (cached ? 'ready' : 'unavailable'),
+          explanation: cached || localExplanation,
+          error: 'Connection is unstable.',
+        });
+      }
+    };
+
+    const retryWhenOnline = () => loadExplanation();
+    window.addEventListener('online', retryWhenOnline);
+    loadExplanation();
+    return () => {
+      current = false;
+      controller.abort();
+      window.removeEventListener('online', retryWhenOnline);
+    };
+  }, [activeCenter, activeExhibit, currentExhibit?.exhibitInfo?.code]);
 
   // Point-based navigation state (removed drawing system)
   const [currentPathway, setCurrentPathway] = useState('DWT_to_EAP');
@@ -843,48 +1139,173 @@ export default function CameraToNavigationScreenPWA() {
     };
   }, []);
 
-  // Request camera access and start real-time detection
+  // Request camera access for live recognition. Uploaded files take precedence.
   useEffect(() => {
-    if (!showCamera || !videoRef.current) return;
+    if (!showCamera || uploadedVideoRef.current || !videoRef.current) return undefined;
 
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+    let cancelled = false;
+    const startCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        cameraReadyResolveRef.current?.();
+        setError('Camera access is not supported in this browser. Upload a video instead.');
+        return;
+      }
+      try {
+        exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'CAMERA_REQUEST');
+        const cameraStartedAt = performance.now();
+        console.time('camera initialization');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false
+        });
+        if (cancelled || !videoRef.current) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
         }
-      })
-      .then((stream) => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            startRealTimeDetection();
-          };
-        }
-      })
-      .catch((err) => {
-        console.error("Camera error:", err);
-        setError("Camera not accessible");
-      });
-
-    return () => {
-      stopRealTimeDetection();
-      // Clean up camera stream on unmount
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = videoRef.current.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
+        cameraStreamRef.current = stream;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'CAMERA_READY', {
+          elapsedMs: Math.round(performance.now() - cameraStartedAt)
+        });
+        cameraReadyResolveRef.current?.();
+        console.timeEnd('camera initialization');
+        console.log(`⏱️ Camera initialized in ${(performance.now() - cameraStartedAt).toFixed(0)}ms`);
+        if (detectionServiceRef.current) startRealTimeDetection();
+      } catch (cameraError) {
+        cameraReadyResolveRef.current?.();
+        console.error('Camera error:', cameraError);
+        const message = cameraError.name === 'NotAllowedError'
+          ? 'Camera permission was denied. Allow camera access or upload a video.'
+          : 'Camera could not be started. Upload a video instead.';
+        setError(message);
       }
     };
-  }, [showCamera, detectionService]);
+
+    startCamera();
+    return () => {
+      cancelled = true;
+      cameraReadyResolveRef.current?.();
+      stopRealTimeDetection();
+      stopCameraStream();
+    };
+  }, [showCamera]);
+
+  const captureReconLearningCandidate = (detection) => {
+    if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
+    const top1 = detection?.top1 || { class: detection?.exhibit || 'UNKNOWN', confidence: detection?.exhibitConfidence || 0 };
+    const top2 = detection?.top2 || { class: 'UNKNOWN', confidence: 0 };
+    const confidence = Number(top1.confidence || 0);
+    const margin = Number.isFinite(Number(detection?.specificConfidenceGap))
+      ? Number(detection.specificConfidenceGap)
+      : confidence - Number(top2.confidence || 0);
+    const reasons = [];
+    if (confidence < 0.8) reasons.push('LOW_CONFIDENCE');
+    if (margin < 0.15) reasons.push('LOW_MARGIN');
+    if (!detection?.success) reasons.push(detection?.reason || 'REJECTED');
+    if (reasons.length === 0 || Date.now() - lastLearningCaptureAtRef.current < 5000) return;
+
+    lastLearningCaptureAtRef.current = Date.now();
+    return notifyReconLearningObserver(captureLandmarkCandidate, {
+      video: videoRef.current,
+      prediction: {
+        top1: top1.class || 'UNKNOWN',
+        top2: top2.class || 'UNKNOWN',
+        rawScores: detection?.rawScores || null,
+        confidence,
+      },
+      sourceSession: learningSessionRef.current,
+      modelVersion: '20261010-recon-13class-v1',
+      trigger: 'recon_low_confidence_camera',
+      reasons,
+    }, (captureError) => {
+      console.warn('RECON learning capture failed:', captureError.message);
+    }).then((result) => {
+      if (!result) return;
+      if (result.saved) {
+        setLearningCaptureStatus('Low-confidence frame saved for review');
+        window.setTimeout(() => setLearningCaptureStatus(''), 1800);
+      }
+    });
+  };
+
+  // Upload a video file for testing instead of using the live camera
+  const handleVideoUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !videoRef.current) return;
+
+    cameraReadyResolveRef.current?.();
+    setShowCamera(false);
+    stopRealTimeDetection();
+    const video = videoRef.current;
+    exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'VIDEO_UPLOAD_START', { name: file.name });
+    uploadedVideoRef.current = file;
+    stopCameraStream();
+    setError("");
+    if (uploadedObjectUrlRef.current) URL.revokeObjectURL(uploadedObjectUrlRef.current);
+    const objectUrl = URL.createObjectURL(file);
+    if (!objectUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(objectUrl);
+      setError('The selected video could not be loaded.');
+      return;
+    }
+    uploadedObjectUrlRef.current = objectUrl;
+    video.src = objectUrl;
+    video.loop = true;
+    video.muted = true;
+    video.onloadedmetadata = () => {
+      video.play().then(() => {
+        exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'VIDEO_UPLOAD_READY', { name: file.name });
+        startRealTimeDetection();
+      }).catch((playError) => {
+        setError(`Video playback failed: ${playError.message}`);
+      });
+    };
+
+    video.onerror = () => setError('The selected video could not be loaded.');
+  };
+
+  const saveReconCorrection = () => {
+    if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current || !lastDetection) return;
+    const label = correctionLabel || lastDetection.exhibit || lastDetection.top1?.class;
+    if (!label) return;
+    captureCorrectedLandmarkCandidate({
+      video: videoRef.current,
+      prediction: {
+        top1: lastDetection.top1?.class || lastDetection.exhibit || 'UNKNOWN',
+        top2: lastDetection.top2?.class || 'UNKNOWN',
+        rawScores: lastDetection.rawScores || null,
+        confidence: Number(lastDetection.top1?.confidence || lastDetection.exhibitConfidence || 0),
+      },
+      sourceSession: learningSessionRef.current,
+      modelVersion: '20261010-recon-13class-v1',
+      correctedLabel: label,
+    }).then((result) => {
+      setLearningCaptureStatus(result.saved ? `Correction saved for review as ${formatRecognitionLabel(label)}` : `Correction not saved: ${result.reason}`);
+      window.setTimeout(() => setLearningCaptureStatus(''), 2200);
+    }).catch((captureError) => {
+      console.warn('RECON correction capture failed:', captureError.message);
+    });
+  };
 
   // Start real-time detection
   const startRealTimeDetection = () => {
-    if (!detectionService || !videoRef.current) return;
+    if (!detectionService || !videoRef.current ||
+      detectionService.runtimeState !== 'RUNTIME_READY' ||
+      detectionService.zoneStates?.[classifierMode.toLowerCase()] !== `${classifierMode.toUpperCase()}_READY` ||
+        (recognitionState !== EXHIBIT_MODEL_STATES.MODEL_READY &&
+         recognitionState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY)) return;
 
     console.log('🚀 Starting continuous real-time exhibit detection...');
     setStatusMessage('Starting continuous real-time exhibit detection...');
     setIsDetecting(true);
+    exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'INFERENCE_LOOP_START', {
+      source: uploadedVideoRef.current ? 'UPLOAD' : 'CAMERA'
+    });
+    exhibitDetectionService.setCandidateSourceContext({
+      type: uploadedVideoRef.current ? 'video' : 'camera',
+      video: uploadedVideoRef.current?.name || null
+    });
 
     // Run detection every 2 seconds for better performance and stability
     detectionIntervalRef.current = setInterval(async () => {
@@ -947,7 +1368,11 @@ export default function CameraToNavigationScreenPWA() {
   // };
 
   const performDetection = async () => {
-  if (!detectionService || !videoRef.current || detectionInFlightRef.current) return;
+    if (!detectionService || !videoRef.current || detectionInFlightRef.current ||
+      detectionService.runtimeState !== 'RUNTIME_READY' ||
+      detectionService.zoneStates?.[classifierMode.toLowerCase()] !== `${classifierMode.toUpperCase()}_READY` ||
+      (recognitionState !== EXHIBIT_MODEL_STATES.MODEL_READY &&
+       recognitionState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY)) return;
 
   detectionInFlightRef.current = true;
   try {
@@ -956,6 +1381,7 @@ export default function CameraToNavigationScreenPWA() {
       return;
     }
 
+    const frameStartedAt = performance.now();
     console.log("🎯 Starting hierarchical detection...");
     if (!lastDetection) {
       setStatusMessage("Analyzing image...");
@@ -963,15 +1389,74 @@ export default function CameraToNavigationScreenPWA() {
     }
     const detection = await detectionService.detectHierarchical(video);
     setLastDetection(detection);
+    try {
+      captureReconLearningCandidate(detection);
+    } catch (observerError) {
+      console.warn('RECON learning observer skipped:', observerError.message);
+    }
+    if (diagnosticsEnabled) {
+      exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'FRAME_QA', {
+        source: uploadedVideoRef.current?.name || 'CAMERA',
+        zone: classifierMode.toUpperCase(),
+        top1: detection.top1?.class || detection.exhibit || 'UNKNOWN',
+        top2: detection.top2?.class || 'UNKNOWN',
+        confidence: Number(detection.top1?.confidence || detection.exhibitConfidence || 0),
+        margin: Number(detection.specificConfidenceGap || detection.mainConfidenceGap || 0),
+        accepted: Boolean(detection.success),
+        rejectionReason: detection.success ? null : detection.reason || 'REJECTED',
+        processingLatencyMs: Math.round(performance.now() - frameStartedAt),
+        personDetector: detection.personDetector || {
+          available: exhibitDetectionService.faceDetectorStatus === 'READY',
+          status: exhibitDetectionService.faceDetectorStatus
+        }
+      });
+    }
     console.log("✅ Hierarchical detection completed:", detection);
 
     if (!detection.success) {
+      const presentation = classifyRecognitionPresentation(detection);
+      const failedLabel = detection.exhibitInfo?.displayName || detection.exhibit || detection.top1?.exhibit || detection.top1?.class || '';
+      const hasPlausibleCandidate = Boolean(
+        failedLabel && detection.zone && detection.exhibitInfo?.code !== 'EXHIBIT' &&
+        !detection.gateOnly && !detection.isLikelyBackground
+      );
+      const tentativeKey = `${detection.zone}:${presentation.label || failedLabel}`;
+      if (presentation.state === 'tentative' && hasPlausibleCandidate) {
+        tentativeLabelCountRef.current = tentativeLabelRef.current === tentativeKey
+          ? tentativeLabelCountRef.current + 1
+          : 1;
+        tentativeLabelRef.current = tentativeKey;
+        const cooldownElapsed = Date.now() - tentativePromptAtRef.current >= 5000;
+        const newPrompt = tentativePromptKeyRef.current !== tentativeKey;
+        if (tentativeLabelCountRef.current >= 2 && (cooldownElapsed || newPrompt)) {
+          const candidate = {
+            id: detection.exhibitInfo?.number || '00', name: failedLabel,
+            key: (detection.exhibitInfo?.code || detection.exhibit || '').toLowerCase(),
+            zone: detection.zone, exhibitInfo: detection.exhibitInfo,
+            coordinates: detection.coordinates, confidence: presentation.confidence,
+          };
+          setTentativeRecognition({ ...presentation, candidate });
+          tentativePromptAtRef.current = Date.now();
+          tentativePromptKeyRef.current = tentativeKey;
+        }
+      } else {
+        tentativeLabelRef.current = '';
+        tentativeLabelCountRef.current = 0;
+        setTentativeRecognition(null);
+      }
+      pendingLabelRef.current = "";
+      pendingLabelCountRef.current = 0;
+      setCurrentExhibit(null);
+      setStableExhibitDetected(false);
+      setLocationDetected(false);
       acceptStreakRef.current = 0;
       rejectStreakRef.current += 1;
-      if (rejectStreakRef.current >= 2 && !currentExhibit) {
-        setStableExhibitDetected(false);
-        setLocationDetected(false);
-      }
+      setRecognitionDebug({
+        top1: detection.top1 || { class: 'UNKNOWN', confidence: detection.mainConfidence || 0 },
+        top2: detection.top2 || { class: 'UNKNOWN', confidence: 0 },
+        inferenceTime: detection.detectionTime || detection.processingTime || 0,
+        confirmationCount: 0
+      });
 
       if (detection.reason === 'noise_rejected') {
         setStatusMessage(`No exhibit detected (${((detection.exhibitConfidence || 0) * 100).toFixed(1)}% exhibit)`);
@@ -993,6 +1478,12 @@ export default function CameraToNavigationScreenPWA() {
       } else if (detection.reason === 'low_specific_confidence') {
         setStatusMessage(`Exhibit uncertain (${((detection.specificConfidence || 0) * 100).toFixed(1)}% match)`);
         console.log("🚫 Specialist confidence too low.");
+      } else if (detection.reason === 'unknown_exhibit') {
+        setCurrentExhibit(null);
+        setStableExhibitDetected(false);
+        setLocationDetected(false);
+        setStatusMessage('No exhibit detected');
+        console.log("🚫 Unknown exhibit: no confident classifier match.");
       } else if (detection.reason === 'no_exhibit_detected') {
         setStatusMessage(`No exhibit detected (${((detection.maxConfidence || 0) * 100).toFixed(1)}% max confidence)`);
         console.log("🚫 Confidence filter: Low confidence background detected in frame — hiding exhibit.");
@@ -1000,20 +1491,22 @@ export default function CameraToNavigationScreenPWA() {
       } else if (detection.isLikelyBackground) {
         setStatusMessage("Background/noise detected");
         console.log("🚫 Background/noise detected — hiding exhibit.");
-        console.log(`   Main confidence gap: ${(detection.mainConfidenceGap * 100).toFixed(1)}%`);
-        console.log(`   Specific confidence gap: ${(detection.specificConfidenceGap * 100).toFixed(1)}%`);
+        const mainGap = Number.isFinite(detection.mainConfidenceGap) ? detection.mainConfidenceGap : 0;
+        const specificGap = Number.isFinite(detection.specificConfidenceGap)
+          ? detection.specificConfidenceGap
+          : mainGap;
+        console.log(`   Main confidence gap: ${(mainGap * 100).toFixed(1)}%`);
+        console.log(`   Specific confidence gap: ${(specificGap * 100).toFixed(1)}%`);
       } else {
         setStatusMessage("Detection not successful");
         console.log("⚠️ Detection not successful — hiding exhibit.");
       }
+      if (presentation.state === 'tentative') setStatusMessage('');
       setTimeout(() => setStatusMessage(""), 1500);
-      // Keep the last confirmed exhibit visible, matching the reference behavior.
-      // Noise/floor frames should not erase the label at the top of the camera.
       return;
     }
 
     const combinedConfidence = detection.combinedConfidence || detection.zoneConfidence || 0;
-    const SHOW_THRESHOLD = 0.6;
     const detectedName = detection.exhibitInfo?.displayName || detection.exhibit || "";
     const detectedZone = detection.zone || "";
     const hasRealLabel = Boolean(
@@ -1028,10 +1521,29 @@ export default function CameraToNavigationScreenPWA() {
       `🔍 Combined confidence: ${(combinedConfidence * 100).toFixed(1)}% (${detection.zone} / ${detection.exhibitInfo?.displayName || detection.exhibit})`
     );
 
-    if (!hasRealLabel || combinedConfidence < SHOW_THRESHOLD) {
-      console.log("Ignoring detection because it is generic or below the display threshold.");
+    const presentation = classifyRecognitionPresentation(detection);
+    if (!hasRealLabel || presentation.state !== 'confirmed') {
+      pendingLabelRef.current = "";
+      pendingLabelCountRef.current = 0;
+      setCurrentExhibit(null);
+      setStableExhibitDetected(false);
+      setLocationDetected(false);
+      setTentativeRecognition(presentation.state === 'tentative' ? {
+        ...presentation,
+        candidate: {
+          id: detection.exhibitInfo?.number || '00', name: detectedName,
+          key: (detection.exhibitInfo?.code || detection.exhibit || '').toLowerCase(),
+          zone: detectedZone, exhibitInfo: detection.exhibitInfo,
+          coordinates: detection.coordinates, confidence: presentation.confidence,
+        }
+      } : null);
+      console.log("Ignoring detection because it is generic or below the acceptance thresholds.");
       return;
     }
+
+    setTentativeRecognition(null);
+    tentativeLabelRef.current = '';
+    tentativeLabelCountRef.current = 0;
 
     const labelKey = `${detectedZone}:${detectedName}`;
     if (pendingLabelRef.current === labelKey) {
@@ -1041,10 +1553,14 @@ export default function CameraToNavigationScreenPWA() {
       pendingLabelCountRef.current = 1;
     }
 
-    const isSwitchingLabel = Boolean(currentExhibit?.name && currentExhibit.name !== detectedName);
-    const requiredHits = isSwitchingLabel ? 3 : 2;
+    setRecognitionDebug({
+      top1: detection.top1 || { class: detectedName, confidence: combinedConfidence },
+      top2: detection.top2 || { class: 'UNKNOWN', confidence: 0 },
+      inferenceTime: detection.processingTime || 0,
+      confirmationCount: pendingLabelCountRef.current
+    });
 
-    if (pendingLabelCountRef.current >= requiredHits) {
+    if (pendingLabelCountRef.current >= 1) {
       const exhibit = {
         id: detection.exhibitInfo?.number || '00',
         name: detectedName,
@@ -1056,8 +1572,20 @@ export default function CameraToNavigationScreenPWA() {
       };
 
       setCurrentExhibit(exhibit);
+      setActiveExhibit(exhibit.name);
+      if (tourMode && typeof window !== 'undefined') {
+        window.sessionStorage.setItem('activeExhibit', exhibit.name);
+      }
+      const knowledgeEntity = getKnowledgeEntity(detectedZone);
+      if (knowledgeEntity && typeof window !== 'undefined') {
+        window.sessionStorage.setItem('taylorActiveEntity', knowledgeEntity);
+        window.dispatchEvent(new CustomEvent('taylor-active-entity-change', {
+          detail: { activeEntity: knowledgeEntity, confirmed: true }
+        }));
+      }
       setLocationDetected(true);
       setStableExhibitDetected(true);
+      lastAcceptedAtRef.current = Date.now();
       acceptStreakRef.current += 1;
       rejectStreakRef.current = 0;
 
@@ -1089,7 +1617,7 @@ export default function CameraToNavigationScreenPWA() {
       // Initialize the service if not already done
       if (!window.exhibitDetectionService) {
         const { default: exhibitDetectionService } = await import(/* @vite-ignore */ './services/exhibitDetectionService.js?v=' + Date.now());
-        await exhibitDetectionService.initialize();
+        await exhibitDetectionService.initialize({ classifier: classifierMode });
         window.exhibitDetectionService = exhibitDetectionService;
       }
 
@@ -1109,7 +1637,8 @@ export default function CameraToNavigationScreenPWA() {
         console.log('🏛️ Detection result:', detection);
 
         // Handle hierarchical detection results
-        if (detection.success && detection.combinedConfidence > 0.1) {
+        if (detection.success && detection.isRecognized && detection.combinedConfidence >= 0.8 &&
+          (detection.specificConfidenceGap || detection.mainConfidenceGap || 0) >= 0.15) {
           // Create hierarchical exhibit object for manual detection
           const hierarchicalExhibit = {
             id: detection.exhibitInfo.number,
@@ -1124,15 +1653,13 @@ export default function CameraToNavigationScreenPWA() {
           setLocationDetected(true);
           setShowCamera(false);
           setCurrentExhibit(hierarchicalExhibit);
+          setActiveExhibit(hierarchicalExhibit.name);
           console.log(`✅ Manual detection: ${detection.zone} → ${detection.exhibitInfo.displayName} (${(detection.combinedConfidence * 100).toFixed(1)}%)`);
         } else {
-          // If confidence is low, show the best guess but with a warning
-          const bestGuess = exhibitPath[0]; // Default fallback
-
-          setLocationDetected(true);
-          setShowCamera(false);
-          setCurrentExhibit(bestGuess);
-          setError(`Low confidence detection (${(detection.combinedConfidence * 100).toFixed(1)}%). Result may be inaccurate.`);
+          setLocationDetected(false);
+          setCurrentExhibit(null);
+          setStableExhibitDetected(false);
+          setError('No exhibit detected. The classifier was not confident enough.');
         }
       }
 
@@ -1161,28 +1688,11 @@ export default function CameraToNavigationScreenPWA() {
     pendingLabelCountRef.current = 0;
     setError("");
     setLastDetection(null);
-    setShowNavigation(false);
+    setTentativeRecognition(null);
+    setFeedbackMode(null);
+    setFeedbackStatus('');
     // Real-time detection will restart automatically when camera shows
     console.log('🔄 Restarting automatic detection...');
-  };
-
-  const handleShowNavigation = () => {
-    if (currentExhibit) {
-      // Update navigation service with current exhibit
-      const exhibit = aiNavigationService.findExhibitByName(currentExhibit.name);
-      if (exhibit) {
-        aiNavigationService.markExhibitVisited(exhibit.id);
-      }
-    }
-    setShowNavigation(true);
-  };
-
-  const handleBackFromNavigation = () => {
-    setShowNavigation(false);
-  };
-
-  const handleExhibitSelect = (exhibit) => {
-    console.log('Selected exhibit for navigation:', exhibit);
   };
 
   // Get unique map image for current exhibit (from React Native implementation)
@@ -1366,21 +1876,131 @@ export default function CameraToNavigationScreenPWA() {
     setCurrentExhibit(next);
   };
 
-  const navigationInfo = { distance: 120, steps: 160, direction: "North-East" };
+  const scanAnotherExhibit = () => {
+    setActiveExhibit(null);
+    setCurrentExhibit(null);
+    setLastDetection(null);
+    setTentativeRecognition(null);
+    setFeedbackMode(null);
+    setFeedbackStatus('');
+    setStableExhibitDetected(false);
+    setLocationDetected(false);
+    pendingLabelRef.current = '';
+    pendingLabelCountRef.current = 0;
+    acceptStreakRef.current = 0;
+    rejectStreakRef.current = 0;
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem('activeExhibit');
+  };
 
-  // Show navigation if requested
-  if (showNavigation) {
-    return (
-      <AINavigation
-        onBack={handleBackFromNavigation}
-        detectedExhibit={currentExhibit}
-        onExhibitSelect={handleExhibitSelect}
-      />
-    );
-  }
+  const navigationInfo = { distance: 120, steps: 160, direction: "North-East" };
+  const displayedActiveExhibit = activeExhibit || (
+    !tentativeRecognition && currentExhibit?.name ? currentExhibit.name : null
+  );
+  const activeExhibitInformation = displayedActiveExhibit
+    ? explanationState.explanation || getVerifiedExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, displayedActiveExhibit)
+    : null;
+  const explanationText = activeExhibitInformation
+    ? `${activeExhibitInformation.whatIsIt} ${activeExhibitInformation.purpose}`
+    : '';
+
+  const listenToExplanation = () => {
+    if (explanationText) textToSpeech(explanationText, false, 'taylor', 'en');
+  };
 
   return (
     <div style={{ flex: 1, position: "relative", height: "100vh", overflow: "hidden" }}>
+      {tourMode && (
+        <>
+          <header className="exhibit-tour-header" data-testid="exhibit-tour-panel">
+            <button className="exhibit-tour-header__exit" onClick={() => navigate(-1)} aria-label="Exit tour">
+              <FiArrowLeft aria-hidden="true" />
+              <span>Exit Tour</span>
+            </button>
+            <div className="exhibit-tour-header__title">{activeCenter} EXHIBIT TOUR</div>
+            <div className={`exhibit-tour-header__state${activeExhibit ? ' is-recognized' : ''}`}>
+              <span aria-hidden="true">●</span> {activeExhibit ? 'Recognized' : 'Searching...'}
+            </div>
+          </header>
+          {!displayedActiveExhibit ? (
+            <div className="exhibit-tour-searching" aria-live="polite">
+              <div className="exhibit-tour-reticle" aria-hidden="true">⌾</div>
+              <strong>Aim at an exhibit</strong>
+              <span>Searching...</span>
+            </div>
+          ) : (
+            <section className="exhibit-tour-sheet" aria-live="polite">
+              <div className="exhibit-tour-sheet__handle" aria-hidden="true" />
+              <div className="exhibit-tour-panel__recognized">✓ EXHIBIT RECOGNIZED</div>
+              <h2>{formatRecognitionLabel(displayedActiveExhibit)}</h2>
+              {activeExhibitInformation ? (
+                <div className="exhibit-explanation" aria-live="polite">
+                  <strong>What is it?</strong>
+                  <p>{activeExhibitInformation.whatIsIt}</p>
+                  <strong>What is it used for?</strong>
+                  <p>{activeExhibitInformation.purpose}</p>
+                </div>
+              ) : explanationState.status === 'loading' ? (
+                <p className="exhibit-explanation__unavailable">
+                  TAYLOR is preparing your explanation. The exhibit has been identified successfully.
+                </p>
+              ) : (
+                <p className="exhibit-explanation__unavailable">
+                  TAYLOR could not retrieve verified exhibit details right now. Connection is unstable; the explanation will appear automatically when a connection becomes available.
+                </p>
+              )}
+              <div className="exhibit-tour-panel__actions">
+                {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
+                <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
+                  Ask TAYLOR
+                </button>
+                {!activeExhibitInformation && <button onClick={() => window.dispatchEvent(new Event('online'))}>Retry Explanation</button>}
+                <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
+              </div>
+            </section>
+          )}
+          {!displayedActiveExhibit && <div className="exhibit-tour-search-status">Searching for an exhibit...</div>}
+        </>
+      )}
+      {!tourMode && specialistRoute && displayedActiveExhibit && (
+        <section className="exhibit-tour-sheet exhibit-direct-information" aria-live="polite">
+          <div className="exhibit-tour-panel__recognized">EXHIBIT RECOGNIZED</div>
+          <h2>{formatRecognitionLabel(displayedActiveExhibit)}</h2>
+          {activeExhibitInformation ? (
+            <div className="exhibit-explanation" aria-live="polite">
+              <strong>What is it?</strong>
+              <p>{activeExhibitInformation.whatIsIt}</p>
+              <strong>What is it used for?</strong>
+              <p>{activeExhibitInformation.purpose}</p>
+            </div>
+          ) : (
+            <p className="exhibit-explanation__unavailable">
+              TAYLOR is preparing your explanation. The exhibit has been identified successfully.
+            </p>
+          )}
+          <div className="exhibit-tour-panel__actions">
+            {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
+            <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
+              Ask TAYLOR
+            </button>
+            {classifierMode.toLowerCase() === 'recon' && learningConsent && !uploadedVideoRef.current && (
+              <>
+                <select
+                  aria-label="Correct RECON prediction"
+                  value={correctionLabel}
+                  onChange={(event) => setCorrectionLabel(event.target.value)}
+                >
+                  <option value="">Correct prediction...</option>
+                  {RECON_CORRECTION_LABELS.map((label) => (
+                    <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
+                  ))}
+                </select>
+                <button onClick={saveReconCorrection} disabled={!correctionLabel}>Save correction</button>
+              </>
+            )}
+            <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
+          </div>
+        </section>
+      )}
       {isLoading && (
         <div style={{ position: "absolute",
       top: 32,
@@ -1397,25 +2017,25 @@ export default function CameraToNavigationScreenPWA() {
           {loadingMessage}
         </div>
     )}
-    {false && statusMessage && (
+    {statusMessage && (
   <div style={{
     position: "absolute",
-    top: isLoading ? 72 : 32,
+    top: isLoading ? 76 : 32,
     left: "50%",
     transform: "translateX(-50%)",
     background: "rgba(255,255,200,0.95)",
     borderRadius: 8,
     zIndex: 1200,
     padding: "12px 26px",
-    fontWeight: "bold",
-    fontSize: 16,
+    fontWeight: 600,
+    fontSize: 13,
     color: "#444",
     boxShadow: "0 2px 12px rgba(0,0,0,0.10)"
   }}>
     {statusMessage}
   </div>
 )}
-    {getStableExhibitLabel() && (
+    {!tourMode && getStableExhibitLabel() && (
   <div style={{
     position: "absolute",
     top: isLoading ? 120 : 32,
@@ -1450,7 +2070,247 @@ export default function CameraToNavigationScreenPWA() {
     </div>
   </div>
 )}
-      {/* Always-on Camera */}
+    {diagnosticsEnabled && recognitionDebug && (
+      <div style={{
+        position: "absolute",
+        left: 12,
+        bottom: 12,
+        zIndex: 1300,
+        background: "rgba(0,0,0,0.72)",
+        color: "#fff",
+        borderRadius: 6,
+        padding: "8px 10px",
+        fontSize: 11,
+        lineHeight: 1.45,
+        fontFamily: "monospace"
+      }}>
+        <div>Top 1: {recognitionDebug.top1.class} {(recognitionDebug.top1.confidence * 100).toFixed(1)}%</div>
+        <div>Top 2: {recognitionDebug.top2.class} {(recognitionDebug.top2.confidence * 100).toFixed(1)}%</div>
+        <div>Inference: {Number(recognitionDebug.inferenceTime || 0).toFixed(0)} ms</div>
+        <div>Confirmation: {recognitionDebug.confirmationCount}/3</div>
+      </div>
+    )}
+    {tentativeRecognition && !currentExhibit && (
+      <div style={{
+        position: "absolute",
+        top: isLoading ? 120 : 32,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "rgba(255, 248, 220, 0.96)",
+        border: "1px solid rgba(126, 91, 20, 0.45)",
+        borderRadius: 8,
+        zIndex: 1200,
+        padding: "10px 18px",
+        color: "#513d13",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+        textAlign: "center",
+        minWidth: 210,
+        maxWidth: "86vw"
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>
+          AI IS UNSURE
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 700, overflowWrap: "anywhere" }}>
+          {tentativeRecognition.alternatives.map(formatRecognitionLabel).join(' or ')}
+        </div>
+        <div style={{ fontSize: 12, marginTop: 4 }}>
+          {(tentativeRecognition.confidence * 100).toFixed(1)}% match. Move closer or adjust the camera.
+        </div>
+      </div>
+    )}
+    {feedbackVisible && (
+      <div style={{
+        position: "absolute",
+        left: "50%",
+        bottom: 24,
+        transform: "translateX(-50%)",
+        zIndex: 1501,
+        pointerEvents: "auto",
+        width: "min(440px, 90vw)",
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "rgba(0, 0, 0, 0.78)",
+        color: "#fff",
+        textAlign: "center",
+        boxSizing: "border-box"
+      }}>
+        {tentativeRecognition ? (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 5 }}>Is this the correct exhibit?</div>
+            <div style={{ fontSize: 12, marginBottom: 7 }}>
+              {tentativeRecognition.alternatives.map(formatRecognitionLabel).join(' or ')}
+              {' '}({(tentativeRecognition.confidence * 100).toFixed(1)}%, margin {(tentativeRecognition.margin * 100).toFixed(1)}%)
+            </div>
+            {feedbackMode === 'wrong' ? (
+              <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+                <select
+                  aria-label="Correct exhibit"
+                  value={feedbackCorrectionLabel}
+                  onChange={(event) => setFeedbackCorrectionLabel(event.target.value)}
+                  style={{ maxWidth: "100%", minHeight: 32 }}
+                >
+                  <option value="">Choose the correct exhibit</option>
+                  {approvedFeedbackLabels.map((label) => (
+                    <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => submitFeedback('WRONG_EXHIBIT', feedbackCorrectionLabel)} disabled={!feedbackCorrectionLabel}>Save correction</button>
+                <button type="button" onClick={() => setFeedbackMode(null)}>Cancel</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
+                <button type="button" onClick={confirmTentativeRecognition}>Confirm</button>
+                <button type="button" onClick={handleWrongExhibit}>Wrong Exhibit</button>
+                <button type="button" onClick={continueScanning}>Continue Scanning</button>
+              </div>
+            )}
+          </>
+        ) : feedbackMode === 'wrong' ? (
+          <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+            <select
+              aria-label="Correct exhibit"
+              value={feedbackCorrectionLabel}
+              onChange={(event) => setFeedbackCorrectionLabel(event.target.value)}
+              style={{ maxWidth: "100%", minHeight: 32 }}
+            >
+              <option value="">Choose the correct exhibit</option>
+              {approvedFeedbackLabels.map((label) => (
+                <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => submitFeedback('WRONG_EXHIBIT', feedbackCorrectionLabel)}
+              disabled={!feedbackCorrectionLabel}
+            >Save correction</button>
+            <button type="button" onClick={() => setFeedbackMode(null)}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
+            <button type="button" onClick={() => submitFeedback('CORRECT')}>Correct</button>
+            <button type="button" onClick={handleWrongExhibit}>Wrong Exhibit</button>
+            <button type="button" onClick={() => submitFeedback('NOT_SURE')}>Not Sure</button>
+          </div>
+        )}
+        {feedbackStatus && <div style={{ fontSize: 11, marginTop: 7 }} aria-live="polite">{feedbackStatus}</div>}
+      </div>
+    )}
+    {diagnosticsEnabled && (
+      <div
+        data-testid="recognition-diagnostics"
+        style={{
+          position: "absolute",
+          right: 12,
+          bottom: 12,
+          zIndex: 1300,
+          background: "rgba(0,0,0,0.82)",
+          color: "#fff",
+          borderRadius: 6,
+          padding: "9px 11px",
+          fontSize: 11,
+          lineHeight: 1.45,
+          fontFamily: "monospace",
+          minWidth: 210
+        }}
+      >
+        <div>Current zone: {classifierMode.toUpperCase()}</div>
+        <div>Camera: {cameraReady ? 'READY' : 'WAITING'}</div>
+        <div>Runtime: {exhibitDetectionService.runtimeState}</div>
+        <div>Model: {zoneReadyState}</div>
+        <div>Source: {currentZoneSource}</div>
+        <div>Model URL: {exhibitDetectionService.initializationDiagnostics.modelUrl || 'Pending'}</div>
+        <div>Model source: {exhibitDetectionService.initializationDiagnostics.modelSource || 'Pending'}</div>
+        <div>Init start: {Math.round(exhibitDetectionService.initializationDiagnostics.initializationStart || 0)}</div>
+        <div>Init end: {Math.round(exhibitDetectionService.initializationDiagnostics.initializationEnd || 0)}</div>
+        <div>Runtime/backend: {exhibitDetectionService.initializationDiagnostics.runtime}/{exhibitDetectionService.initializationDiagnostics.backend}</div>
+        {exhibitDetectionService.initializationDiagnostics.exceptionMessage && (
+          <>
+            <div>Exception: {exhibitDetectionService.initializationDiagnostics.exceptionName}</div>
+            <div>Message: {exhibitDetectionService.initializationDiagnostics.exceptionMessage}</div>
+            <details><summary>Stack</summary><div>{exhibitDetectionService.initializationDiagnostics.stack}</div></details>
+          </>
+        )}
+        <div>Inference: {isDetecting ? 'RUNNING' : 'WAITING'}</div>
+        <div>Last inference: {Number(recognitionDebug?.inferenceTime || 0).toFixed(0)} ms</div>
+        <div>Cache:</div>
+        {currentResourceDiagnostics.map(([resource, diagnostic]) => (
+          <div key={resource}>
+            {resource.split('/').pop().split('?')[0]}: {diagnostic.status}
+          </div>
+        ))}
+        <div>Lifecycle:</div>
+        {(exhibitDetectionService.getZoneDiagnostics(currentZoneKey) || []).map((diagnostic, index) => (
+          <div key={`${diagnostic.event}-${diagnostic.timestamp}-${index}`}>
+            {diagnostic.event}: {diagnostic.elapsedMs} ms
+          </div>
+        ))}
+        <div aria-hidden="true">refresh:{diagnosticsTick}</div>
+      </div>
+    )}
+      {/* Upload video for testing (replaces the live camera feed) */}
+      {!tourMode && <div style={{
+        position: "absolute",
+        top: 12,
+        right: 12,
+        zIndex: 1300,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-end",
+        gap: 8,
+      }}>
+        {classifierMode.toLowerCase() === 'recon' && (
+          <label style={{
+            background: "rgba(0,0,0,0.72)",
+            color: "#fff",
+            borderRadius: 8,
+            padding: "8px 12px",
+            fontSize: 12,
+            cursor: "pointer",
+          }}>
+            <input
+              type="checkbox"
+              checked={learningConsent}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setLearningConsent(enabled);
+                setLandmarkLearningConsent(enabled);
+              }}
+              style={{ marginRight: 7 }}
+            />
+            Improve RECON from uncertain camera frames
+          </label>
+        )}
+        {learningCaptureStatus && (
+          <div style={{
+            background: "rgba(18, 92, 58, 0.9)",
+            color: "#fff",
+            borderRadius: 8,
+            padding: "7px 10px",
+            fontSize: 12,
+          }}>
+            {learningCaptureStatus}
+          </div>
+        )}
+        <label style={{
+          background: "rgba(0,0,0,0.72)",
+          color: "#fff",
+          borderRadius: 8,
+          padding: "8px 14px",
+          fontSize: 13,
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}>
+          Upload test video
+          <input
+            type="file"
+            accept="video/*"
+            onChange={handleVideoUpload}
+            style={{ display: "none" }}
+          />
+        </label>
+      </div>}
+
+      {/* Video element now driven by an uploaded file instead of the live camera */}
       <video
         ref={videoRef}
         autoPlay

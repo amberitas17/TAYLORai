@@ -5,13 +5,69 @@
 
 import * as tf from '@tensorflow/tfjs';
 import * as ort from 'onnxruntime-web';
+import * as faceapi from 'face-api.js';
+import { exhibitImprovementCandidateStore } from './exhibitImprovementCandidateStore.js';
+
+export const EXHIBIT_MODEL_STATES = Object.freeze({
+    CAMERA_READY: 'CAMERA_READY',
+    MODEL_LOADING: 'MODEL_LOADING',
+    MODEL_READY: 'MODEL_READY',
+    OFFLINE_MODEL_READY: 'OFFLINE_MODEL_READY',
+    MODEL_NOT_PREPARED: 'MODEL_NOT_PREPARED',
+    MODEL_DOWNLOAD_REQUIRED: 'MODEL_DOWNLOAD_REQUIRED',
+    MODEL_LOAD_ERROR: 'MODEL_LOAD_ERROR'
+});
+
+export const EXHIBIT_ZONE_STATES = Object.freeze({
+    FABLAB_READY: 'FABLAB_READY',
+    ARICC_READY: 'ARICC_READY',
+    RECON_READY: 'RECON_READY',
+    CAESAR_READY: 'CAESAR_READY'
+});
+
+export const MODEL_ASSET_VERSION = '20261010-recon-13class-v1';
+const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
+const MODEL_REQUEST_TIMEOUT_MS = 8000;
+const MODEL_RETRY_DELAYS_MS = [500, 1500, 3500];
+const RECOGNITION_MIN_CONFIDENCE = 0.80;
+const RECOGNITION_MIN_MARGIN = 0.15;
+const RUNTIME_ASSETS = [
+    '/ort/ort-wasm.wasm',
+    '/ort/ort-wasm-simd.wasm',
+    '/ort/ort-wasm-simd-threaded.wasm',
+    '/ort/ort-wasm-simd-threaded.jsep.wasm'
+];
+const ZONE_RESOURCES = Object.freeze({
+    fablab: [
+        ['/models/fablab/fablab_classifier.onnx', 'fablab_classifier.onnx'],
+        ['/models/fablab/fablab_classifier_metadata.json', 'fablab_classifier_metadata.json']
+    ],
+    aricc: [
+        ['/models/aricc/aricc_classifier.onnx', 'aricc_classifier.onnx'],
+        ['/models/aricc/aricc_classifier_metadata.json', 'aricc_classifier_metadata.json']
+    ],
+    recon: [
+        ['/models/recon/recon_classifier.onnx', 'recon_classifier.onnx'],
+        ['/models/recon/recon_classifier_metadata.json', 'recon_classifier_metadata.json']
+    ],
+    caesar: [
+        ['/models/caesar/caesar_classifier.onnx', 'caesar_classifier.onnx'],
+        ['/models/caesar/caesar_classifier_metadata.json', 'caesar_classifier_metadata.json']
+    ]
+});
+const SHARED_RESOURCES = [
+    ['/models/exhibit_gate/exhibit_gate.onnx', 'exhibit_gate.onnx'],
+    ['/models/exhibit_gate/exhibit_gate_metadata.json', 'exhibit_gate_metadata.json'],
+    ['/models/exhibit_gate/gate_similarity_index.json', 'gate_similarity_index.json'],
+    ['/models/faceapi/tiny_face_detector_model-weights_manifest.json', 'tiny_face_detector_model-weights_manifest.json'],
+    ['/models/faceapi/tiny_face_detector_model-shard1', 'tiny_face_detector_model-shard1']
+];
 
 // Configure ORT-Web to use matching WASM files (OpenAI solution)
 console.log('🔧 Configuring ORT-Web with matching WASM files...');
 
-// Tell ORT exactly where to find the matching .wasm files for THIS version
-// Use CDN for reliable access to matching WASM files
-ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.0/dist/';
+// Keep the inference runtime local so a cached model does not depend on WAN access.
+ort.env.wasm.wasmPaths = '/ort/';
 console.log('wasmPaths:', ort.env.wasm.wasmPaths);
 
 // Keep SIMD on; disable threads unless you have COOP/COEP
@@ -35,6 +91,10 @@ class ExhibitDetectionService {
         this.dwtModel = null;  // Dialogue with Time classifier
         this.eapModel = null;  // Earth Alive Planet classifier
         this.egnModel = null;  // Energy Story classifier
+        this.ariccModel = null; // ARICC exhibit classifier
+        this.reconModel = null; // RECON Center exhibit classifier
+        this.fablabModel = null; // FABLAB equipment classifier
+        this.caesarModel = null; // CAESAR equipment classifier
         this.macModel = null;  // Mechanics Alive classifier
         this.mepModel = null;  // Mind Eye classifier
         this.qsModel = null;   // Quanta School classifier
@@ -62,6 +122,10 @@ class ExhibitDetectionService {
         this.dwtMetadata = null;
         this.eapMetadata = null;
         this.egnMetadata = null;
+        this.ariccMetadata = null;
+        this.reconMetadata = null;
+        this.fablabMetadata = null;
+        this.caesarMetadata = null;
         this.macMetadata = null;
         this.mepMetadata = null;
         this.qsMetadata = null;
@@ -83,7 +147,7 @@ class ExhibitDetectionService {
         this.isInitialized = false;
         this.backendUrl = 'http://localhost:5000';
         this.realMetadataPath = '/models/exhibit_metadata.json';
-        this.useSimilarityGate = false;
+        this.useSimilarityGate = true;
         this.gateConfig = {
             inputSize: 224,
             threshold: 0.5,
@@ -92,6 +156,60 @@ class ExhibitDetectionService {
         };
         this.rejectedFrameLogKey = 'scienceCentreRejectedFrames';
         this.rejectedFrameLogLimit = 50;
+        this.candidateSourceContext = {
+            type: null,
+            sessionId: `exhibit-session-${globalThis.crypto?.randomUUID?.() || Date.now().toString(36)}`,
+            video: null
+        };
+        this.candidateTemporalHistory = new Map();
+        this.candidateRejectionCounts = new Map();
+        this.classifierMode = 'aricc';
+        this.initializedMode = null;
+        this.faceDetectorReady = false;
+        this.faceDetectorLoad = null;
+        this.faceDetectorStatus = 'UNAVAILABLE';
+        this.faceDetectorError = null;
+        this.firstInferenceLogged = false;
+        this.modelState = EXHIBIT_MODEL_STATES.CAMERA_READY;
+        this.modelLoadStartedAt = 0;
+        this.modelLoadTimeMs = 0;
+        this.modelCacheHits = 0;
+        this.modelNetworkDownloads = 0;
+        this.runtimeState = 'RUNTIME_LOADING';
+        this.zoneStates = {
+            fablab: 'MODEL_LOADING',
+            aricc: 'MODEL_LOADING',
+            recon: 'MODEL_LOADING',
+            caesar: 'MODEL_LOADING'
+        };
+        this.resourceDiagnostics = {};
+        this.zoneDiagnostics = {
+            fablab: [],
+            aricc: [],
+            recon: [],
+            caesar: []
+        };
+        this.zoneDiagnosticStarts = new Map();
+        this.runtimeReadyPromise = null;
+        this.zoneLoadPromises = new Map();
+        this.initializationPromises = new Map();
+        this.initializationGeneration = 0;
+        this.initializationDiagnostics = {
+            route: '',
+            modelUrl: '',
+            modelSource: '',
+            runtime: 'onnxruntime-web',
+            backend: 'wasm',
+            initializationStart: 0,
+            initializationEnd: 0,
+            exceptionName: '',
+            exceptionMessage: '',
+            stack: ''
+        };
+        this.prefetchPromise = null;
+        this.cacheOnly = false;
+        this.zoneResourceCacheMisses = new Set();
+        this.firstInferenceLoggedZones = new Set();
 
         // Model configuration (will be updated from real metadata)
         this.config = {
@@ -152,32 +270,498 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     ctx.restore();
 }
 
-    async initialize() {
+    initialize(options = {}) {
+        const requestedMode = options.classifier || 'aricc';
+        if (this.isInitialized && this.initializedMode === requestedMode) {
+            return Promise.resolve();
+        }
+        const existingPromise = this.initializationPromises.get(requestedMode);
+        if (existingPromise) return existingPromise;
+
+        const generation = ++this.initializationGeneration;
+        this.isInitialized = false;
+        this.initializedMode = null;
+        const initializationPromise = this.initializeMode({ ...options, generation })
+            .finally(() => {
+                if (this.initializationPromises.get(requestedMode) === initializationPromise) {
+                    this.initializationPromises.delete(requestedMode);
+                }
+            });
+        this.initializationPromises.set(requestedMode, initializationPromise);
+        return initializationPromise;
+    }
+
+    async initializeMode(options = {}) {
+        const requestedMode = options.classifier || 'aricc';
+        const generation = options.generation || this.initializationGeneration;
+        const initializationStartedAt = performance.now();
+        this.zoneDiagnosticStarts.set(requestedMode, initializationStartedAt);
+        this.initializationDiagnostics = {
+            ...this.initializationDiagnostics,
+            route: `/machine-vision-${requestedMode}`,
+            modelUrl: '',
+            modelSource: '',
+            initializationStart: initializationStartedAt,
+            initializationEnd: 0,
+            exceptionName: '',
+            exceptionMessage: '',
+            stack: ''
+        };
+        this.modelState = EXHIBIT_MODEL_STATES.MODEL_LOADING;
+        this.modelLoadStartedAt = initializationStartedAt;
+        this.modelCacheHits = 0;
+        this.modelNetworkDownloads = 0;
+        this.cacheOnly = Boolean(options.cacheOnly);
         try {
-            console.log('🎯 Initializing exhibit detection service with ONNX model...');
+            console.log('🎯 Model initialization start', {
+                modelVersion: MODEL_ASSET_VERSION,
+                classifier: requestedMode,
+                modelState: this.modelState,
+                wasmPath: ort.env.wasm.wasmPaths
+            });
 
-            // Load the binary gate, main exhibit classifier, and legacy specialists.
-            console.log('🔄 Loading exhibit gate and main classifier');
+            console.log('🔄 Loading shared runtime, exhibit gate, and current zone model');
 
-            await this.loadExhibitGateModel();
+            await this.ensureRuntimeReady();
+            const runtimeStatuses = RUNTIME_ASSETS.map((resource) => this.resourceDiagnostics[resource]?.status);
+            this.recordZoneDiagnostic(requestedMode,
+                runtimeStatuses.every((status) => status === 'HIT') ? 'RUNTIME_CACHE_HIT' : 'RUNTIME_CACHE_MISS',
+                { runtimeState: this.runtimeState, resources: RUNTIME_ASSETS });
 
-            try {
-                await this.loadMainModel();
-                this.gateOnlyMode = false;
-                await this.loadSpecialistModels();
-            } catch (mainModelError) {
-                console.warn('Main exhibit classifier failed to load; continuing in gate-only mode:', mainModelError.message);
-                this.gateOnlyMode = true;
+            if (!this.gateModel) {
+                await this.loadExhibitGateModel();
             }
 
-            this.isInitialized = true;
-            console.log('✅ Exhibit detection service initialized with ONNX model');
+            await this.loadFaceDetector(requestedMode);
 
+            if (requestedMode === 'recon') {
+                await this.loadReconModel();
+                this.zoneStates.recon = EXHIBIT_ZONE_STATES.RECON_READY;
+                this.gateOnlyMode = false;
+            } else if (requestedMode === 'aricc') {
+                this.gateOnlyMode = false;
+                await this.loadSpecialistModels({ labels: ['ARICC'] });
+                this.zoneStates.aricc = EXHIBIT_ZONE_STATES.ARICC_READY;
+            } else if (requestedMode === 'fablab') {
+                this.gateOnlyMode = false;
+                await this.loadFablabModel();
+                this.zoneStates.fablab = EXHIBIT_ZONE_STATES.FABLAB_READY;
+            } else if (requestedMode === 'caesar') {
+                this.gateOnlyMode = false;
+                await this.loadCaesarModel();
+                this.zoneStates.caesar = EXHIBIT_ZONE_STATES.CAESAR_READY;
+            } else {
+                try {
+                    if (!this.model) {
+                        await this.loadMainModel();
+                    }
+                    this.gateOnlyMode = false;
+                    await this.loadSpecialistModels();
+                } catch (mainModelError) {
+                    console.warn('Main exhibit classifier failed to load; continuing in gate-only mode:', mainModelError.message);
+                    this.gateOnlyMode = true;
+                }
+            }
+
+            this.zoneResourceCacheMisses.delete(requestedMode);
+
+            if (generation !== this.initializationGeneration) {
+                console.info('Ignoring stale recognition initialization completion', { requestedMode, generation });
+                return;
+            }
+            this.classifierMode = requestedMode;
+            this.isInitialized = true;
+            this.initializedMode = requestedMode;
+            this.modelState = this.modelNetworkDownloads === 0
+                ? EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY
+                : EXHIBIT_MODEL_STATES.MODEL_READY;
+            this.modelLoadTimeMs = performance.now() - initializationStartedAt;
+            this.initializationDiagnostics.initializationEnd = performance.now();
+            this.recordZoneDiagnostic(requestedMode, 'ZONE_READY', {
+                modelState: this.modelState,
+                cacheHits: this.modelCacheHits,
+                networkDownloads: this.modelNetworkDownloads
+            });
+            console.log(`✅ Model initialization end in ${(performance.now() - initializationStartedAt).toFixed(0)}ms`, {
+                modelVersion: MODEL_ASSET_VERSION,
+                modelState: this.modelState,
+                loadTimeMs: Math.round(this.modelLoadTimeMs),
+                cacheHits: this.modelCacheHits,
+                networkDownloads: this.modelNetworkDownloads
+            });
         } catch (error) {
-            console.error('❌ ONNX model initialization failed:', error);
-            console.error('🚫 ONNX model must work - no fallbacks!');
+            if (generation !== this.initializationGeneration) {
+                console.info('Ignoring stale recognition initialization error', { requestedMode, generation });
+                throw error;
+            }
+            let initializationError = error;
+            this.zoneStates[requestedMode] = this.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+                ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+                : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
+            if (!options.cacheOnly && !options.retry) {
+                console.warn('⚠️ Retrying recognition initialization from local cache', error.message);
+                try {
+                    return await this.initializeMode({ ...options, retry: true, cacheOnly: true, generation });
+                } catch (cacheRetryError) {
+                    initializationError = cacheRetryError;
+                }
+            }
+            this.modelState = this.zoneResourceCacheMisses.has(requestedMode) || initializationError.code === 'MODEL_DOWNLOAD_REQUIRED'
+                ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+                : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
+            this.zoneStates[requestedMode] = this.modelState;
+            this.recordZoneDiagnostic(requestedMode, this.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
+                ? 'MODEL_CACHE_MISS'
+                : 'SESSION_CREATE_FAIL', { message: initializationError.message });
+            console.error('❌ ONNX model initialization failed:', initializationError);
+            console.error('❌ Model-loading error', {
+                modelVersion: MODEL_ASSET_VERSION,
+                modelState: this.modelState,
+                cacheHits: this.modelCacheHits,
+                networkDownloads: this.modelNetworkDownloads,
+                elapsedMs: Math.round(performance.now() - initializationStartedAt),
+                message: initializationError.message
+            });
+            this.initializationDiagnostics = {
+                ...this.initializationDiagnostics,
+                initializationEnd: performance.now(),
+                exceptionName: initializationError.name || 'Error',
+                exceptionMessage: initializationError.message || String(initializationError),
+                stack: initializationError.stack || ''
+            };
+            throw initializationError;
+        }
+    }
+
+    async ensureRuntimeReady() {
+        if (this.runtimeReadyPromise) return this.runtimeReadyPromise;
+        this.runtimeReadyPromise = (async () => {
+            console.log('🔧 Runtime initialization start', { wasmPath: ort.env.wasm.wasmPaths });
+            await Promise.all(RUNTIME_ASSETS.map((url) => this.fetchModelResource(url, { cacheKey: url })));
+            this.runtimeState = 'RUNTIME_READY';
+            console.log('✅ Runtime initialization end', { runtimeState: this.runtimeState });
+        })().catch((error) => {
+            this.runtimeState = 'RUNTIME_LOAD_ERROR';
+            this.runtimeReadyPromise = null;
+            throw error;
+        });
+        return this.runtimeReadyPromise;
+    }
+
+    getZoneState(zone) {
+        return this.zoneStates[zone] || 'MODEL_LOAD_ERROR';
+    }
+
+    recordZoneDiagnostic(zone, event, details = {}) {
+        const normalizedZone = String(zone || this.classifierMode || '').toLowerCase();
+        if (!this.zoneDiagnostics[normalizedZone]) return;
+        const start = this.zoneDiagnosticStarts.get(normalizedZone) || performance.now();
+        const entry = {
+            event: `${normalizedZone.toUpperCase()}_${event}`,
+            zone: normalizedZone.toUpperCase(),
+            elapsedMs: Math.round(performance.now() - start),
+            timestamp: new Date().toISOString(),
+            ...details
+        };
+        this.zoneDiagnostics[normalizedZone] = [
+            ...this.zoneDiagnostics[normalizedZone].slice(-99),
+            entry
+        ];
+        if (typeof window !== 'undefined') {
+            window.taylorExhibitDiagnostics = this.zoneDiagnostics;
+        }
+        return entry;
+    }
+
+    getZoneDiagnostics(zone) {
+        return this.zoneDiagnostics[String(zone || '').toLowerCase()] || [];
+    }
+
+    async prefetchAllZoneModels() {
+        if (this.prefetchPromise) return this.prefetchPromise;
+        this.prefetchPromise = (async () => {
+            console.log('📦 Background recognition prefetch start', { zones: Object.keys(ZONE_RESOURCES) });
+            const resources = [...SHARED_RESOURCES, ...Object.values(ZONE_RESOURCES).flat()];
+            await Promise.all(resources.map(async ([url, label]) => {
+                try {
+                    await this.fetchModelResource(url, { cacheKey: url, prefetch: true });
+                    console.log(`[CACHE] ${label} READY`);
+                } catch (error) {
+                    console.warn(`[CACHE] ${label} PREFETCH_FAILED`, error.message);
+                }
+            }));
+            console.log('✅ Background recognition prefetch end');
+        })().finally(() => {
+            this.prefetchPromise = null;
+        });
+        return this.prefetchPromise;
+    }
+
+    async loadFaceDetector(diagnosticZone = this.classifierMode) {
+        if (this.faceDetectorReady) return;
+        this.faceDetectorStatus = 'LOADING';
+        this.faceDetectorError = null;
+        if (!this.faceDetectorLoad) {
+            this.faceDetectorLoad = faceapi.nets.tinyFaceDetector.loadFromUri('/models/faceapi')
+                .then(() => {
+                    this.faceDetectorReady = true;
+                    this.faceDetectorStatus = 'READY';
+                    this.recordZoneDiagnostic(diagnosticZone, 'FACE_DETECTOR_READY', { status: this.faceDetectorStatus });
+                    console.log('✅ Tiny face detector loaded for person rejection');
+                })
+                .catch(error => {
+                    this.faceDetectorLoad = null;
+                    this.faceDetectorReady = false;
+                    this.faceDetectorStatus = 'UNAVAILABLE';
+                    this.faceDetectorError = error.message;
+                    this.recordZoneDiagnostic(diagnosticZone, 'FACE_DETECTOR_UNAVAILABLE', {
+                        status: this.faceDetectorStatus,
+                        message: error.message
+                    });
+                    console.warn('⚠️ Tiny face detector unavailable; person rejection is disabled:', error.message);
+                });
+        }
+        await this.faceDetectorLoad;
+    }
+
+    async detectPersonOnlyFrame(imageElement) {
+        if (!this.faceDetectorReady) {
+            return { detected: false, available: false };
+        }
+        try {
+            const detections = await faceapi.detectAllFaces(
+                imageElement,
+                new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.6 })
+            );
+            return { detected: detections.length > 0, available: true };
+        } catch (error) {
+            this.faceDetectorStatus = 'UNAVAILABLE';
+            this.faceDetectorError = error.message;
+            this.recordZoneDiagnostic(this.classifierMode, 'FACE_DETECTOR_UNAVAILABLE', {
+                status: this.faceDetectorStatus,
+                message: error.message
+            });
+            console.warn('⚠️ Person frame check failed; person rejection is disabled:', error.message);
+            return { detected: false, available: false };
+        }
+    }
+
+    async createCachedONNXSession(modelPath, sessionOptions) {
+        const diagnosticZone = Object.keys(ZONE_RESOURCES).find((zone) => modelPath.includes(`/models/${zone}/`));
+        if (diagnosticZone) this.recordZoneDiagnostic(diagnosticZone, 'SESSION_CREATE_START', { modelUrl: modelPath });
+        const createSession = (source) => ort.InferenceSession.create(source, sessionOptions);
+        const versionedPath = `${modelPath}${modelPath.includes('?') ? '&' : '?'}v=${MODEL_ASSET_VERSION}`;
+        const logResponse = async (response, source) => {
+            const buffer = await response.arrayBuffer();
+            const contentType = response.headers.get('content-type') || '(missing)';
+            const declaredLength = response.headers.get('content-length');
+            const prefix = new TextDecoder().decode(buffer.slice(0, 128)).trimStart();
+            console.log('ONNX model response:', {
+                modelPath,
+                source,
+                url: response.url || versionedPath,
+                status: response.status,
+                contentType,
+                declaredLength,
+                actualByteLength: buffer.byteLength
+            });
+            if (!response.ok) {
+                throw new Error(`Model request failed: ${response.status} ${modelPath}`);
+            }
+            if (buffer.byteLength < 1024 || prefix.startsWith('<!DOCTYPE') || prefix.startsWith('<html') || prefix.startsWith('{') || prefix.startsWith('version https://git-lfs.github.com/spec')) {
+                throw new Error(`Invalid ONNX response for ${modelPath}: received ${contentType}, ${buffer.byteLength} bytes`);
+            }
+            if (declaredLength && Number(declaredLength) !== buffer.byteLength) {
+                throw new Error(`Truncated ONNX response for ${modelPath}: declared ${declaredLength} bytes, received ${buffer.byteLength}`);
+            }
+            return buffer;
+        };
+        try {
+            const response = await this.fetchModelResource(versionedPath);
+            const source = this.resourceDiagnostics[versionedPath]?.source
+                || (response.headers.get('x-taylor-cache-hit') === '1' ? 'CACHE' : 'NETWORK');
+            this.initializationDiagnostics = {
+                ...this.initializationDiagnostics,
+                modelUrl: modelPath,
+                modelSource: source,
+                runtime: 'onnxruntime-web',
+                backend: sessionOptions.executionProviders?.join(',') || 'default'
+            };
+            const session = await createSession(await logResponse(response, source));
+            if (diagnosticZone) this.recordZoneDiagnostic(diagnosticZone, 'SESSION_CREATE_SUCCESS', { modelUrl: modelPath, source });
+            return session;
+        } catch (error) {
+            this.initializationDiagnostics = {
+                ...this.initializationDiagnostics,
+                modelUrl: modelPath,
+                exceptionName: error.name || 'Error',
+                exceptionMessage: error.message || String(error),
+                stack: error.stack || ''
+            };
+            console.error('❌ ONNX session initialization failed', {
+                route: this.initializationDiagnostics.route,
+                modelUrl: modelPath,
+                modelSource: this.initializationDiagnostics.modelSource || 'UNKNOWN',
+                runtime: 'onnxruntime-web',
+                backend: sessionOptions.executionProviders?.join(',') || 'default',
+                exceptionName: error.name,
+                exceptionMessage: error.message,
+                stack: error.stack
+            });
+            if (diagnosticZone) this.recordZoneDiagnostic(diagnosticZone, 'SESSION_CREATE_FAIL', {
+                modelUrl: modelPath,
+                message: error.message
+            });
             throw error;
         }
+    }
+
+    async fetchModelResource(url, options = {}) {
+        const cacheKey = options.cacheKey || url;
+        const zoneWithCacheMiss = Object.keys(ZONE_RESOURCES).find((zone) => url.includes(`/models/${zone}/`));
+        const normalizedCacheKey = cacheKey.includes('.onnx') && !cacheKey.includes('?')
+            ? `${cacheKey}?v=${MODEL_ASSET_VERSION}`
+            : cacheKey;
+        const requestOptions = { ...options };
+        delete requestOptions.cacheKey;
+        delete requestOptions.prefetch;
+
+        if (typeof caches !== 'undefined') {
+            const cache = await caches.open(MODEL_CACHE_NAME);
+            const cached = await cache.match(normalizedCacheKey);
+            if (cached) {
+                this.modelCacheHits += 1;
+                this.resourceDiagnostics[url] = { source: 'CACHE', status: 'HIT' };
+                const cachedZone = Object.keys(ZONE_RESOURCES).find((zone) => url.includes(`/models/${zone}/`));
+                if (cachedZone) {
+                    this.recordZoneDiagnostic(cachedZone, 'MODEL_CACHE_HIT', { resource: url });
+                    this.recordZoneDiagnostic(cachedZone, 'MODEL_BYTES_READY', { resource: url, source: 'CACHE' });
+                }
+                console.log(`[CACHE] ${url.split('/').pop()} HIT`, { modelVersion: MODEL_ASSET_VERSION });
+                return cached;
+            }
+            if (zoneWithCacheMiss) this.zoneResourceCacheMisses.add(zoneWithCacheMiss);
+            if (zoneWithCacheMiss) this.recordZoneDiagnostic(zoneWithCacheMiss, 'MODEL_CACHE_MISS', { resource: url });
+            this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'MISS' };
+            console.log(`[CACHE] ${url.split('/').pop()} MISS`, { modelVersion: MODEL_ASSET_VERSION });
+            if (this.cacheOnly) {
+                const cacheError = new Error(`Required model resource is not cached: ${url}`);
+                cacheError.code = 'MODEL_DOWNLOAD_REQUIRED';
+                throw cacheError;
+            }
+        }
+
+        let lastError;
+        for (let attempt = 0; attempt <= MODEL_RETRY_DELAYS_MS.length; attempt += 1) {
+            const controller = new AbortController();
+            const timeout = window.setTimeout(() => controller.abort(), MODEL_REQUEST_TIMEOUT_MS);
+            const startedAt = performance.now();
+            try {
+                console.log(`📥 Model download start: ${url}`, {
+                    modelVersion: MODEL_ASSET_VERSION,
+                    attempt: attempt + 1
+                });
+                const response = await fetch(url, {
+                    ...requestOptions,
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
+                if (!response.ok) throw new Error(`Model resource request failed: ${response.status} ${url}`);
+                if (typeof caches !== 'undefined') {
+                    const cache = await caches.open(MODEL_CACHE_NAME);
+                    await cache.put(normalizedCacheKey, response.clone());
+                    if (!await cache.match(normalizedCacheKey)) {
+                        const verificationError = new Error(`Model resource cache verification failed: ${url}`);
+                        verificationError.code = 'MODEL_CACHE_VERIFICATION_FAILED';
+                        throw verificationError;
+                    }
+                }
+                this.modelNetworkDownloads += 1;
+                this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'DOWNLOADED' };
+                if (zoneWithCacheMiss) this.recordZoneDiagnostic(zoneWithCacheMiss, 'MODEL_BYTES_READY', { resource: url, source: 'NETWORK' });
+                console.log(`📥 Model download end in ${(performance.now() - startedAt).toFixed(0)}ms: ${url}`, {
+                    modelVersion: MODEL_ASSET_VERSION
+                });
+                return response;
+            } catch (error) {
+                lastError = error;
+                if (attempt === MODEL_RETRY_DELAYS_MS.length) break;
+                const delay = MODEL_RETRY_DELAYS_MS[attempt];
+                console.warn(`⚠️ Model resource attempt ${attempt + 1} failed; retrying in ${delay}ms: ${url}`, error.message);
+                await new Promise((resolve) => window.setTimeout(resolve, delay));
+            } finally {
+                window.clearTimeout(timeout);
+            }
+        }
+        throw lastError;
+    }
+
+    async fetchModelJson(url) {
+        const response = await this.fetchModelResource(url);
+        const data = await response.json();
+        return data;
+    }
+
+    async loadReconModel() {
+        if (this.reconModel && this.reconMetadata) {
+            return;
+        }
+        const sessionOptions = {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all',
+            logSeverityLevel: 0
+        };
+        const modelPath = '/models/recon/recon_classifier.onnx';
+        const metadataPath = '/models/recon/recon_classifier_metadata.json';
+        console.log('Loading cached RECON Center classifier...');
+        this.reconModel = await this.createCachedONNXSession(modelPath, sessionOptions);
+        this.reconMetadata = await this.fetchModelJson(metadataPath);
+        console.log('RECON classifier loaded:', this.reconMetadata.displayNames);
+    }
+
+    async loadFablabModel() {
+        if (this.fablabModel && this.fablabMetadata) {
+            return;
+        }
+        const sessionOptions = {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all',
+            logSeverityLevel: 0
+        };
+        const modelPath = '/models/fablab/fablab_classifier.onnx';
+        const metadataPath = '/models/fablab/fablab_classifier_metadata.json';
+        console.log('Loading FABLAB equipment classifier...');
+        this.fablabModel = await this.createCachedONNXSession(modelPath, sessionOptions);
+        this.fablabMetadata = await this.fetchModelJson(metadataPath);
+        console.log('FABLAB classifier loaded:', this.fablabMetadata.displayNames);
+    }
+
+    async loadCaesarModel() {
+        if (this.caesarModel && this.caesarMetadata) {
+            return;
+        }
+        const sessionOptions = {
+            executionProviders: ['wasm'],
+            graphOptimizationLevel: 'all',
+            logSeverityLevel: 0
+        };
+        const modelPath = '/models/caesar/caesar_classifier.onnx';
+        const metadataPath = '/models/caesar/caesar_classifier_metadata.json';
+        console.log('Loading CAESAR equipment classifier...');
+        this.caesarModel = await this.createCachedONNXSession(modelPath, sessionOptions);
+        this.caesarMetadata = await this.fetchModelJson(metadataPath);
+        console.log('CAESAR classifier loaded:', this.caesarMetadata.displayNames);
+    }
+
+    getApprovedLabels(zone = this.classifierMode) {
+        const metadata = {
+            aricc: this.ariccMetadata,
+            recon: this.reconMetadata,
+            fablab: this.fablabMetadata,
+            caesar: this.caesarMetadata
+        }[String(zone).toLowerCase()];
+        const labels = metadata?.displayNames || metadata?.display_names || metadata?.classes || metadata?.class_names || [];
+        return [...new Set(labels.map((label) => String(label).trim()).filter(Boolean))];
     }
 
     async loadExhibitGateModel() {
@@ -190,31 +774,25 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 logSeverityLevel: 0
             };
 
-            this.gateModel = await ort.InferenceSession.create('/models/exhibit_gate/exhibit_gate.onnx', sessionOptions);
+            this.gateModel = await this.createCachedONNXSession('/models/exhibit_gate/exhibit_gate.onnx', sessionOptions);
 
             try {
-                const metadataResponse = await fetch('/models/exhibit_gate/exhibit_gate_metadata.json');
-                if (metadataResponse.ok) {
-                    this.gateMetadata = await metadataResponse.json();
-                    this.gateConfig = {
-                        ...this.gateConfig,
-                        inputSize: this.gateMetadata.inputSize || this.gateConfig.inputSize,
-                        threshold: this.gateMetadata.threshold || this.gateConfig.threshold,
-                        classes: this.gateMetadata.classes || this.gateConfig.classes,
-                        exhibitClassIndex: this.gateMetadata.classToIdx?.exhibit ?? this.gateConfig.exhibitClassIndex
-                    };
-                }
+                this.gateMetadata = await this.fetchModelJson('/models/exhibit_gate/exhibit_gate_metadata.json');
+                this.gateConfig = {
+                    ...this.gateConfig,
+                    inputSize: this.gateMetadata.inputSize || this.gateConfig.inputSize,
+                    threshold: this.gateMetadata.threshold || this.gateConfig.threshold,
+                    classes: this.gateMetadata.classes || this.gateConfig.classes,
+                    exhibitClassIndex: this.gateMetadata.classToIdx?.exhibit ?? this.gateConfig.exhibitClassIndex
+                };
             } catch (metadataError) {
                 console.warn('Gate metadata load failed, using defaults:', metadataError.message);
             }
 
             if (this.useSimilarityGate) {
                 try {
-                    const similarityResponse = await fetch('/models/exhibit_gate/gate_similarity_index.json');
-                    if (similarityResponse.ok) {
-                        this.gateSimilarityIndex = await similarityResponse.json();
-                        console.log('Gate similarity index loaded:', this.gateSimilarityIndex.stats);
-                    }
+                    this.gateSimilarityIndex = await this.fetchModelJson('/models/exhibit_gate/gate_similarity_index.json');
+                    console.log('Gate similarity index loaded:', this.gateSimilarityIndex.stats);
                 } catch (similarityError) {
                     console.warn('Gate similarity index load failed; using YOLO gate only:', similarityError.message);
                 }
@@ -234,6 +812,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     async connectToBackend() {
         console.log('🎯 Connecting to YOUR REAL PyTorch model backend (99.04% accuracy)...');
+        console.log('🔧 Backend initialization start', { backendUrl: this.backendUrl });
+        const backendStartedAt = performance.now();
 
         try {
             // Test backend connection
@@ -244,7 +824,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             }
 
             const healthData = await healthResponse.json();
-            console.log('✅ Backend connection successful!');
+            console.log(`✅ Backend connection successful in ${(performance.now() - backendStartedAt).toFixed(0)}ms`);
             console.log(`🏆 Model loaded: ${healthData.model_loaded}`);
             console.log(`📊 Accuracy: ${healthData.accuracy}%`);
 
@@ -285,7 +865,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             console.log('🏆 Using regenerated YOLOv8s for 28-class exhibit/background prediction');
             const t0 = performance.now();
             console.log('⏳ Creating ONNX inference session...');
-            this.model = await ort.InferenceSession.create(onnxModelPath, sessionOptions);
+                this.model = await this.createCachedONNXSession(onnxModelPath, sessionOptions);
             console.log(`✅ Main model loaded in ${(performance.now() - t0).toFixed(1)}ms`);
             console.log('✅ YOLOv8s main model loaded successfully!');
             console.log('🔧 Session execution providers:', this.model.executionProviders);
@@ -294,9 +874,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             try {
                 const metadataPath = '/models/exhibit_models_onnx/main_model/yolov8s_exhibit_fixed_metadata.json';
                 console.log('📋 Loading main model metadata...');
-                const metadataResponse = await fetch(metadataPath);
-                if (metadataResponse.ok) {
-                    this.metadata = await metadataResponse.json();
+                const metadataResponse = await this.fetchModelJson(metadataPath);
+                if (metadataResponse) {
+                    this.metadata = metadataResponse;
                     console.log('✅ Main model metadata loaded successfully!');
                     console.log('📊 Model info:', {
                         architecture: this.metadata.architecture || this.metadata.model_name || 'YOLOv8 classifier',
@@ -369,15 +949,15 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const metadataPath = `/models/exhibit_models_onnx/classifiers_model/${zone.toLowerCase()}_metadata.json`;
 
             // Load model
-            const model = await ort.InferenceSession.create(modelPath, sessionOptions);
+            const model = await this.createCachedONNXSession(modelPath, sessionOptions);
             console.log(`✅ ${zoneName} classifier loaded successfully!`);
 
             // Load metadata
             let metadata = null;
             try {
-                const metadataResponse = await fetch(metadataPath);
-                if (metadataResponse.ok) {
-                    metadata = await metadataResponse.json();
+                const metadataResponse = await this.fetchModelJson(metadataPath);
+                if (metadataResponse) {
+                    metadata = metadataResponse;
                     console.log(`📊 ${zoneName} metadata loaded: ${metadata.num_classes} exhibits`);
                 }
             } catch (metadataError) {
@@ -452,7 +1032,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         this.umpMetadata = result.metadata;
     }
 
-    async loadSpecialistModels() {
+    async loadSpecialistModels({ labels } = {}) {
         const sessionOptions = {
             executionProviders: ['wasm'],
             logSeverityLevel: 0
@@ -474,25 +1054,55 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 assignMetadata: (metadata) => { this.eapMetadata = metadata; }
             },
             {
-                label: 'EGN',
-                modelPath: '/models/egn_balanced_model_corrected.onnx',
-                metadataPath: '/models/egn_exact_weights_metadata.json',
-                assignModel: (model) => { this.egnModel = model; },
-                assignMetadata: (metadata) => { this.egnMetadata = metadata; }
+                label: 'ARICC',
+                modelPath: '/models/aricc/aricc_classifier.onnx',
+                metadataPath: '/models/aricc/aricc_classifier_metadata.json',
+                assignModel: (model) => { this.ariccModel = model; },
+                assignMetadata: (metadata) => { this.ariccMetadata = metadata; }
             }
         ];
 
-        for (const specialist of specialists) {
+        const specialistsToLoad = labels
+            ? specialists.filter((specialist) => labels.includes(specialist.label))
+            : specialists;
+        for (const specialist of specialistsToLoad) {
             try {
+                const existingModel = specialist.label === 'ARICC' ? this.ariccModel
+                    : specialist.label === 'DWT' ? this.dwtModel
+                        : specialist.label === 'EAP' ? this.eapModel
+                            : null;
+                const existingMetadata = specialist.label === 'ARICC' ? this.ariccMetadata
+                    : specialist.label === 'DWT' ? this.dwtMetadata
+                        : specialist.label === 'EAP' ? this.eapMetadata
+                            : null;
+                if (existingModel && existingMetadata) {
+                    console.log(`${specialist.label} specialist classifier already initialized; reusing existing runtime session`);
+                    continue;
+                }
                 console.log(`Loading ${specialist.label} specialist classifier...`);
-                const model = await ort.InferenceSession.create(specialist.modelPath, sessionOptions);
+                const model = await this.createCachedONNXSession(specialist.modelPath, sessionOptions);
                 specialist.assignModel(model);
+                console.log(`${specialist.label} ONNX input metadata:`, {
+                    inputNames: model.inputNames,
+                    inputMetadata: model.inputNames.map(inputName => model.inputMetadata?.[inputName] || null),
+                    outputNames: model.outputNames
+                });
 
                 try {
-                    const metadataResponse = await fetch(specialist.metadataPath);
-                    if (metadataResponse.ok) {
-                        specialist.assignMetadata(await metadataResponse.json());
+                    const metadataResponse = await this.fetchModelJson(specialist.metadataPath);
+                    if (metadataResponse) {
+                        specialist.assignMetadata(metadataResponse);
                         console.log(`✅ ${specialist.label} specialist metadata loaded`);
+                        if (specialist.label === 'ARICC') {
+                            console.log('🧾 ARICC runtime configuration:', {
+                                modelPath: specialist.modelPath,
+                                modelOutput: model.outputNames,
+                                classes: specialist.metadata?.displayNames,
+                                mean: specialist.metadata?.mean,
+                                std: specialist.metadata?.std,
+                                outputType: specialist.metadata?.output_type
+                            });
+                        }
                     }
                 } catch (metadataError) {
                     console.warn(`⚠️ ${specialist.label} metadata not loaded:`, metadataError.message);
@@ -684,7 +1294,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             // numerical safety
             variance = Math.max(0, variance);
             const contrast = Math.sqrt(variance);
-            const brightness = mean;
+            let brightness = mean;
 
             // If we read a totally black frame (likely camera warmup or placeholder), retry once quickly
             if (variance === 0 && brightness === 0) {
@@ -702,7 +1312,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     const m = s / pxCount;
                     variance = Math.max(0, (ss / pxCount) - (m * m));
                     brightness = m;
-                } catch (err) {
+                } catch {
                     // ignore and fall through to treat as poor-quality
                 }
             }
@@ -758,6 +1368,120 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
 
     async detectHierarchical(imageElement) {
+        const detection = await this.detectHierarchicalCore(imageElement);
+        this.observeImprovementCandidate(detection, imageElement);
+        return detection;
+    }
+
+    setCandidateSourceContext(source = {}) {
+        this.candidateSourceContext = {
+            type: source.type || null,
+            sessionId: source.sessionId || null,
+            video: source.video || null
+        };
+    }
+
+    getImprovementCandidateDiagnostics() {
+        return exhibitImprovementCandidateStore.getDiagnostics();
+    }
+
+    getImprovementCandidates() {
+        return exhibitImprovementCandidateStore.list();
+    }
+
+    clearImprovementCandidates() {
+        return exhibitImprovementCandidateStore.clear();
+    }
+
+    observeImprovementCandidate(detection, imageElement) {
+        try {
+            const zone = this.classifierMode.toUpperCase();
+            const top1 = detection?.top1 || {
+                class: detection?.exhibit || detection?.class || 'UNKNOWN',
+                confidence: detection?.exhibitConfidence || detection?.mainConfidence || 0
+            };
+            const top2 = detection?.top2 || { class: 'UNKNOWN', confidence: 0 };
+            const confidenceMargin = Number.isFinite(Number(detection?.specificConfidenceGap))
+                ? Number(detection.specificConfidenceGap)
+                : Number(top1.confidence || 0) - Number(top2.confidence || 0);
+            const history = this.candidateTemporalHistory.get(zone) || [];
+            const temporalPrediction = {
+                timestamp: new Date().toISOString(),
+                top1_class: top1.class || null,
+                top1_confidence: Number(top1.confidence || 0),
+                top2_class: top2.class || null,
+                top2_confidence: Number(top2.confidence || 0),
+                confidence_margin: confidenceMargin
+            };
+            const temporalPredictions = [...history, temporalPrediction].slice(-5);
+            this.candidateTemporalHistory.set(zone, temporalPredictions);
+
+            const labels = temporalPredictions.map(prediction => prediction.top1_class).filter(Boolean);
+            const unstable = new Set(labels).size > 1 && labels.length >= 2;
+            const reasons = [];
+            if (Number(top1.confidence || 0) < RECOGNITION_MIN_CONFIDENCE) reasons.push('LOW_CONFIDENCE');
+            if (confidenceMargin < RECOGNITION_MIN_MARGIN) reasons.push('LOW_MARGIN');
+            if (unstable) reasons.push('UNSTABLE');
+            if (detection?.reason === 'unknown_exhibit' || detection?.reason === 'model_not_ready') reasons.push('UNKNOWN');
+            if (detection?.reason === 'noise_rejected' || detection?.reason === 'background_class') reasons.push('FALSE_POSITIVE_CANDIDATE');
+            if (!detection?.success) {
+                this.candidateRejectionCounts.set(zone, (this.candidateRejectionCounts.get(zone) || 0) + 1);
+            } else {
+                this.candidateRejectionCounts.set(zone, 0);
+            }
+            if ((this.candidateRejectionCounts.get(zone) || 0) >= 3) reasons.push('REPEATED_REJECTION');
+            if (reasons.length === 0) return;
+
+            const timestampSeconds = Number.isFinite(Number(imageElement?.currentTime))
+                ? Number(imageElement.currentTime)
+                : null;
+            exhibitImprovementCandidateStore.capture({
+                zone,
+                timestamp: new Date().toISOString(),
+                timestampSeconds,
+                modelVersion: MODEL_ASSET_VERSION,
+                top1,
+                top2,
+                temporalPredictions,
+                candidateReasons: reasons,
+                source: this.candidateSourceContext
+            });
+        } catch (error) {
+            console.warn('Improvement candidate observation failed:', error.message);
+        }
+    }
+
+    async detectHierarchicalCore(imageElement) {
+        const activeZone = this.classifierMode;
+        if (this.modelState !== EXHIBIT_MODEL_STATES.MODEL_READY &&
+            this.modelState !== EXHIBIT_MODEL_STATES.OFFLINE_MODEL_READY ||
+            !this.isInitialized ||
+            this.initializedMode !== activeZone ||
+            this.zoneStates[activeZone] !== `${activeZone.toUpperCase()}_READY`) {
+            console.warn('⏸️ Inference skipped: exhibit model is not ready', {
+                modelState: this.modelState,
+                modelVersion: MODEL_ASSET_VERSION
+            });
+            return {
+                success: false,
+                reason: 'model_not_ready',
+                modelState: this.modelState,
+                message: this.modelState === EXHIBIT_MODEL_STATES.MODEL_DOWNLOAD_REQUIRED
+                    ? 'Internet required to download recognition model'
+                    : 'Recognition model is still loading'
+            };
+        }
+        if (!this.firstInferenceLogged) {
+            console.log('⏱️ Inference start', {
+                modelState: this.modelState,
+                modelVersion: MODEL_ASSET_VERSION
+            });
+            this.firstInferenceLogged = true;
+        }
+        if (!this.firstInferenceLoggedZones.has(activeZone)) {
+            this.firstInferenceLoggedZones.add(activeZone);
+            this.recordZoneDiagnostic(activeZone, 'FIRST_INFERENCE');
+        }
         console.log('🔄 Starting hierarchical detection (v6 with clarity gate + confidence filter)...');
         try {
             // Step -1: Frame clarity gate (optional but recommended)
@@ -785,18 +1509,42 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.log('⏭️ Skipping clarity gate - proceeding to confidence filter');
             }
 
+            const personCheck = await this.detectPersonOnlyFrame(imageElement);
+            if (personCheck.detected) {
+                await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                    classifier: this.classifierMode,
+                    reason: 'person_detected'
+                });
+                return {
+                    success: false,
+                    reason: 'unknown_exhibit',
+                    zone: this.classifierMode === 'aricc'
+                        ? 'ARICC'
+                        : this.classifierMode === 'fablab' ? 'FABLAB' : 'RECON',
+                    exhibit: 'Unknown / Unrecognized Exhibit',
+                    message: 'No exhibit detected',
+                    classifier: this.classifierMode,
+                    personDetector: personCheck
+                };
+            }
+
             // Stage 1: Binary exhibit/background gate
             console.log('Stage 1: Running binary exhibit/background gate...');
             const gateResult = await this.detectExhibitGate(imageElement);
 
-            if (!gateResult.isExhibit) {
+            const exactRejectionCondition = !gateResult.classifierAccepted && !gateResult.similarityAccepted;
+            if (exactRejectionCondition) {
                 console.log(`Gate rejected frame as noise/background (${(gateResult.exhibitConfidence * 100).toFixed(1)}% exhibit confidence)`);
                 await this.logRejectedFrame(imageElement, 'noise_rejected', {
                     gateClass: gateResult.predictedClass,
                     gateConfidence: gateResult.confidence,
                     exhibitConfidence: gateResult.exhibitConfidence,
                     backgroundConfidence: gateResult.backgroundConfidence,
-                    requiredConfidence: gateResult.threshold
+                    requiredConfidence: gateResult.threshold,
+                    classifierAccepted: gateResult.classifierAccepted,
+                    similarityAccepted: gateResult.similarityAccepted,
+                    finalGateDecision: gateResult.finalGateDecision,
+                    exactRejectionCondition
                 });
                 return {
                     success: false,
@@ -806,6 +1554,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     exhibitConfidence: gateResult.exhibitConfidence,
                     backgroundConfidence: gateResult.backgroundConfidence,
                     requiredConfidence: gateResult.threshold,
+                    classifierAccepted: gateResult.classifierAccepted,
+                    similarityAccepted: gateResult.similarityAccepted,
+                    finalGateDecision: gateResult.finalGateDecision,
+                    exactRejectionCondition,
                     similarity: gateResult.similarity,
                     message: gateResult.isModelExhibit && !gateResult.isSimilarityExhibit
                         ? 'Frame rejected because it does not look similar to exhibit dataset examples'
@@ -814,9 +1566,24 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 };
             }
 
+            console.log('Gate decision:', {
+                classifierAccepted: gateResult.classifierAccepted,
+                similarityAccepted: gateResult.similarityAccepted,
+                finalGateDecision: gateResult.finalGateDecision,
+                exactRejectionCondition
+            });
             console.log(`Gate accepted frame (${(gateResult.exhibitConfidence * 100).toFixed(1)}% exhibit confidence)`);
 
-            if (this.gateOnlyMode || !this.model) {
+            const hasRequestedClassifier = this.classifierMode === 'recon'
+                ? Boolean(this.reconModel && this.reconMetadata)
+                : this.classifierMode === 'aricc'
+                    ? Boolean(this.ariccModel && this.ariccMetadata)
+                    : this.classifierMode === 'fablab'
+                        ? Boolean(this.fablabModel && this.fablabMetadata)
+                        : this.classifierMode === 'caesar'
+                            ? Boolean(this.caesarModel && this.caesarMetadata)
+                        : Boolean(this.model);
+            if (!hasRequestedClassifier || (this.gateOnlyMode && !hasRequestedClassifier)) {
                 await this.logRejectedFrame(imageElement, 'main_classifier_unavailable', {
                     exhibitConfidence: gateResult.exhibitConfidence
                 });
@@ -827,6 +1594,230 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     exhibitConfidence: gateResult.exhibitConfidence,
                     message: 'Gate accepted the frame, but no label classifier is available',
                     gate: gateResult
+                };
+            }
+
+            // RECON and ARICC are mutually exclusive: only the model matching the
+            // active classifierMode may produce a result. A model left over from a
+            // different mode on this singleton service must never be used here.
+            const SPECIALIST_MIN_CONFIDENCE = 0.60;
+            const isUnknownSpecialistResult = result =>
+                result.confidence < SPECIALIST_MIN_CONFIDENCE || result.isLikelyBackground;
+
+            if (this.classifierMode === 'recon') {
+                if (!this.reconModel || !this.reconMetadata) {
+                    await this.logRejectedFrame(imageElement, 'main_classifier_unavailable', {
+                        exhibitConfidence: gateResult.exhibitConfidence
+                    });
+                    return {
+                        success: false,
+                        gateOnly: true,
+                        reason: 'main_classifier_unavailable',
+                        exhibitConfidence: gateResult.exhibitConfidence,
+                        message: 'Gate accepted the frame, but the RECON classifier is not available',
+                        gate: gateResult
+                    };
+                }
+                const reconResult = await this.runZoneSpecificInference(imageElement, 'RECON');
+                const displayName = reconResult.displayName || reconResult.exhibit;
+                const code = reconResult.classCode || 'RECON-1';
+                if (isUnknownSpecialistResult(reconResult)) {
+                    await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                        classifier: 'recon',
+                        predictedClass: displayName,
+                        confidence: reconResult.confidence,
+                        confidenceGap: reconResult.confidenceGap,
+                        requiredConfidence: SPECIALIST_MIN_CONFIDENCE
+                    });
+                    return {
+                        success: false,
+                        reason: 'unknown_exhibit',
+                        zone: 'RECON',
+                        exhibit: 'Unknown / Unrecognized Exhibit',
+                        exhibitConfidence: reconResult.confidence,
+                        specificConfidenceGap: reconResult.confidenceGap,
+                        top1: reconResult.top1,
+                        top2: reconResult.top2,
+                        message: 'Exhibit is outside the confident RECON classes',
+                        gate: gateResult,
+                        classifier: 'recon'
+                    };
+                }
+                return {
+                    success: true,
+                    zone: 'RECON',
+                    zoneConfidence: reconResult.confidence,
+                    exhibit: reconResult.exhibit,
+                    exhibitConfidence: reconResult.confidence,
+                    combinedConfidence: reconResult.confidence,
+                    exhibitInfo: { displayName, code, number: code.replace('RECON-', '') },
+                    coordinates: this.getExhibitCoordinates(code, 'default'),
+                    detectionTime: new Date().toISOString(),
+                    isLikelyBackground: reconResult.isLikelyBackground,
+                    isRecognized: reconResult.isRecognized || (
+                        reconResult.confidence >= SPECIALIST_MIN_CONFIDENCE &&
+                        !reconResult.isLikelyBackground
+                    ),
+                    mainConfidenceGap: reconResult.confidenceGap,
+                    specificConfidenceGap: reconResult.confidenceGap,
+                    gate: gateResult,
+                    classifier: 'recon'
+                };
+            }
+
+            // ARICC is the trained exhibit classifier for the ARICC webcam workflow.
+            // Run it directly after the noise gate so the legacy 28-class model
+            // cannot replace an ARICC result with labels such as Phobia.
+            if (this.classifierMode === 'aricc' && this.ariccModel && this.ariccMetadata) {
+                const ariccResult = await this.runZoneSpecificInference(imageElement, 'ARICC');
+                const ariccDisplayName = ariccResult.displayName || ariccResult.exhibit;
+                if (isUnknownSpecialistResult(ariccResult)) {
+                    await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                        classifier: 'aricc',
+                        predictedClass: ariccDisplayName,
+                        confidence: ariccResult.confidence,
+                        confidenceGap: ariccResult.confidenceGap,
+                        requiredConfidence: SPECIALIST_MIN_CONFIDENCE
+                    });
+                    return {
+                        success: false,
+                        reason: 'unknown_exhibit',
+                        zone: 'ARICC',
+                        exhibit: 'Unknown / Unrecognized Exhibit',
+                        exhibitConfidence: ariccResult.confidence,
+                        specificConfidenceGap: ariccResult.confidenceGap,
+                        top1: ariccResult.top1,
+                        top2: ariccResult.top2,
+                        message: 'Exhibit is outside the confident ARICC classes',
+                        gate: gateResult,
+                        classifier: 'aricc'
+                    };
+                }
+                return {
+                    success: true,
+                    zone: 'ARICC',
+                    zoneConfidence: ariccResult.confidence,
+                    exhibit: ariccResult.exhibit,
+                    exhibitConfidence: ariccResult.confidence,
+                    combinedConfidence: ariccResult.confidence,
+                    exhibitInfo: {
+                        displayName: ariccDisplayName,
+                        code: ariccResult.exhibit,
+                        number: ariccResult.exhibit.replace('ARICC-', '')
+                    },
+                    coordinates: this.getExhibitCoordinates(ariccResult.exhibit, 'default'),
+                    detectionTime: new Date().toISOString(),
+                    isLikelyBackground: ariccResult.isLikelyBackground,
+                    isRecognized: ariccResult.isRecognized,
+                    mainConfidenceGap: ariccResult.confidenceGap,
+                    specificConfidenceGap: ariccResult.confidenceGap,
+                    gate: gateResult,
+                    classifier: 'aricc'
+                };
+            }
+
+            if (this.classifierMode === 'fablab' && this.fablabModel && this.fablabMetadata) {
+                const fablabResult = await this.runZoneSpecificInference(imageElement, 'FABLAB');
+                const fablabDisplayName = fablabResult.displayName || fablabResult.exhibit;
+                if (isUnknownSpecialistResult(fablabResult)) {
+                    await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                        classifier: 'fablab',
+                        predictedClass: fablabDisplayName,
+                        confidence: fablabResult.confidence,
+                        confidenceGap: fablabResult.confidenceGap,
+                        requiredConfidence: SPECIALIST_MIN_CONFIDENCE
+                    });
+                    return {
+                        success: false,
+                        reason: 'unknown_exhibit',
+                        zone: 'FABLAB',
+                        exhibit: 'Unknown / Unrecognized Equipment',
+                        exhibitConfidence: fablabResult.confidence,
+                        specificConfidenceGap: fablabResult.confidenceGap,
+                        top1: fablabResult.top1,
+                        top2: fablabResult.top2,
+                        message: 'Frame is outside the confident FABLAB classes',
+                        gate: gateResult,
+                        classifier: 'fablab'
+                    };
+                }
+                return {
+                    success: true,
+                    zone: 'FABLAB',
+                    zoneConfidence: fablabResult.confidence,
+                    exhibit: fablabResult.exhibit,
+                    exhibitConfidence: fablabResult.confidence,
+                    combinedConfidence: fablabResult.confidence,
+                    exhibitInfo: {
+                        displayName: fablabDisplayName,
+                        code: fablabResult.exhibit,
+                        number: fablabResult.exhibit
+                    },
+                    coordinates: this.getExhibitCoordinates('default', 'default'),
+                    detectionTime: new Date().toISOString(),
+                    isLikelyBackground: fablabResult.isLikelyBackground,
+                    isRecognized: fablabResult.isRecognized,
+                    mainConfidenceGap: fablabResult.confidenceGap,
+                    specificConfidenceGap: fablabResult.confidenceGap,
+                    gate: gateResult,
+                    classifier: 'fablab'
+                };
+            }
+
+            if (this.classifierMode === 'caesar' && this.caesarModel && this.caesarMetadata) {
+                const caesarResult = await this.runZoneSpecificInference(imageElement, 'CAESAR');
+                const caesarDisplayName = caesarResult.displayName || caesarResult.exhibit;
+                if (isUnknownSpecialistResult(caesarResult)) {
+                    return {
+                        success: false,
+                        reason: 'unknown_exhibit',
+                        zone: 'CAESAR',
+                        exhibit: 'Unknown / Unrecognized Equipment',
+                        exhibitConfidence: caesarResult.confidence,
+                        specificConfidenceGap: caesarResult.confidenceGap,
+                        top1: caesarResult.top1,
+                        top2: caesarResult.top2,
+                        message: 'Equipment is outside the confident CAESAR classes',
+                        gate: gateResult,
+                        classifier: 'caesar'
+                    };
+                }
+                return {
+                    success: true,
+                    zone: 'CAESAR',
+                    zoneConfidence: caesarResult.confidence,
+                    exhibit: caesarResult.exhibit,
+                    exhibitConfidence: caesarResult.confidence,
+                    combinedConfidence: caesarResult.confidence,
+                    exhibitInfo: {
+                        displayName: caesarDisplayName,
+                        code: caesarResult.exhibit,
+                        number: caesarResult.exhibit
+                    },
+                    coordinates: this.getExhibitCoordinates('default', 'default'),
+                    detectionTime: new Date().toISOString(),
+                    isLikelyBackground: caesarResult.isLikelyBackground,
+                    isRecognized: caesarResult.isRecognized,
+                    mainConfidenceGap: caesarResult.confidenceGap,
+                    specificConfidenceGap: caesarResult.confidenceGap,
+                    gate: gateResult,
+                    classifier: 'caesar'
+                };
+            }
+
+            if (this.classifierMode === 'aricc') {
+                await this.logRejectedFrame(imageElement, 'unknown_exhibit', {
+                    classifier: 'aricc',
+                    reason: 'ARICC classifier unavailable'
+                });
+                return {
+                    success: false,
+                    reason: 'unknown_exhibit',
+                    zone: 'ARICC',
+                    exhibit: 'Unknown / Unrecognized Exhibit',
+                    message: 'No exhibit detected',
+                    gate: gateResult,
+                    classifier: 'aricc'
                 };
             }
 
@@ -862,21 +1853,26 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 return mainResult;
             }
 
-            const MAIN_MODEL_MIN_CONFIDENCE = 0.5;
-            if (mainResult.confidence < MAIN_MODEL_MIN_CONFIDENCE) {
-                console.log(`🚫 Main model confidence too low: ${(mainResult.confidence * 100).toFixed(1)}% (required: ${(MAIN_MODEL_MIN_CONFIDENCE * 100).toFixed(0)}%)`);
+            if (!mainResult.isRecognized) {
+                console.log(`🚫 Main model rejected: ${(mainResult.confidence * 100).toFixed(1)}% top confidence, ${(mainResult.confidenceGap * 100).toFixed(1)}% margin`);
                 await this.logRejectedFrame(imageElement, 'low_main_confidence', {
                     predictedClass: mainResult.class,
                     mainConfidence: mainResult.confidence,
-                    requiredConfidence: MAIN_MODEL_MIN_CONFIDENCE,
+                    requiredConfidence: RECOGNITION_MIN_CONFIDENCE,
                     confidenceGap: mainResult.confidenceGap
                 });
                 return {
                     success: false,
-                    reason: 'low_main_confidence',
+                    reason: mainResult.confidence < RECOGNITION_MIN_CONFIDENCE ? 'low_main_confidence' : 'low_main_confidence_gap',
+                    class: 'UNKNOWN',
+                    exhibit: 'UNKNOWN',
                     mainConfidence: mainResult.confidence,
-                    requiredConfidence: MAIN_MODEL_MIN_CONFIDENCE,
-                    message: `Zone confidence too low: ${(mainResult.confidence * 100).toFixed(1)}%`,
+                    mainConfidenceGap: mainResult.confidenceGap,
+                    requiredConfidence: RECOGNITION_MIN_CONFIDENCE,
+                    requiredConfidenceGap: RECOGNITION_MIN_MARGIN,
+                    top1: mainResult.top1,
+                    top2: mainResult.top2,
+                    message: 'UNKNOWN: classifier confidence or margin was insufficient',
                     gate: gateResult
                 };
             }
@@ -899,48 +1895,6 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 };
             }
 
-            const MAIN_MODEL_MIN_CONFIDENCE_GAP = 0.18;
-            if ((mainResult.confidenceGap || 0) < MAIN_MODEL_MIN_CONFIDENCE_GAP) {
-                await this.logRejectedFrame(imageElement, 'low_main_confidence_gap', {
-                    predictedClass: mainResult.class,
-                    mainConfidence: mainResult.confidence,
-                    confidenceGap: mainResult.confidenceGap,
-                    requiredGap: MAIN_MODEL_MIN_CONFIDENCE_GAP
-                });
-                return {
-                    success: false,
-                    reason: 'low_main_confidence_gap',
-                    mainConfidence: mainResult.confidence,
-                    mainConfidenceGap: mainResult.confidenceGap,
-                    requiredConfidenceGap: MAIN_MODEL_MIN_CONFIDENCE_GAP,
-                    message: `Classifier margin too low: ${(((mainResult.confidenceGap || 0) * 100)).toFixed(1)}%`,
-                    gate: gateResult
-                };
-            }
-
-            const labelDisplayName = this.config.exhibitMapping[detectedZone] || this.parseExhibitInfo(detectedZone).displayName;
-
-            // The current browser build uses the 28-class classifier as the final label source.
-            // The original DWT/EAP/EGN specialist block below is retained for compatibility.
-            return {
-                success: true,
-                zone: detectedZone,
-                zoneConfidence: mainResult.confidence,
-                exhibit: detectedZone,
-                exhibitConfidence: mainResult.confidence,
-                combinedConfidence: mainResult.confidence,
-                exhibitInfo: {
-                    displayName: labelDisplayName,
-                    code: detectedZone,
-                    number: '00'
-                },
-                coordinates: this.getExhibitCoordinates(detectedZone, 'default'),
-                detectionTime: new Date().toISOString(),
-                isLikelyBackground: false,
-                mainConfidenceGap: mainResult.confidenceGap,
-                gate: gateResult
-            };
-
             // Step 2: Zone-specific exhibit classification (DWT / EAP / EGN specialists)
             console.log(`🎯 Step 2: Running ${detectedZone}-specific detection...`);
 
@@ -958,7 +1912,11 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 specificResult = {
                     exhibit: mainResult.exhibit,
                     confidence: mainResult.confidence,
-                    isLikelyBackground: mainResult.isLikelyBackground
+                    confidenceGap: mainResult.confidenceGap,
+                    isLikelyBackground: mainResult.isLikelyBackground,
+                    isRecognized: mainResult.isRecognized,
+                    top1: mainResult.top1,
+                    top2: mainResult.top2
                 };
             } else {
                 console.log(`${zoneInfo.emoji} Running ${zoneInfo.name} specialist...`);
@@ -966,23 +1924,22 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.log(`✅ Step 2 completed: ${specificResult.exhibit} (${(specificResult.confidence * 100).toFixed(1)}%)`);
             }
 
-            const SPECIFIC_MIN_CONFIDENCE = 0.45;
-            const zoneDisplayName = zoneInfo?.name || this.config.exhibitMapping[detectedZone] || detectedZone;
-            if (specificResult.confidence < SPECIFIC_MIN_CONFIDENCE) {
+            const SPECIFIC_MIN_CONFIDENCE = RECOGNITION_MIN_CONFIDENCE;
+            if (!specificResult.isRecognized || specificResult.confidence < SPECIFIC_MIN_CONFIDENCE) {
                 return {
-                    success: true,
-                    specialistSkipped: true,
+                    success: false,
+                    reason: specificResult.confidence < SPECIFIC_MIN_CONFIDENCE ? 'low_specific_confidence' : 'low_specific_confidence_gap',
+                    class: 'UNKNOWN',
+                    exhibit: 'UNKNOWN',
                     zone: detectedZone,
                     zoneConfidence: mainResult.confidence,
-                    exhibit: detectedZone,
-                    exhibitConfidence: mainResult.confidence,
-                    combinedConfidence: mainResult.confidence,
-                    exhibitInfo: {
-                        displayName: zoneDisplayName,
-                        code: detectedZone,
-                        number: '00'
-                    },
-                    coordinates: this.getExhibitCoordinates(detectedZone, 'default'),
+                    exhibitConfidence: specificResult.confidence,
+                    specificConfidenceGap: specificResult.confidenceGap,
+                    top1: specificResult.top1,
+                    top2: specificResult.top2,
+                    requiredConfidence: SPECIFIC_MIN_CONFIDENCE,
+                    requiredConfidenceGap: RECOGNITION_MIN_MARGIN,
+                    message: 'UNKNOWN: exhibit classifier confidence or margin was insufficient',
                     gate: gateResult
                 };
             }
@@ -992,7 +1949,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const isBackground = mainResult.isLikelyBackground || specificResult.isLikelyBackground;
 
             return {
-                success: !isBackground,
+                success: !isBackground && specificResult.isRecognized,
                 zone: detectedZone,
                 zoneConfidence: mainResult.confidence,
                 exhibit: specificResult.exhibit,
@@ -1004,7 +1961,12 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 isLikelyBackground: isBackground,
                 mainConfidenceGap: mainResult.confidenceGap,
                 specificConfidenceGap: specificResult.confidenceGap,
-                gate: gateResult
+                isRecognized: mainResult.isRecognized && specificResult.isRecognized,
+                top1: specificResult.top1 || mainResult.top1,
+                top2: specificResult.top2 || mainResult.top2,
+                processingTime: (mainResult.processingTime || 0) + (specificResult.processingTime || 0),
+                gate: gateResult,
+                personDetector: personCheck
             };
 
         } catch (error) {
@@ -1043,8 +2005,27 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const exhibitConfidence = probabilities[this.gateConfig.exhibitClassIndex] || 0;
             const backgroundConfidence = probabilities[0] || 0;
             const isModelExhibit = exhibitConfidence >= this.gateConfig.threshold;
-            const isSimilarityExhibit = !similarity || similarity.isSimilarToExhibit;
-            const isExhibit = isModelExhibit && isSimilarityExhibit;
+            const classifierAccepted = predictedClass === 'exhibit' && maxProb >= this.gateConfig.threshold;
+            const similarityAccepted = !similarity || similarity.isSimilarToExhibit;
+            const finalGateDecision = classifierAccepted || (maxProb < this.gateConfig.threshold && similarityAccepted)
+                ? 'accepted'
+                : 'noise_rejected';
+            const isSimilarityExhibit = similarityAccepted;
+            const isExhibit = finalGateDecision === 'accepted';
+
+            if (classifierAccepted && finalGateDecision === 'noise_rejected') {
+                console.error('GATE LOGIC ERROR: high-confidence exhibit was rejected');
+            }
+
+            console.log('Gate decision details:', {
+                gateClass: predictedClass,
+                gateConfidence: maxProb,
+                requiredConfidence: this.gateConfig.threshold,
+                classifierAccepted,
+                similarityAccepted,
+                finalGateDecision,
+                exactRejectionCondition: !classifierAccepted && !similarityAccepted
+            });
 
             console.log('Gate raw output:', rawOutput.map(value => value.toFixed(4)).join(', '));
             console.log('Gate probabilities:',
@@ -1054,6 +2035,9 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 isExhibit,
                 isModelExhibit,
                 isSimilarityExhibit,
+                classifierAccepted,
+                similarityAccepted,
+                finalGateDecision,
                 predictedClass,
                 confidence: maxProb,
                 exhibitConfidence,
@@ -1148,7 +2132,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const backgroundNearest = this.findNearestFeature(vector, this.gateSimilarityIndex.background || []);
         const baseMaxDistance = this.gateSimilarityIndex.maxNearestExhibitDistance || 0.22;
         const maxDistance = Math.min(baseMaxDistance, 0.24);
-        const distanceMargin = 1.0;
+        const distanceMargin = 1.15;
         const isSimilarToExhibit =
             exhibitNearest.distance <= maxDistance &&
             exhibitNearest.distance <= backgroundNearest.distance * distanceMargin;
@@ -1277,6 +2261,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     }
 
     async detectExhibit(imageElement) {
+        const inferenceStartedAt = performance.now();
         try {
             if (!this.isInitialized) {
                 throw new Error('Exhibit detection service not initialized');
@@ -1376,7 +2361,6 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 logitsTensor?.dispose();
                 probabilitiesTensor?.dispose();
 
-                const probData = await finalPredictions.data();
                 // Log top 3 predictions for 10-class model
                 const topPredictions = Array.from(probabilities)
                     .map((prob, idx) => ({ class: this.config.classes[idx], confidence: prob, idx }))
@@ -1400,12 +2384,18 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const processingTime = performance.now() - startTime;
             console.log(`🏆 Exhibit classifier inference complete in ${processingTime.toFixed(2)}ms`);
 
-            return {
+            const detectionResult = {
                 ...result,
                 success: true,
                 processingTime,
                 timestamp: Date.now()
             };
+
+            if (!this.firstInferenceLogged) {
+                this.firstInferenceLogged = true;
+                console.log(`⏱️ First inference completed in ${(performance.now() - inferenceStartedAt).toFixed(0)}ms`);
+            }
+            return detectionResult;
 
         } catch (error) {
             console.error('❌ Exhibit classifier inference failed:', error);
@@ -1518,7 +2508,58 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     }
 
 
-    async preprocessImage(imageElement) {
+    getModelInputSpec(model, metadata, modelName) {
+        const inputName = model?.inputNames?.[0];
+        const runtimeInput = inputName && model?.inputMetadata
+            ? model.inputMetadata[inputName]
+            : null;
+        const rawShape = runtimeInput?.dimensions || runtimeInput?.shape ||
+            metadata?.input_shape || metadata?.inputShape ||
+            (modelName === 'CAESAR' ? [1, 3, 224, 224] : null);
+        const shape = Array.isArray(rawShape)
+            ? rawShape.map(dimension => Number.isFinite(Number(dimension)) ? Number(dimension) : null)
+            : null;
+        const isNCHW = shape?.length === 4 && shape[1] === 3 && shape[3] !== 3;
+        const isNHWC = shape?.length === 4 && shape[3] === 3 && shape[1] !== 3;
+
+        if (!shape || (!isNCHW && !isNHWC)) {
+            throw new Error(`${modelName} input shape/layout is unavailable or unsupported: ${JSON.stringify(rawShape)}`);
+        }
+
+        return {
+            inputName,
+            shape,
+            layout: isNCHW ? 'NCHW' : 'NHWC',
+            inputSize: isNCHW ? shape[2] : shape[1]
+        };
+    }
+
+    createValidatedONNXTensor(input, model, modelName, inputSpec, preprocessingConfig) {
+        const actualShape = Array.from(input.shape, Number);
+        const actualLength = input.size;
+        const expectedLength = inputSpec.shape.reduce((total, dimension) =>
+            dimension && dimension > 0 ? total * dimension : total, 1);
+        const shapeMatches = actualShape.length === inputSpec.shape.length &&
+            inputSpec.shape.every((dimension, index) => !dimension || dimension === actualShape[index]);
+
+        console.log(`${modelName} preprocessing:`, {
+            inputName: inputSpec.inputName,
+            expectedShape: inputSpec.shape,
+            actualShape,
+            layout: inputSpec.layout,
+            dataLength: actualLength,
+            expectedDataLength: expectedLength,
+            preprocessing: preprocessingConfig
+        });
+
+        if (!shapeMatches || actualLength !== expectedLength) {
+            throw new Error(`${modelName} input validation failed: expected ${JSON.stringify(inputSpec.shape)} with ${expectedLength} values, got ${JSON.stringify(actualShape)} with ${actualLength} values`);
+        }
+
+        return new ort.Tensor('float32', new Float32Array(input.dataSync()), actualShape);
+    }
+
+    async preprocessImage(imageElement, preprocessing = null, layout = null, inputSize = 224) {
         try {
             console.log('🔄 Starting preprocessing pipeline (EXACT match to Python webcam_record.py)...');
 
@@ -1536,40 +2577,24 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             ctx.drawImage(imageElement, 0, 0);
 
             // Step 2: Get image data and convert to RGB (matching Python: cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            const imageData = ctx.getImageData(0, 0, originalWidth, originalHeight);
-            const rgbData = new Uint8ClampedArray(imageData.data);
             // Note: HTML5 canvas already gives RGB, no conversion needed
 
-            // Step 3: Resize to 224x224 (required for EfficientNet B5 model)
+            // Step 3: Match Ultralytics classify_transforms: resize the shortest
+            // edge to 224, then take a centered 224x224 crop.
             const resizeCanvas = document.createElement('canvas');
             const resizeCtx = resizeCanvas.getContext('2d');
-            resizeCanvas.width = 224;
-            resizeCanvas.height = 224;
-            resizeCtx.drawImage(canvas, 0, 0, 224, 224);
-            console.log('📐 Resized to 224x224 for EfficientNet B3');
+            resizeCanvas.width = inputSize;
+            resizeCanvas.height = inputSize;
+            const scale = inputSize / Math.min(originalWidth, originalHeight);
+            const resizedWidth = Math.round(originalWidth * scale);
+            const resizedHeight = Math.round(originalHeight * scale);
+            const offsetX = (resizedWidth - 224) / 2;
+            const offsetY = (resizedHeight - 224) / 2;
+            resizeCtx.drawImage(canvas, -offsetX, -offsetY, resizedWidth, resizedHeight);
+            console.log(`📐 Resized shortest edge to ${inputSize} and center-cropped to ${inputSize}x${inputSize}`);
 
-            // Step 4: Apply JPEG compression at 95% quality (matching Python JPEG compression)
-            console.log('📦 Applying JPEG compression at 95% quality...');
-            const jpegDataUrl = resizeCanvas.toDataURL('image/jpeg', 0.95);
-
-            // Step 5: Load compressed image back (matching Python: cv2.imdecode)
-            const compressedImage = new Image();
-            await new Promise((resolve, reject) => {
-                compressedImage.onload = resolve;
-                compressedImage.onerror = reject;
-                compressedImage.src = jpegDataUrl;
-            });
-
-            // Step 6: Draw compressed image to final canvas (now we have the exact same data as Python)
-            const finalCanvas = document.createElement('canvas');
-            const finalCtx = finalCanvas.getContext('2d');
-            finalCanvas.width = 224;
-            finalCanvas.height = 224;
-            finalCtx.drawImage(compressedImage, 0, 0, 224, 224);
-            console.log('✅ JPEG compression applied');
-
-            // Step 7: Convert to tensor in RGB format (matching Python: Image.fromarray)
-            let imageTensor = tf.browser.fromPixels(finalCanvas);
+            // Step 4: Convert to tensor in RGB format.
+            let imageTensor = tf.browser.fromPixels(resizeCanvas);
 
             // Ensure 3 channels (RGB)
             if (imageTensor.shape[2] === 4) {
@@ -1585,13 +2610,11 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const rawSample = await float32.slice([0, 0, 0], [1, 1, 3]).data();
             console.log(`🔍 Raw pixel values [0-1]: [${Array.from(rawSample).map(v => v.toFixed(3)).join(', ')}]`);
 
-            // Step 9: Apply ImageNet normalization (EXACT match to Python transforms.Normalize)
-            // Python: transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            console.log('🎯 Applying ImageNet normalization (matching Python transforms.Normalize)...');
+            // Step 9: Apply the normalization declared by the deployed model metadata.
+            console.log('🎯 Applying model-declared normalization...');
 
-            // Use the EXACT values from your Python code
-            const meanValues = [0.485, 0.456, 0.406];
-            const stdValues = [0.229, 0.224, 0.225];
+            const meanValues = preprocessing?.preprocessing?.mean || preprocessing?.mean || [0, 0, 0];
+            const stdValues = preprocessing?.preprocessing?.std || preprocessing?.std || [1, 1, 1];
 
             console.log(`📊 Using normalization: mean=[${meanValues.join(', ')}], std=[${stdValues.join(', ')}]`);
 
@@ -1617,7 +2640,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
             // Step 10: Add batch dimension and handle format based on model type
             let batched;
-            if (this.model && this.model.isONNX) {
+            if (layout === 'NCHW' || (!layout && this.model && this.model.isONNX)) {
                 // For ONNX models, we need NCHW format [1, 3, 224, 224]
                 const transposed = normalized.transpose([2, 0, 1]); // HWC -> CHW
                 batched = transposed.expandDims(0); // Add batch dimension -> NCHW
@@ -1657,8 +2680,27 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             const sortedProbs = [...probabilities].sort((a, b) => b - a);
             const secondHighest = sortedProbs[1] || 0;
             const confidenceGap = confidence - secondHighest;
-            const MIN_CONFIDENCE_GAP = 0.12;
-            const isLikelyBackground = confidenceGap < MIN_CONFIDENCE_GAP;
+            const isLikelyBackground = confidenceGap < RECOGNITION_MIN_MARGIN;
+            const isRecognized = confidence >= RECOGNITION_MIN_CONFIDENCE &&
+                confidenceGap >= RECOGNITION_MIN_MARGIN &&
+                predictedClass !== this.config.backgroundClass &&
+                predictedClass !== 'UNKNOWN' &&
+                predictedClass !== 'OTHER';
+            const rankedIndices = probabilities
+                .map((probability, index) => ({ probability, index }))
+                .sort((first, second) => second.probability - first.probability);
+            const secondIndex = rankedIndices[1]?.index;
+            const top1 = {
+                class: predictedClass,
+                exhibit: this.config.exhibitMapping[predictedClass] || predictedClass,
+                confidence
+            };
+            const top2Class = this.config.classes[secondIndex] || 'UNKNOWN';
+            const top2 = {
+                class: top2Class,
+                exhibit: this.config.exhibitMapping[top2Class] || 'UNKNOWN',
+                confidence: secondHighest
+            };
 
             console.log(`🔍 Confidence analysis: Top: ${(confidence * 100).toFixed(1)}%, Second: ${(secondHighest * 100).toFixed(1)}%, Gap: ${(confidenceGap * 100).toFixed(1)}%`);
 
@@ -1678,12 +2720,15 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             })).sort((a, b) => b.confidence - a.confidence);
 
             return {
-                exhibit: exhibitKey,
-                class: predictedClass,
+                exhibit: isRecognized ? exhibitKey : 'UNKNOWN',
+                class: isRecognized ? predictedClass : 'UNKNOWN',
                 confidence,
                 classId: maxProbIndex,
                 allDetections,
                 isLikelyBackground,
+                isRecognized,
+                top1,
+                top2,
                 confidenceGap,
                 metadata: {
                     model: this.model.isONNX ?
@@ -1742,15 +2787,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
     async runZoneSpecificInference(imageElement, zone) {
         console.log(`🎯 Running zone-specific inference for ${zone}...`);
-        const input = await this.preprocessImage(imageElement);
-        console.log('🔍 Preprocessed input shape:', input.shape);
-        console.log('🔍 Input tensor format check:', input.shape.length === 4 ? 'NCHW format detected' : 'Unexpected format');
-
-        // The main model preprocessing already returns NCHW format [1, 3, 224, 224]
-        // Zone-specific models also expect NCHW, so we can use the tensor directly
-        const inputTensor = new ort.Tensor('float32', await input.data(), input.shape);
-        console.log('🔍 Zone-specific input tensor shape:', inputTensor.dims);
-
+        const inferenceStartedAt = performance.now();
         // Get zone-specific model and metadata
         const zoneMap = {
             'AT': { model: this.atModel, metadata: this.atMetadata, name: 'Atrium', emoji: '🏛️' },
@@ -1759,6 +2796,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             'DWT': { model: this.dwtModel, metadata: this.dwtMetadata, name: 'Dialogue with Time', emoji: '🧠' },
             'EAP': { model: this.eapModel, metadata: this.eapMetadata, name: 'Earth Alive Planet', emoji: '🌍' },
             'EGN': { model: this.egnModel, metadata: this.egnMetadata, name: 'Energy Story', emoji: '⚙️' },
+            'ARICC': { model: this.ariccModel, metadata: this.ariccMetadata, name: 'ARICC', emoji: '🏭' },
+            'RECON': { model: this.reconModel, metadata: this.reconMetadata, name: 'RECON Center', emoji: '🔬' },
+            'FABLAB': { model: this.fablabModel, metadata: this.fablabMetadata, name: 'FABLAB', emoji: '🛠️' },
+            'CAESAR': { model: this.caesarModel, metadata: this.caesarMetadata, name: 'CAESAR', emoji: '🧪' },
             'MAC': { model: this.macModel, metadata: this.macMetadata, name: 'Mechanics Alive', emoji: '🔧' },
             'MEP': { model: this.mepModel, metadata: this.mepMetadata, name: 'Mind Eye', emoji: '👁️' },
             'QS': { model: this.qsModel, metadata: this.qsMetadata, name: 'Quanta School', emoji: '🎓' },
@@ -1774,19 +2815,60 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         const metadata = zoneInfo.metadata;
         console.log(`${zoneInfo.emoji} Using ${zoneInfo.name} model with ${metadata?.num_classes || metadata?.classes?.length || 'unknown'} classes`);
 
+        const inputSpec = this.getModelInputSpec(model, metadata, zoneInfo.name);
+        const input = await this.preprocessImage(
+            imageElement,
+            metadata,
+            inputSpec.layout,
+            inputSpec.inputSize || 224
+        );
+        console.log('🔍 Preprocessed input shape:', input.shape);
+        const actualFormat = input.shape.length === 4 && input.shape[1] === 3 && input.shape[3] !== 3
+            ? 'NCHW'
+            : input.shape.length === 4 && input.shape[3] === 3 && input.shape[1] !== 3
+                ? 'NHWC'
+                : 'UNKNOWN';
+        console.log('🔍 Input tensor format check:', actualFormat);
+        const inputTensor = this.createValidatedONNXTensor(
+            input,
+            model,
+            zoneInfo.name,
+            inputSpec,
+            {
+                layout: inputSpec.layout,
+                inputSize: inputSpec.inputSize,
+                mean: metadata?.preprocessing?.mean || metadata?.mean || [0, 0, 0],
+                std: metadata?.preprocessing?.std || metadata?.std || [1, 1, 1]
+            }
+        );
+        console.log('🔍 Zone-specific input tensor shape:', inputTensor.dims);
+
         // Run inference
         console.log(`⚡ Running ${zone} model inference...`);
         const results = await model.run({ [model.inputNames[0]]: inputTensor });
-        const logits = Array.from(results[model.outputNames[0]].data);
-        console.log(`📊 ${zone} model raw logits:`, logits.slice(0, 5), '...'); // Show first 5 logits
+        const rawOutput = results[model.outputNames[0]]?.data;
+        const outputValues = rawOutput ? Array.from(rawOutput, Number) : [];
+        const expectedClassCount = metadata?.displayNames?.length || metadata?.classes?.length;
+        if (!expectedClassCount || outputValues.length !== expectedClassCount || outputValues.some(value => !Number.isFinite(value))) {
+            throw new Error(`${zone} model returned invalid output values: expected ${expectedClassCount || 'known'} finite values, received ${outputValues.length}`);
+        }
+        console.log(`📊 ${zone} model raw output:`, outputValues.slice(0, 5), '...'); // Show first 5 values
 
-        // Apply softmax and get prediction
-        const probabilities = this.softmax(logits);
+        // Classifier exports may return logits or probabilities. Preserve probabilities
+        // that already sum to one; only apply softmax to finite logits.
+        const outputSum = outputValues.reduce((sum, value) => sum + value, 0);
+        const looksLikeProbabilities = outputValues.every(value => value >= 0 && value <= 1) &&
+            Math.abs(outputSum - 1) < 0.01;
+        const probabilities = looksLikeProbabilities ? outputValues : this.softmax(outputValues);
+        if (probabilities.some(value => !Number.isFinite(value))) {
+            throw new Error(`${zone} model produced non-finite probabilities`);
+        }
         const predictedIdx = probabilities.indexOf(Math.max(...probabilities));
         const confidence = probabilities[predictedIdx];
         // Handle different metadata formats (classes vs class_names)
-        const classNames = metadata.class_names || metadata.classes || [];
-        const exhibit = classNames[predictedIdx];
+        const displayNames = metadata.displayNames || metadata.display_names || [];
+        const classNames = metadata.class_names || metadata.classes || displayNames;
+        const exhibit = displayNames[predictedIdx] || classNames[predictedIdx];
 
         if (!exhibit) {
             console.error(`❌ No class name found for index ${predictedIdx} in ${zone} metadata`);
@@ -1797,8 +2879,22 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         // Add confidence validation for zone-specific models too
         const sortedProbs = [...probabilities].sort((a, b) => b - a);
         const secondHighest = sortedProbs[1];
-        const confidenceGap = confidence - secondHighest;
-        const isLikelyBackground = confidenceGap < 0.12;
+        const confidenceGap = Number.isFinite(secondHighest) && Number.isFinite(confidence)
+            ? Math.max(0, confidence - secondHighest)
+            : 0;
+        const isUnknownBackground = exhibit.trim().toLowerCase().replace(/[\s-]+/g, '_') === 'unknown_background';
+        const isLikelyBackground = isUnknownBackground || confidenceGap < RECOGNITION_MIN_MARGIN;
+        const isRecognized = confidence >= RECOGNITION_MIN_CONFIDENCE &&
+            confidenceGap >= RECOGNITION_MIN_MARGIN &&
+            exhibit !== 'UNKNOWN' && exhibit !== 'OTHER' &&
+            exhibit.toLowerCase() !== 'unknown_background';
+        const rankedPredictions = probabilities
+            .map((probability, index) => ({
+                class: classNames[index] || `Unknown_${index}`,
+                exhibit: displayNames[index] || classNames[index] || 'UNKNOWN',
+                confidence: probability
+            }))
+            .sort((first, second) => second.confidence - first.confidence);
 
         console.log(`✅ ${zone} model result: ${exhibit} (${(confidence * 100).toFixed(1)}% confidence)`);
         console.log(`🔍 ${zone} confidence gap: ${(confidenceGap * 100).toFixed(1)}%`);
@@ -1810,10 +2906,21 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         );
 
         if (isLikelyBackground) {
-            console.log(`⚠️ ${zone} model: Low confidence gap (${(confidenceGap * 100).toFixed(1)}%) - likely background/noise`);
+            console.log(`⚠️ ${zone} model: Low or unavailable confidence gap - likely background/noise`);
         }
 
-        return { exhibit, confidence, isLikelyBackground, confidenceGap };
+        return {
+            exhibit,
+            displayName: displayNames[predictedIdx] || exhibit,
+            classCode: zone === 'RECON' ? `RECON-${predictedIdx + 1}` : classNames[predictedIdx],
+            confidence,
+            isLikelyBackground,
+            confidenceGap,
+            isRecognized,
+            top1: rankedPredictions[0],
+            top2: rankedPredictions[1] || { class: 'UNKNOWN', exhibit: 'UNKNOWN', confidence: 0 },
+            processingTime: performance.now() - inferenceStartedAt
+        };
     }
 
     convertToONNXTensor(tensorflowTensor) {
