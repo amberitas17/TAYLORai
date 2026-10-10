@@ -76,7 +76,9 @@ def eligibility(records: list[dict], minimum_per_class: int, minimum_sessions: i
             rejected["missing_verified_label"] += 1
         elif image is None:
             rejected["missing_image_data"] += 1
-        elif not (evidence.get("uncertainFrames", 0) >= 2 or ("UNSTABLE" in reasons and evidence.get("distinctLabels", 0) >= 3)):
+        elif not (evidence.get("uncertainFrames", 0) >= 2 or ("UNSTABLE" in reasons and evidence.get("distinctLabels", 0) >= 3) or
+                  ("USER_REPORTED_MISCLASSIFICATION" in reasons and evidence.get("userCorrection") is True and
+                   record.get("verificationSource") not in (None, "", "model") and record.get("label") == record.get("proposedLabel"))):
             rejected["insufficient_repeated_trigger_evidence"] += 1
         else:
             accepted.append({**record, "imageBytes": image, "digest": hashlib.sha256(image).hexdigest()})
