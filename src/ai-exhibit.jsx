@@ -836,7 +836,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       setFeedbackStatus(message);
       setFeedbackMode(null);
       setFeedbackCorrectionLabel('');
-      if (tentativeRecognition) {
+      if (tentativeRecognition && feedbackType !== 'CORRECT') {
         tentativePromptAtRef.current = Date.now();
         setTentativeRecognition(null);
         tentativeLabelRef.current = '';
@@ -911,6 +911,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       setFeedbackStatus('User confirmation saved offline; pending verification.');
     }
     // Do not promote tentative results to recognized exhibits.
+    tentativePromptAtRef.current = Date.now();
+    setFeedbackMode('confirmed_pending_review');
   };
 
   const getStableExhibitLabel = () => {
@@ -1991,12 +1993,16 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       }}>
         {tentativeRecognition ? (
           <>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 5 }}>Is this the correct exhibit?</div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 5 }}>
+              {feedbackMode === 'confirmed_pending_review' ? 'User-confirmed exhibit — pending verification' : 'Is this the correct exhibit?'}
+            </div>
             <div style={{ fontSize: 12, marginBottom: 7 }}>
               {tentativeRecognition.alternatives.map(formatRecognitionLabel).join(' or ')}
               {' '}({(tentativeRecognition.confidence * 100).toFixed(1)}%, margin {(tentativeRecognition.margin * 100).toFixed(1)}%)
             </div>
-            {feedbackMode === 'wrong' ? (
+            {feedbackMode === 'confirmed_pending_review' ? (
+              <button type="button" onClick={continueScanning}>Continue Scanning</button>
+            ) : feedbackMode === 'wrong' ? (
               <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
                 <select
                   aria-label="Correct exhibit"
