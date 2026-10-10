@@ -1941,6 +1941,87 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     if (explanationText) textToSpeech(explanationText, false, 'taylor', 'en');
   };
 
+  const renderFeedbackCard = () => (
+    {feedbackVisible && (
+      <div style={{
+        position: "relative",
+        
+        
+        
+        
+        pointerEvents: "auto",
+        width: "100%",
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "rgba(0, 0, 0, 0.78)",
+        color: "#fff",
+        textAlign: "center",
+        boxSizing: "border-box",
+         marginTop: 12
+      }}>
+        {tentativeRecognition ? (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 5 }}>Is this the correct exhibit?</div>
+            <div style={{ fontSize: 12, marginBottom: 7 }}>
+              {tentativeRecognition.alternatives.map(formatRecognitionLabel).join(' or ')}
+              {' '}({(tentativeRecognition.confidence * 100).toFixed(1)}%, margin {(tentativeRecognition.margin * 100).toFixed(1)}%)
+            </div>
+            {feedbackMode === 'wrong' ? (
+              <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+                <select
+                  aria-label="Correct exhibit"
+                  value={feedbackCorrectionLabel}
+                  onChange={(event) => setFeedbackCorrectionLabel(event.target.value)}
+                  style={{ maxWidth: "100%", minHeight: 32 }}
+                >
+                  <option value="">Choose the correct exhibit</option>
+                  {approvedFeedbackLabels.map((label) => (
+                    <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => submitFeedback('WRONG_EXHIBIT', feedbackCorrectionLabel)} disabled={!feedbackCorrectionLabel}>Save correction</button>
+                <button type="button" onClick={() => setFeedbackMode(null)}>Cancel</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
+                <button type="button" onClick={confirmTentativeRecognition}>Confirm</button>
+                <button type="button" onClick={handleWrongExhibit}>Wrong Exhibit</button>
+                <button type="button" onClick={continueScanning}>Continue Scanning</button>
+              </div>
+            )}
+          </>
+        ) : feedbackMode === 'wrong' ? (
+          <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+            <select
+              aria-label="Correct exhibit"
+              value={feedbackCorrectionLabel}
+              onChange={(event) => setFeedbackCorrectionLabel(event.target.value)}
+              style={{ maxWidth: "100%", minHeight: 32 }}
+            >
+              <option value="">Choose the correct exhibit</option>
+              {approvedFeedbackLabels.map((label) => (
+                <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => submitFeedback('WRONG_EXHIBIT', feedbackCorrectionLabel)}
+              disabled={!feedbackCorrectionLabel}
+            >Save correction</button>
+            <button type="button" onClick={() => setFeedbackMode(null)}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
+            <button type="button" onClick={() => submitFeedback('CORRECT')}>Correct</button>
+            <button type="button" onClick={handleWrongExhibit}>Wrong Exhibit</button>
+            <button type="button" onClick={() => submitFeedback('NOT_SURE')}>Not Sure</button>
+          </div>
+        )}
+        {feedbackStatus && <div style={{ fontSize: 11, marginTop: 7 }} aria-live="polite">{feedbackStatus}</div>}
+      </div>
+    )}
+  );
+
   return (
     <div style={{ flex: 1, position: "relative", height: "100vh", overflow: "hidden" }}>
       {tourMode && (
@@ -1990,6 +2071,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
                 {!activeExhibitInformation && <button onClick={() => window.dispatchEvent(new Event('online'))}>Retry Explanation</button>}
                 <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
               </div>
+              {renderFeedbackCard()}
             </section>
           )}
           {!displayedActiveExhibit && <div className="exhibit-tour-search-status">Searching for an exhibit...</div>}
@@ -2033,6 +2115,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             )}
             <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
           </div>
+          {renderFeedbackCard()}
         </section>
       )}
       {isLoading && (
@@ -2152,81 +2235,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         </div>
       </div>
     )}
-    {feedbackVisible && (
-      <div style={{
-        position: "absolute",
-        left: "50%",
-        bottom: 24,
-        transform: "translateX(-50%)",
-        zIndex: 1501,
-        pointerEvents: "auto",
-        width: "min(440px, 90vw)",
-        padding: "10px 12px",
-        borderRadius: 8,
-        background: "rgba(0, 0, 0, 0.78)",
-        color: "#fff",
-        textAlign: "center",
-        boxSizing: "border-box"
-      }}>
-        {tentativeRecognition ? (
-          <>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 5 }}>Is this the correct exhibit?</div>
-            <div style={{ fontSize: 12, marginBottom: 7 }}>
-              {tentativeRecognition.alternatives.map(formatRecognitionLabel).join(' or ')}
-              {' '}({(tentativeRecognition.confidence * 100).toFixed(1)}%, margin {(tentativeRecognition.margin * 100).toFixed(1)}%)
-            </div>
-            {feedbackMode === 'wrong' ? (
-              <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-                <select
-                  aria-label="Correct exhibit"
-                  value={feedbackCorrectionLabel}
-                  onChange={(event) => setFeedbackCorrectionLabel(event.target.value)}
-                  style={{ maxWidth: "100%", minHeight: 32 }}
-                >
-                  <option value="">Choose the correct exhibit</option>
-                  {approvedFeedbackLabels.map((label) => (
-                    <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
-                  ))}
-                </select>
-                <button type="button" onClick={() => submitFeedback('WRONG_EXHIBIT', feedbackCorrectionLabel)} disabled={!feedbackCorrectionLabel}>Save correction</button>
-                <button type="button" onClick={() => setFeedbackMode(null)}>Cancel</button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
-                <button type="button" onClick={confirmTentativeRecognition}>Confirm</button>
-                <button type="button" onClick={handleWrongExhibit}>Wrong Exhibit</button>
-                <button type="button" onClick={continueScanning}>Continue Scanning</button>
-              </div>
-            )}
-          </>
-        ) : feedbackMode === 'wrong' ? (
-          <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-            <select
-              aria-label="Correct exhibit"
-              value={feedbackCorrectionLabel}
-              onChange={(event) => setFeedbackCorrectionLabel(event.target.value)}
-              style={{ maxWidth: "100%", minHeight: 32 }}
-            >
-              <option value="">Choose the correct exhibit</option>
-              {approvedFeedbackLabels.map((label) => (
-                <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => submitFeedback('WRONG_EXHIBIT', feedbackCorrectionLabel)}
-              disabled={!feedbackCorrectionLabel}
-            >Save correction</button>
-            <button type="button" onClick={() => setFeedbackMode(null)}>Cancel</button>
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
-            <button type="button" onClick={() => submitFeedback('CORRECT')}>Correct</button>
-            <button type="button" onClick={handleWrongExhibit}>Wrong Exhibit</button>
-            <button type="button" onClick={() => submitFeedback('NOT_SURE')}>Not Sure</button>
-          </div>
-        )}
-        {feedbackStatus && <div style={{ fontSize: 11, marginTop: 7 }} aria-live="polite">{feedbackStatus}</div>}
+    {tentativeRecognition && !displayedActiveExhibit && (
+      <div style={{ position: 'absolute', bottom: 24, left: 12, right: 12, zIndex: 1501, maxWidth: 440, margin: '0 auto' }}>
+        {renderFeedbackCard()}
       </div>
     )}
     {diagnosticsEnabled && (
