@@ -3,8 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { FiEye, FiArrowLeft, FiMapPin, FiChevronRight, FiNavigation } from 'react-icons/fi';
 import './ai-exhibit.css';
 import LeafletMap from './components/LeafletMap';
-import exhibitDetectionService, { EXHIBIT_MODEL_STATES } from './services/exhibitDetectionService.js';
+import exhibitDetectionService, { EXHIBIT_MODEL_STATES, MODEL_ASSET_VERSION } from './services/exhibitDetectionService.js';
 import { textToSpeech } from './services/speechAPI.js';
+import { classifyRecognitionPresentation } from './services/recognitionPresentation.js';
+import { getAnonymousSessionId, saveExhibitFeedback } from './services/exhibitFeedbackStore.js';
 import { getOfflineExhibitInformation, getVerifiedExhibitInformation } from './services/exhibitInformation.js';
 import {
   cacheExhibitExplanation,
@@ -13,12 +15,29 @@ import {
 } from './services/exhibitExplanationCache.js';
 import {
   captureLandmarkCandidate,
+  captureCorrectedLandmarkCandidate,
   getLandmarkLearningConsent,
   setLandmarkLearningConsent,
 } from './services/landmarkLearningStore.js';
+import { notifyReconLearningObserver } from './services/reconLearningObserver.js';
 
 const width = window.innerWidth;
 const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
+const RECON_CORRECTION_LABELS = [
+  'charcoal_oven_machine',
+  'festo_solar_wind_training_system',
+  'fluke_2042_cable_tracer',
+  'fluke_355_clamp_meter',
+  'fluke_922_air_flow_meter',
+  'fluke_930_non_contact_tachometer',
+  'fluke_971_temperature_humidity_meter',
+  'ip_display_area',
+  'quadruple_suction_single_discharge_cooking_oil_transfer_device',
+  'root_crop_slicing_machine',
+  'testo_420_volume_flow_hood',
+  'testo_440_air_velocity_iaq',
+  'unmanned_aerial_system',
+];
 
 const getKnowledgeEntity = (zone = '') => {
   const normalizedZone = String(zone).trim().toUpperCase().replace(/[_-]+/g, ' ');
@@ -664,10 +683,15 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const rejectStreakRef = useRef(0);
   const pendingLabelRef = useRef("");
   const pendingLabelCountRef = useRef(0);
+  const tentativeLabelRef = useRef("");
+  const tentativeLabelCountRef = useRef(0);
+  const tentativePromptAtRef = useRef(0);
+  const tentativePromptKeyRef = useRef("");
   const lastAcceptedAtRef = useRef(0);
   const [recognitionDebug, setRecognitionDebug] = useState(null);
   const [learningConsent, setLearningConsent] = useState(() => getLandmarkLearningConsent());
   const [learningCaptureStatus, setLearningCaptureStatus] = useState('');
+  const [correctionLabel, setCorrectionLabel] = useState('');
   const [explanationState, setExplanationState] = useState({ status: 'idle', explanation: null, error: null });
   const explanationRequestRef = useRef(null);
 
@@ -701,11 +725,19 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState('Loading models...');
   const [statusMessage, setStatusMessage] = useState("");
+  const [tentativeRecognition, setTentativeRecognition] = useState(null);
+  const [feedbackMode, setFeedbackMode] = useState(null);
+  const [feedbackCorrectionLabel, setFeedbackCorrectionLabel] = useState('');
+  const [feedbackStatus, setFeedbackStatus] = useState('');
   const [recognitionState, setRecognitionState] = useState(EXHIBIT_MODEL_STATES.CAMERA_READY);
   const [diagnosticsTick, setDiagnosticsTick] = useState(0);
   const diagnosticsEnabled = new URLSearchParams(window.location.search).has('recognitionDebug');
   const currentZoneKey = classifierMode.toLowerCase();
   const zoneLabel = classifierMode.toUpperCase();
+  const loadedFeedbackLabels = exhibitDetectionService.getApprovedLabels(classifierMode);
+  const approvedFeedbackLabels = loadedFeedbackLabels.length > 0
+    ? loadedFeedbackLabels
+    : currentZoneKey === 'recon' ? RECON_CORRECTION_LABELS : [];
   const zoneReadyState = exhibitDetectionService.zoneStates?.[currentZoneKey] || 'MODEL_LOADING';
   const cameraReady = Boolean(videoRef.current?.srcObject || uploadedVideoRef.current);
   const currentResourceDiagnostics = Object.entries(exhibitDetectionService.resourceDiagnostics || {})
@@ -738,17 +770,82 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   const formatRecognitionLabel = (label = '') => String(label).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 
+  const feedbackVisible = Boolean(currentExhibit || tentativeRecognition);
+  const feedbackPredictedLabel = tentativeRecognition?.label || lastDetection?.top1?.exhibit || lastDetection?.top1?.class ||
+    currentExhibit?.name || '';
+  const feedbackConfidence = Number(lastDetection?.top1?.confidence || lastDetection?.exhibitConfidence ||
+    tentativeRecognition?.confidence || currentExhibit?.confidence || 0);
+
+  const submitFeedback = async (feedbackType, correctedLabel = null) => {
+    if (!feedbackPredictedLabel) return;
+    try {
+      const result = await saveExhibitFeedback({
+        predictedLabel: feedbackPredictedLabel,
+        correctedLabel,
+        feedbackType,
+        confidence: feedbackConfidence,
+        zone: zoneLabel,
+        modelVersion: MODEL_ASSET_VERSION,
+        sessionId: getAnonymousSessionId(),
+      });
+      setFeedbackStatus(result.duplicate ? 'Feedback already saved on this device.' : 'Feedback saved offline.');
+      setFeedbackMode(null);
+      setFeedbackCorrectionLabel('');
+      if (tentativeRecognition) {
+        tentativePromptAtRef.current = Date.now();
+        setTentativeRecognition(null);
+        tentativeLabelRef.current = '';
+        tentativeLabelCountRef.current = 0;
+      }
+    } catch (feedbackError) {
+      setFeedbackStatus(feedbackError.message || 'Feedback could not be saved.');
+    }
+  };
+
+  const handleWrongExhibit = () => {
+    setFeedbackMode('wrong');
+    setFeedbackStatus('');
+    setFeedbackCorrectionLabel('');
+  };
+
+  const promoteTentativeRecognition = () => {
+    if (!tentativeRecognition?.candidate) return;
+    const exhibit = tentativeRecognition.candidate;
+    setCurrentExhibit(exhibit);
+    setActiveExhibit(exhibit.name);
+    setTentativeRecognition(null);
+    setFeedbackMode(null);
+    setLocationDetected(true);
+    setStableExhibitDetected(true);
+    lastAcceptedAtRef.current = Date.now();
+    if (tourMode && typeof window !== 'undefined') window.sessionStorage.setItem('activeExhibit', exhibit.name);
+    const knowledgeEntity = getKnowledgeEntity(exhibit.zone);
+    if (knowledgeEntity && typeof window !== 'undefined') {
+      window.sessionStorage.setItem('taylorActiveEntity', knowledgeEntity);
+      window.dispatchEvent(new CustomEvent('taylor-active-entity-change', {
+        detail: { activeEntity: knowledgeEntity, confirmed: false, userConfirmed: true }
+      }));
+    }
+  };
+
+  const continueScanning = () => {
+    tentativePromptAtRef.current = Date.now();
+    tentativePromptKeyRef.current = tentativeRecognition?.label || '';
+    setTentativeRecognition(null);
+    setFeedbackMode(null);
+    setFeedbackStatus('');
+    tentativeLabelRef.current = '';
+    tentativeLabelCountRef.current = 0;
+  };
+
+  const confirmTentativeRecognition = async () => {
+    await submitFeedback('CORRECT');
+    promoteTentativeRecognition();
+  };
+
   const getStableExhibitLabel = () => {
     if (currentExhibit?.name && currentExhibit.name !== "Exhibit detected") return formatRecognitionLabel(currentExhibit.name);
     if (currentExhibit?.zone) return currentExhibit.zone;
-    if (
-      lastDetection?.success &&
-      !lastDetection.gateOnly &&
-      lastDetection.exhibitInfo?.code !== "EXHIBIT" &&
-      lastDetection.exhibitInfo?.displayName
-    ) {
-      return formatRecognitionLabel(lastDetection.exhibitInfo.displayName);
-    }
     return "";
   };
 
@@ -1094,6 +1191,44 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     };
   }, [showCamera]);
 
+  const captureReconLearningCandidate = (detection) => {
+    if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
+    const top1 = detection?.top1 || { class: detection?.exhibit || 'UNKNOWN', confidence: detection?.exhibitConfidence || 0 };
+    const top2 = detection?.top2 || { class: 'UNKNOWN', confidence: 0 };
+    const confidence = Number(top1.confidence || 0);
+    const margin = Number.isFinite(Number(detection?.specificConfidenceGap))
+      ? Number(detection.specificConfidenceGap)
+      : confidence - Number(top2.confidence || 0);
+    const reasons = [];
+    if (confidence < 0.8) reasons.push('LOW_CONFIDENCE');
+    if (margin < 0.15) reasons.push('LOW_MARGIN');
+    if (!detection?.success) reasons.push(detection?.reason || 'REJECTED');
+    if (reasons.length === 0 || Date.now() - lastLearningCaptureAtRef.current < 5000) return;
+
+    lastLearningCaptureAtRef.current = Date.now();
+    return notifyReconLearningObserver(captureLandmarkCandidate, {
+      video: videoRef.current,
+      prediction: {
+        top1: top1.class || 'UNKNOWN',
+        top2: top2.class || 'UNKNOWN',
+        rawScores: detection?.rawScores || null,
+        confidence,
+      },
+      sourceSession: learningSessionRef.current,
+      modelVersion: '20261010-recon-13class-v1',
+      trigger: 'recon_low_confidence_camera',
+      reasons,
+    }, (captureError) => {
+      console.warn('RECON learning capture failed:', captureError.message);
+    }).then((result) => {
+      if (!result) return;
+      if (result.saved) {
+        setLearningCaptureStatus('Low-confidence frame saved for review');
+        window.setTimeout(() => setLearningCaptureStatus(''), 1800);
+      }
+    });
+  };
+
   // Upload a video file for testing instead of using the live camera
   const handleVideoUpload = (event) => {
     const file = event.target.files?.[0];
@@ -1123,6 +1258,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
     video.onerror = () => setError('The selected video could not be loaded.');
   };
+<<<<<<< HEAD
+=======
 
     const captureReconLearningCandidate = (detection) => {
       if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
@@ -1160,6 +1297,30 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         console.warn('RECON learning capture failed:', captureError.message);
       });
     };
+>>>>>>> 0c6b3b5250025cbe486d8fe6b3d15fe95b8e78fe
+
+  const saveReconCorrection = () => {
+    if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current || !lastDetection) return;
+    const label = correctionLabel || lastDetection.exhibit || lastDetection.top1?.class;
+    if (!label) return;
+    captureCorrectedLandmarkCandidate({
+      video: videoRef.current,
+      prediction: {
+        top1: lastDetection.top1?.class || lastDetection.exhibit || 'UNKNOWN',
+        top2: lastDetection.top2?.class || 'UNKNOWN',
+        rawScores: lastDetection.rawScores || null,
+        confidence: Number(lastDetection.top1?.confidence || lastDetection.exhibitConfidence || 0),
+      },
+      sourceSession: learningSessionRef.current,
+      modelVersion: '20261010-recon-13class-v1',
+      correctedLabel: label,
+    }).then((result) => {
+      setLearningCaptureStatus(result.saved ? `Correction saved for review as ${formatRecognitionLabel(label)}` : `Correction not saved: ${result.reason}`);
+      window.setTimeout(() => setLearningCaptureStatus(''), 2200);
+    }).catch((captureError) => {
+      console.warn('RECON correction capture failed:', captureError.message);
+    });
+  };
 
   // Start real-time detection
   const startRealTimeDetection = () => {
@@ -1254,6 +1415,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       return;
     }
 
+    const frameStartedAt = performance.now();
     console.log("🎯 Starting hierarchical detection...");
     if (!lastDetection) {
       setStatusMessage("Analyzing image...");
@@ -1261,10 +1423,61 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     }
     const detection = await detectionService.detectHierarchical(video);
     setLastDetection(detection);
-    captureReconLearningCandidate(detection);
+    try {
+      captureReconLearningCandidate(detection);
+    } catch (observerError) {
+      console.warn('RECON learning observer skipped:', observerError.message);
+    }
+    if (diagnosticsEnabled) {
+      exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'FRAME_QA', {
+        source: uploadedVideoRef.current?.name || 'CAMERA',
+        zone: classifierMode.toUpperCase(),
+        top1: detection.top1?.class || detection.exhibit || 'UNKNOWN',
+        top2: detection.top2?.class || 'UNKNOWN',
+        confidence: Number(detection.top1?.confidence || detection.exhibitConfidence || 0),
+        margin: Number(detection.specificConfidenceGap || detection.mainConfidenceGap || 0),
+        accepted: Boolean(detection.success),
+        rejectionReason: detection.success ? null : detection.reason || 'REJECTED',
+        processingLatencyMs: Math.round(performance.now() - frameStartedAt),
+        personDetector: detection.personDetector || {
+          available: exhibitDetectionService.faceDetectorStatus === 'READY',
+          status: exhibitDetectionService.faceDetectorStatus
+        }
+      });
+    }
     console.log("✅ Hierarchical detection completed:", detection);
 
     if (!detection.success) {
+      const presentation = classifyRecognitionPresentation(detection);
+      const failedLabel = detection.exhibitInfo?.displayName || detection.exhibit || detection.top1?.exhibit || detection.top1?.class || '';
+      const hasPlausibleCandidate = Boolean(
+        failedLabel && detection.zone && detection.exhibitInfo?.code !== 'EXHIBIT' &&
+        !detection.gateOnly && !detection.isLikelyBackground
+      );
+      const tentativeKey = `${detection.zone}:${presentation.label || failedLabel}`;
+      if (presentation.state === 'tentative' && hasPlausibleCandidate) {
+        tentativeLabelCountRef.current = tentativeLabelRef.current === tentativeKey
+          ? tentativeLabelCountRef.current + 1
+          : 1;
+        tentativeLabelRef.current = tentativeKey;
+        const cooldownElapsed = Date.now() - tentativePromptAtRef.current >= 5000;
+        const newPrompt = tentativePromptKeyRef.current !== tentativeKey;
+        if (tentativeLabelCountRef.current >= 2 && (cooldownElapsed || newPrompt)) {
+          const candidate = {
+            id: detection.exhibitInfo?.number || '00', name: failedLabel,
+            key: (detection.exhibitInfo?.code || detection.exhibit || '').toLowerCase(),
+            zone: detection.zone, exhibitInfo: detection.exhibitInfo,
+            coordinates: detection.coordinates, confidence: presentation.confidence,
+          };
+          setTentativeRecognition({ ...presentation, candidate });
+          tentativePromptAtRef.current = Date.now();
+          tentativePromptKeyRef.current = tentativeKey;
+        }
+      } else {
+        tentativeLabelRef.current = '';
+        tentativeLabelCountRef.current = 0;
+        setTentativeRecognition(null);
+      }
       pendingLabelRef.current = "";
       pendingLabelCountRef.current = 0;
       setCurrentExhibit(null);
@@ -1322,6 +1535,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         setStatusMessage("Detection not successful");
         console.log("⚠️ Detection not successful — hiding exhibit.");
       }
+      if (presentation.state === 'tentative') setStatusMessage('');
       setTimeout(() => setStatusMessage(""), 1500);
       return;
     }
@@ -1341,16 +1555,29 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       `🔍 Combined confidence: ${(combinedConfidence * 100).toFixed(1)}% (${detection.zone} / ${detection.exhibitInfo?.displayName || detection.exhibit})`
     );
 
-    const displayConfidenceThreshold = detectedZone === "RECON" ? 0.60 : 0.80;
-    if (!hasRealLabel || !detection.isRecognized || combinedConfidence < displayConfidenceThreshold || (detection.specificConfidenceGap || detection.mainConfidenceGap || 0) < 0.15) {
+    const presentation = classifyRecognitionPresentation(detection);
+    if (!hasRealLabel || presentation.state !== 'confirmed') {
       pendingLabelRef.current = "";
       pendingLabelCountRef.current = 0;
       setCurrentExhibit(null);
       setStableExhibitDetected(false);
       setLocationDetected(false);
-      console.log("Ignoring detection because it is generic or below the display threshold.");
+      setTentativeRecognition(presentation.state === 'tentative' ? {
+        ...presentation,
+        candidate: {
+          id: detection.exhibitInfo?.number || '00', name: detectedName,
+          key: (detection.exhibitInfo?.code || detection.exhibit || '').toLowerCase(),
+          zone: detectedZone, exhibitInfo: detection.exhibitInfo,
+          coordinates: detection.coordinates, confidence: presentation.confidence,
+        }
+      } : null);
+      console.log("Ignoring detection because it is generic or below the acceptance thresholds.");
       return;
     }
+
+    setTentativeRecognition(null);
+    tentativeLabelRef.current = '';
+    tentativeLabelCountRef.current = 0;
 
     const labelKey = `${detectedZone}:${detectedName}`;
     if (pendingLabelRef.current === labelKey) {
@@ -1495,6 +1722,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     pendingLabelCountRef.current = 0;
     setError("");
     setLastDetection(null);
+    setTentativeRecognition(null);
+    setFeedbackMode(null);
+    setFeedbackStatus('');
     // Real-time detection will restart automatically when camera shows
     console.log('🔄 Restarting automatic detection...');
   };
@@ -1684,6 +1914,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     setActiveExhibit(null);
     setCurrentExhibit(null);
     setLastDetection(null);
+    setTentativeRecognition(null);
+    setFeedbackMode(null);
+    setFeedbackStatus('');
     setStableExhibitDetected(false);
     setLocationDetected(false);
     pendingLabelRef.current = '';
@@ -1694,8 +1927,11 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   };
 
   const navigationInfo = { distance: 120, steps: 160, direction: "North-East" };
-  const activeExhibitInformation = activeExhibit
-    ? explanationState.explanation || getVerifiedExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, activeExhibit)
+  const displayedActiveExhibit = activeExhibit || (
+    !tentativeRecognition && currentExhibit?.name ? currentExhibit.name : null
+  );
+  const activeExhibitInformation = displayedActiveExhibit
+    ? explanationState.explanation || getVerifiedExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, displayedActiveExhibit)
     : null;
   const explanationText = activeExhibitInformation
     ? `${activeExhibitInformation.whatIsIt} ${activeExhibitInformation.purpose}`
@@ -1719,7 +1955,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
               <span aria-hidden="true">●</span> {activeExhibit ? 'Recognized' : 'Searching...'}
             </div>
           </header>
-          {!activeExhibit ? (
+          {!displayedActiveExhibit ? (
             <div className="exhibit-tour-searching" aria-live="polite">
               <div className="exhibit-tour-reticle" aria-hidden="true">⌾</div>
               <strong>Aim at an exhibit</strong>
@@ -1729,7 +1965,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             <section className="exhibit-tour-sheet" aria-live="polite">
               <div className="exhibit-tour-sheet__handle" aria-hidden="true" />
               <div className="exhibit-tour-panel__recognized">✓ EXHIBIT RECOGNIZED</div>
-              <h2>{formatRecognitionLabel(activeExhibit)}</h2>
+              <h2>{formatRecognitionLabel(displayedActiveExhibit)}</h2>
               {activeExhibitInformation ? (
                 <div className="exhibit-explanation" aria-live="polite">
                   <strong>What is it?</strong>
@@ -1756,13 +1992,13 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
               </div>
             </section>
           )}
-          {!activeExhibit && <div className="exhibit-tour-search-status">Searching for an exhibit...</div>}
+          {!displayedActiveExhibit && <div className="exhibit-tour-search-status">Searching for an exhibit...</div>}
         </>
       )}
-      {!tourMode && specialistRoute && activeExhibit && (
+      {!tourMode && specialistRoute && displayedActiveExhibit && (
         <section className="exhibit-tour-sheet exhibit-direct-information" aria-live="polite">
           <div className="exhibit-tour-panel__recognized">EXHIBIT RECOGNIZED</div>
-          <h2>{formatRecognitionLabel(activeExhibit)}</h2>
+          <h2>{formatRecognitionLabel(displayedActiveExhibit)}</h2>
           {activeExhibitInformation ? (
             <div className="exhibit-explanation" aria-live="polite">
               <strong>What is it?</strong>
@@ -1780,6 +2016,21 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
               Ask TAYLOR
             </button>
+            {classifierMode.toLowerCase() === 'recon' && learningConsent && !uploadedVideoRef.current && (
+              <>
+                <select
+                  aria-label="Correct RECON prediction"
+                  value={correctionLabel}
+                  onChange={(event) => setCorrectionLabel(event.target.value)}
+                >
+                  <option value="">Correct prediction...</option>
+                  {RECON_CORRECTION_LABELS.map((label) => (
+                    <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
+                  ))}
+                </select>
+                <button onClick={saveReconCorrection} disabled={!correctionLabel}>Save correction</button>
+              </>
+            )}
             <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
           </div>
         </section>
@@ -1871,6 +2122,111 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         <div>Top 2: {recognitionDebug.top2.class} {(recognitionDebug.top2.confidence * 100).toFixed(1)}%</div>
         <div>Inference: {Number(recognitionDebug.inferenceTime || 0).toFixed(0)} ms</div>
         <div>Confirmation: {recognitionDebug.confirmationCount}/3</div>
+      </div>
+    )}
+    {tentativeRecognition && !currentExhibit && (
+      <div style={{
+        position: "absolute",
+        top: isLoading ? 120 : 32,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "rgba(255, 248, 220, 0.96)",
+        border: "1px solid rgba(126, 91, 20, 0.45)",
+        borderRadius: 8,
+        zIndex: 1200,
+        padding: "10px 18px",
+        color: "#513d13",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
+        textAlign: "center",
+        minWidth: 210,
+        maxWidth: "86vw"
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginBottom: 3 }}>
+          AI IS UNSURE
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 700, overflowWrap: "anywhere" }}>
+          {tentativeRecognition.alternatives.map(formatRecognitionLabel).join(' or ')}
+        </div>
+        <div style={{ fontSize: 12, marginTop: 4 }}>
+          {(tentativeRecognition.confidence * 100).toFixed(1)}% match. Move closer or adjust the camera.
+        </div>
+      </div>
+    )}
+    {feedbackVisible && (
+      <div style={{
+        position: "absolute",
+        left: "50%",
+        bottom: 24,
+        transform: "translateX(-50%)",
+        zIndex: 1501,
+        pointerEvents: "auto",
+        width: "min(440px, 90vw)",
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "rgba(0, 0, 0, 0.78)",
+        color: "#fff",
+        textAlign: "center",
+        boxSizing: "border-box"
+      }}>
+        {tentativeRecognition ? (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 5 }}>Is this the correct exhibit?</div>
+            <div style={{ fontSize: 12, marginBottom: 7 }}>
+              {tentativeRecognition.alternatives.map(formatRecognitionLabel).join(' or ')}
+              {' '}({(tentativeRecognition.confidence * 100).toFixed(1)}%, margin {(tentativeRecognition.margin * 100).toFixed(1)}%)
+            </div>
+            {feedbackMode === 'wrong' ? (
+              <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+                <select
+                  aria-label="Correct exhibit"
+                  value={feedbackCorrectionLabel}
+                  onChange={(event) => setFeedbackCorrectionLabel(event.target.value)}
+                  style={{ maxWidth: "100%", minHeight: 32 }}
+                >
+                  <option value="">Choose the correct exhibit</option>
+                  {approvedFeedbackLabels.map((label) => (
+                    <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => submitFeedback('WRONG_EXHIBIT', feedbackCorrectionLabel)} disabled={!feedbackCorrectionLabel}>Save correction</button>
+                <button type="button" onClick={() => setFeedbackMode(null)}>Cancel</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
+                <button type="button" onClick={confirmTentativeRecognition}>Confirm</button>
+                <button type="button" onClick={handleWrongExhibit}>Wrong Exhibit</button>
+                <button type="button" onClick={continueScanning}>Continue Scanning</button>
+              </div>
+            )}
+          </>
+        ) : feedbackMode === 'wrong' ? (
+          <div style={{ display: "flex", gap: 7, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+            <select
+              aria-label="Correct exhibit"
+              value={feedbackCorrectionLabel}
+              onChange={(event) => setFeedbackCorrectionLabel(event.target.value)}
+              style={{ maxWidth: "100%", minHeight: 32 }}
+            >
+              <option value="">Choose the correct exhibit</option>
+              {approvedFeedbackLabels.map((label) => (
+                <option key={label} value={label}>{formatRecognitionLabel(label)}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => submitFeedback('WRONG_EXHIBIT', feedbackCorrectionLabel)}
+              disabled={!feedbackCorrectionLabel}
+            >Save correction</button>
+            <button type="button" onClick={() => setFeedbackMode(null)}>Cancel</button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
+            <button type="button" onClick={() => submitFeedback('CORRECT')}>Correct</button>
+            <button type="button" onClick={handleWrongExhibit}>Wrong Exhibit</button>
+            <button type="button" onClick={() => submitFeedback('NOT_SURE')}>Not Sure</button>
+          </div>
+        )}
+        {feedbackStatus && <div style={{ fontSize: 11, marginTop: 7 }} aria-live="polite">{feedbackStatus}</div>}
       </div>
     )}
     {diagnosticsEnabled && (
