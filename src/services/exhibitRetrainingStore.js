@@ -190,7 +190,7 @@ export async function captureExhibitRetrainingCandidate({ frame, zone, modelVers
 // The corrected label remains UNVERIFIED until a trusted reviewer approves it.
 export async function captureCorrectedExhibitCandidate({ frame, zone, modelVersion, predictedLabel, correctedLabel, confidence, source = {} }) {
   if (!getExhibitRetrainingConsent()) return { saved: false, reason: 'consent_required' };
-  if (!frame || !zone || !modelVersion || !predictedLabel || !correctedLabel || predictedLabel === correctedLabel) {
+  if (!frame || !zone || !modelVersion || !predictedLabel || !correctedLabel) {
     return { saved: false, reason: 'invalid_correction' };
   }
   const config = getExhibitRetrainingConfig();
@@ -217,8 +217,8 @@ export async function captureCorrectedExhibitCandidate({ frame, zone, modelVersi
     modelVersion,
     prediction: { top1: { class: String(predictedLabel), confidence: Number(confidence) || 0 }, top2: null },
     temporalPredictions: [],
-    reasons: ['USER_REPORTED_MISCLASSIFICATION'],
-    evidence: { frameCount: 1, uncertainFrames: 0, distinctLabels: 1, sufficient: false, userCorrection: true },
+    reasons: [predictedLabel === correctedLabel ? 'USER_CONFIRMED_TENTATIVE' : 'USER_REPORTED_MISCLASSIFICATION'],
+    evidence: { frameCount: 1, uncertainFrames: 0, distinctLabels: 1, sufficient: false, userCorrection: true, userConfirmedTentative: predictedLabel === correctedLabel },
     quality,
     source: { type: source.type || 'user_correction', sessionId: source.sessionId || null, video: source.video || null },
     createdAt: now,
