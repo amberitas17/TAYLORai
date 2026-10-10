@@ -1717,6 +1717,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     exhibit: ariccResult.exhibit,
                     exhibitConfidence: ariccResult.confidence,
                     combinedConfidence: ariccResult.confidence,
+                    top1: ariccResult.top1 || { class: ariccResult.exhibit, confidence: ariccResult.confidence },
+                    top2: ariccResult.top2 || { class: 'UNKNOWN', confidence: Math.max(0, ariccResult.confidence - (ariccResult.confidenceGap || 0)) },
                     exhibitInfo: {
                         displayName: ariccDisplayName,
                         code: ariccResult.exhibit,
@@ -1765,6 +1767,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     exhibit: fablabResult.exhibit,
                     exhibitConfidence: fablabResult.confidence,
                     combinedConfidence: fablabResult.confidence,
+                    top1: fablabResult.top1 || { class: fablabResult.exhibit, confidence: fablabResult.confidence },
+                    top2: fablabResult.top2 || { class: 'UNKNOWN', confidence: Math.max(0, fablabResult.confidence - (fablabResult.confidenceGap || 0)) },
                     exhibitInfo: {
                         displayName: fablabDisplayName,
                         code: fablabResult.exhibit,
@@ -1806,6 +1810,8 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     exhibit: caesarResult.exhibit,
                     exhibitConfidence: caesarResult.confidence,
                     combinedConfidence: caesarResult.confidence,
+                    top1: caesarResult.top1 || { class: caesarResult.exhibit, confidence: caesarResult.confidence },
+                    top2: caesarResult.top2 || { class: 'UNKNOWN', confidence: Math.max(0, caesarResult.confidence - (caesarResult.confidenceGap || 0)) },
                     exhibitInfo: {
                         displayName: caesarDisplayName,
                         code: caesarResult.exhibit,
