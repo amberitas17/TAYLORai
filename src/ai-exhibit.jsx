@@ -1124,15 +1124,17 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   // Live tracking initialization
   useEffect(() => {
+    let unmounted = false;
+    let trackingCleanup = null;
     const startLiveTracking = async () => {
       try {
         // Request device motion permission for iOS
         if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) {
           const permission = await DeviceMotionEvent.requestPermission();
+          if (unmounted) return;
           if (permission !== 'granted') {
             console.log('Device motion permission denied');
-            startSimulatedTracking();
-            return;
+            return startSimulatedTracking();
           }
         }
 
@@ -1196,6 +1198,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           }
         };
 
+        if (unmounted) return;
         // Add event listeners
         window.addEventListener('devicemotion', handleDeviceMotion);
         window.addEventListener('deviceorientation', handleDeviceOrientation);
@@ -1207,12 +1210,11 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         return () => {
           window.removeEventListener('devicemotion', handleDeviceMotion);
           window.removeEventListener('deviceorientation', handleDeviceOrientation);
-          setIsTracking(false);
         };
 
       } catch (error) {
         console.log('Live tracking not available:', error);
-        startSimulatedTracking();
+        if (!unmounted) return startSimulatedTracking();
       }
     };
 
@@ -1237,10 +1239,19 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       return () => clearInterval(interval);
     };
 
-    const cleanup = startLiveTracking();
+    // Async initialization returns a Promise, not a cleanup function.
+    // Store its resolved cleanup and handle unmount-before-permission safely.
+    void startLiveTracking().then((cleanup) => {
+      if (unmounted) {
+        if (typeof cleanup === 'function') cleanup();
+      } else {
+        trackingCleanup = typeof cleanup === 'function' ? cleanup : null;
+      }
+    }).catch((error) => console.warn('Motion tracking initialization failed:', error));
 
     return () => {
-      if (cleanup) cleanup();
+      unmounted = true;
+      if (trackingCleanup) trackingCleanup();
     };
   }, []);
 
