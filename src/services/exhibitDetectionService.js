@@ -195,6 +195,8 @@ class ExhibitDetectionService {
         this.zoneLoadPromises = new Map();
         this.initializationPromises = new Map();
         this.initializationGeneration = 0;
+        this.activeInferences = 0;
+        this.releaseGeneration = 0;
         this.initializationDiagnostics = {
             route: '',
             modelUrl: '',
@@ -272,6 +274,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 }
 
     initialize(options = {}) {
+        ++this.releaseGeneration; // Cancel cleanup if a visitor immediately returns.
         const requestedMode = options.classifier || 'aricc';
         if (this.isInitialized && this.initializedMode === requestedMode) {
             return Promise.resolve();
@@ -1369,9 +1372,42 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
 
     async detectHierarchical(imageElement) {
-        const detection = await this.detectHierarchicalCore(imageElement);
-        this.observeImprovementCandidate(detection, imageElement);
-        return detection;
+        this.activeInferences += 1;
+        try {
+            const detection = await this.detectHierarchicalCore(imageElement);
+            this.observeImprovementCandidate(detection, imageElement);
+            return detection;
+        } finally {
+            this.activeInferences -= 1;
+        }
+    }
+
+    async releaseInactiveSessions() {
+        const releaseId = ++this.releaseGeneration;
+        // Initialization and inference must finish before native WASM sessions are released.
+        await Promise.allSettled([...this.initializationPromises.values()]);
+        while (this.activeInferences > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            if (releaseId !== this.releaseGeneration) return;
+        }
+        if (releaseId !== this.releaseGeneration) return;
+        for (const name of ['ariccModel', 'reconModel', 'fablabModel', 'caesarModel', 'gateModel']) {
+            const session = this[name];
+            this[name] = null;
+            if (session && typeof session.release === 'function') {
+                try { await session.release(); }
+                catch (error) { console.warn('ONNX session release failed:', name, error); }
+            }
+        }
+        this.ariccMetadata = null;
+        this.reconMetadata = null;
+        this.fablabMetadata = null;
+        this.caesarMetadata = null;
+        this.isInitialized = false;
+        this.initializedMode = null;
+        this.modelState = EXHIBIT_MODEL_STATES.CAMERA_READY;
+        for (const zone of ['aricc', 'recon', 'fablab', 'caesar']) this.zoneStates[zone] = 'MODEL_LOADING';
+        // Cache Storage is intentionally retained; next visit reloads locally.
     }
 
     setCandidateSourceContext(source = {}) {
