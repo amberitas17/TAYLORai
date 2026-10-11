@@ -46,6 +46,12 @@ const RECON_CORRECTION_LABELS = [
   'unmanned_aerial_system',
 ];
 
+const EXHIBIT_UI_TEXT = {
+  en: { language: 'Language', recognized: 'EXHIBIT RECOGNIZED', whatIsIt: 'What is it?', purpose: 'What is it used for?', listen: 'Listen', ask: 'Ask TAYLOR', retry: 'Retry Explanation', scan: 'Scan Another Exhibit', preparing: 'TAYLOR is preparing your explanation. The exhibit has been identified successfully.' },
+  tl: { language: 'Wika', recognized: 'NAKILALA ANG EXHIBIT', whatIsIt: 'Ano ito?', purpose: 'Para saan ito?', listen: 'Makinig', ask: 'Magtanong kay TAYLOR', retry: 'Subukan muli ang paliwanag', scan: 'Mag-scan ng Ibang Exhibit', preparing: 'Inihahanda ni TAYLOR ang paliwanag. Matagumpay na nakilala ang exhibit.' },
+  zh: { language: '语言', recognized: '已识别展品', whatIsIt: '这是什么？', purpose: '它有什么用途？', listen: '收听', ask: '询问 TAYLOR', retry: '重试说明', scan: '扫描其他展品', preparing: 'TAYLOR 正在准备说明。展品已成功识别。' },
+};
+
 const getKnowledgeEntity = (zone = '') => {
   const normalizedZone = String(zone).trim().toUpperCase().replace(/[_-]+/g, ' ');
   if (normalizedZone === 'BARAS' || normalizedZone === 'BARAS TBI') return 'BARAS TBI';
@@ -702,6 +708,20 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [correctionLabel, setCorrectionLabel] = useState('');
   const [explanationState, setExplanationState] = useState({ status: 'idle', explanation: null, error: null });
   const explanationRequestRef = useRef(null);
+  const [language, setLanguage] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem('taylorLanguage');
+      return ['en', 'tl', 'zh'].includes(saved) ? saved : 'en';
+    } catch {
+      return 'en';
+    }
+  });
+  const exhibitText = EXHIBIT_UI_TEXT[language] || EXHIBIT_UI_TEXT.en;
+
+  const changeLanguage = (nextLanguage) => {
+    setLanguage(nextLanguage);
+    try { window.localStorage.setItem('taylorLanguage', nextLanguage); } catch (error) { console.warn('Unable to save exhibit language preference:', error); }
+  };
 
   useEffect(() => {
     const sync = () => syncExhibitRetrainingQueue().catch((error) => console.warn('Exhibit retraining sync deferred:', error.message));
@@ -1030,19 +1050,20 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     let current = true;
 
     const loadExplanation = async () => {
-      const cached = await getCachedExhibitExplanation(activeCenter, activeExhibit);
+      const cached = await getCachedExhibitExplanation(activeCenter, activeExhibit, undefined, language);
       if (!current || controller.signal.aborted) return;
-      const localExplanation = getOfflineExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, activeExhibit);
+      const localExplanation = getOfflineExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, activeExhibit, language);
       setExplanationState({ status: cached || localExplanation ? 'ready' : 'loading', explanation: cached || localExplanation, error: null });
       try {
         const explanation = await requestExhibitExplanation({
           center: activeCenter,
           recognitionLabel: currentExhibit?.exhibitInfo?.code || activeExhibit,
           displayName: activeExhibit,
+          language,
           signal: controller.signal,
         });
         if (!current || controller.signal.aborted) return;
-        await cacheExhibitExplanation(activeCenter, activeExhibit, explanation);
+        await cacheExhibitExplanation(activeCenter, activeExhibit, explanation, undefined, language);
         if (current) setExplanationState({ status: 'ready', explanation, error: null });
       } catch (error) {
         if (!current || controller.signal.aborted) return;
@@ -1062,7 +1083,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       controller.abort();
       window.removeEventListener('online', retryWhenOnline);
     };
-  }, [activeCenter, activeExhibit, currentExhibit?.exhibitInfo?.code]);
+  }, [activeCenter, activeExhibit, currentExhibit?.exhibitInfo?.code, language]);
 
   // Point-based navigation state (removed drawing system)
   const [currentPathway, setCurrentPathway] = useState('DWT_to_EAP');
@@ -1974,7 +1995,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     : '';
 
   const listenToExplanation = () => {
-    if (explanationText) textToSpeech(explanationText, false, 'taylor', 'en');
+    if (explanationText) textToSpeech(explanationText, false, 'taylor', language);
   };
 
   const renderFeedbackCard = () => (
@@ -2066,6 +2087,14 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   return (
     <div style={{ flex: 1, position: "relative", height: "100vh", overflow: "hidden" }}>
+      <div className="exhibit-language-picker">
+        <label htmlFor="exhibit-language">{exhibitText.language}</label>
+        <select id="exhibit-language" value={language} onChange={(event) => changeLanguage(event.target.value)}>
+          <option value="en">English</option>
+          <option value="tl">Filipino</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
       {tourMode && (
         <>
           <header className="exhibit-tour-header" data-testid="exhibit-tour-panel">
@@ -2087,18 +2116,18 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           ) : (
             <section className="exhibit-tour-sheet" aria-live="polite">
               <div className="exhibit-tour-sheet__handle" aria-hidden="true" />
-              <div className="exhibit-tour-panel__recognized">✓ EXHIBIT RECOGNIZED</div>
+              <div className="exhibit-tour-panel__recognized">✓ {exhibitText.recognized}</div>
               <h2>{formatRecognitionLabel(displayedActiveExhibit)}</h2>
               {activeExhibitInformation ? (
                 <div className="exhibit-explanation" aria-live="polite">
-                  <strong>What is it?</strong>
+                  <strong>{exhibitText.whatIsIt}</strong>
                   <p>{activeExhibitInformation.whatIsIt}</p>
-                  <strong>What is it used for?</strong>
+                  <strong>{exhibitText.purpose}</strong>
                   <p>{activeExhibitInformation.purpose}</p>
                 </div>
               ) : explanationState.status === 'loading' ? (
                 <p className="exhibit-explanation__unavailable">
-                  TAYLOR is preparing your explanation. The exhibit has been identified successfully.
+                  {exhibitText.preparing}
                 </p>
               ) : (
                 <p className="exhibit-explanation__unavailable">
@@ -2106,12 +2135,12 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
                 </p>
               )}
               <div className="exhibit-tour-panel__actions">
-                {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
+                {activeExhibitInformation && <button onClick={listenToExplanation}>{exhibitText.listen}</button>}
                 <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
-                  Ask TAYLOR
+                  {exhibitText.ask}
                 </button>
-                {!activeExhibitInformation && <button onClick={() => window.dispatchEvent(new Event('online'))}>Retry Explanation</button>}
-                <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
+                {!activeExhibitInformation && <button onClick={() => window.dispatchEvent(new Event('online'))}>{exhibitText.retry}</button>}
+                <button onClick={scanAnotherExhibit}>{exhibitText.scan}</button>
               </div>
               {renderFeedbackCard()}
             </section>
@@ -2121,24 +2150,24 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       )}
       {!tourMode && specialistRoute && displayedActiveExhibit && (
         <section className="exhibit-tour-sheet exhibit-direct-information" aria-live="polite">
-          <div className="exhibit-tour-panel__recognized">EXHIBIT RECOGNIZED</div>
+          <div className="exhibit-tour-panel__recognized">{exhibitText.recognized}</div>
           <h2>{formatRecognitionLabel(displayedActiveExhibit)}</h2>
           {activeExhibitInformation ? (
             <div className="exhibit-explanation" aria-live="polite">
-              <strong>What is it?</strong>
+              <strong>{exhibitText.whatIsIt}</strong>
               <p>{activeExhibitInformation.whatIsIt}</p>
-              <strong>What is it used for?</strong>
+              <strong>{exhibitText.purpose}</strong>
               <p>{activeExhibitInformation.purpose}</p>
             </div>
           ) : (
             <p className="exhibit-explanation__unavailable">
-              TAYLOR is preparing your explanation. The exhibit has been identified successfully.
+              {exhibitText.preparing}
             </p>
           )}
           <div className="exhibit-tour-panel__actions">
-            {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
+            {activeExhibitInformation && <button onClick={listenToExplanation}>{exhibitText.listen}</button>}
             <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
-              Ask TAYLOR
+              {exhibitText.ask}
             </button>
             {classifierMode.toLowerCase() === 'recon' && learningConsent && !uploadedVideoRef.current && (
               <>

@@ -53,15 +53,50 @@ const OFFLINE_EXHIBIT_MEANINGS = Object.freeze({
   'unmanned aerial system': 'An aircraft system operated without a person onboard, commonly used for observation, mapping, or research.',
 });
 
-function offlineMeaning(displayName = '') {
+const OFFLINE_LANGUAGE_TEXT = Object.freeze({
+  en: {
+    generic: (center) => `It is included in the ${center || 'local'} exhibit dataset for visitor learning and demonstration.`,
+    meter: 'A measuring instrument used to observe a physical or environmental property.',
+    mixer: 'A laboratory device used to mix or agitate samples under controlled conditions.',
+    fumehood: 'A ventilated laboratory enclosure that helps contain and remove hazardous vapors.',
+    glassware: 'Laboratory vessels used to contain, measure, mix, or process samples.',
+    area: 'A designated workspace for carrying out the activities associated with this laboratory or center.',
+    unknown: 'An exhibit or equipment label recorded in the local center dataset. TAYLOR can provide a more specific explanation when a connection is available.',
+  },
+  tl: {
+    generic: (center) => `Kasama ito sa dataset ng mga exhibit ng ${center || 'lokal na sentro'} para sa pagkatuto at demonstrasyon ng mga bisita.`,
+    meter: 'Isang instrumento sa pagsukat ng pisikal o pangkapaligirang katangian.',
+    mixer: 'Isang kagamitang laboratoryo para maghalo o magpagalaw ng mga sample sa kontroladong paraan.',
+    fumehood: 'Isang maaliwalas na enclosure ng laboratoryo na tumutulong maglaman at maglabas ng mapanganib na singaw.',
+    glassware: 'Mga lalagyan sa laboratoryo para maglaman, magsukat, maghalo, o magproseso ng mga sample.',
+    area: 'Isang itinalagang lugar ng trabaho para sa mga gawain ng laboratoryo o sentrong ito.',
+    unknown: 'Isang label ng exhibit o kagamitan na nakatala sa lokal na dataset ng sentro. Makapagbibigay si TAYLOR ng mas tiyak na paliwanag kapag may koneksyon.',
+  },
+  zh: {
+    generic: (center) => `它已列入${center || '本地中心'}的展品数据库，用于访客学习和演示。`,
+    meter: '一种用于观察物理或环境属性的测量仪器。',
+    mixer: '一种在受控条件下混合或搅拌样品的实验室设备。',
+    fumehood: '一种通风实验室设备，用于收集并排出有害蒸气。',
+    glassware: '用于盛放、测量、混合或处理样品的实验室器皿。',
+    area: '一个用于开展该实验室或中心相关活动的指定工作区域。',
+    unknown: '这是本地中心数据库中记录的展品或设备标签。联网后，TAYLOR 可以提供更具体的说明。',
+  },
+});
+
+function offlineMeaning(displayName = '', language = 'en') {
   const normalizedName = normalize(displayName);
-  if (OFFLINE_EXHIBIT_MEANINGS[normalizedName]) return OFFLINE_EXHIBIT_MEANINGS[normalizedName];
-  if (normalizedName.includes('meter')) return 'A measuring instrument used to observe a physical or environmental property.';
-  if (normalizedName.includes('mixer') || normalizedName.includes('shaker')) return 'A laboratory device used to mix or agitate samples under controlled conditions.';
-  if (normalizedName.includes('fumehood')) return 'A ventilated laboratory enclosure that helps contain and remove hazardous vapors.';
-  if (normalizedName.includes('glassware')) return 'Laboratory vessels used to contain, measure, mix, or process samples.';
-  if (normalizedName.includes('area')) return 'A designated workspace for carrying out the activities associated with this laboratory or center.';
-  return 'An exhibit or equipment label recorded in the local center dataset. TAYLOR can provide a more specific explanation when a connection is available.';
+  if (language === 'en' && OFFLINE_EXHIBIT_MEANINGS[normalizedName]) return OFFLINE_EXHIBIT_MEANINGS[normalizedName];
+  const text = OFFLINE_LANGUAGE_TEXT[language] || OFFLINE_LANGUAGE_TEXT.en;
+  if (normalizedName === 'speech home automation' && language === 'tl') return 'Isang sistema na gumagamit ng mga utos sa pagsasalita upang kontrolin ang mga nakakonektang device at function sa bahay.';
+  if (normalizedName === 'speech home automation' && language === 'zh') return '一种使用语音指令控制联网设备和家庭功能的系统。';
+  if (normalizedName.includes('meter')) return text.meter;
+  if (normalizedName.includes('mixer') || normalizedName.includes('shaker')) return text.mixer;
+  if (normalizedName.includes('fumehood')) return text.fumehood;
+  if (normalizedName.includes('glassware')) return text.glassware;
+  if (normalizedName.includes('area')) return text.area;
+  return language === 'en'
+    ? text.unknown
+    : `${displayName || 'Ang exhibit na ito'}: ${text.unknown}`;
 }
 
 export function getVerifiedExhibitInformation(center, recognitionLabel, displayName) {
@@ -84,7 +119,7 @@ export function getExhibitInformationRecord(center, recognitionLabel, displayNam
   )) || null;
 }
 
-export function getOfflineExhibitInformation(center, recognitionLabel, displayName) {
+export function getOfflineExhibitInformation(center, recognitionLabel, displayName, language = 'en') {
   const normalizedCenter = String(center || '').trim().toUpperCase();
   const label = String(displayName || recognitionLabel || '').trim();
   if (!label) return null;
@@ -92,8 +127,8 @@ export function getOfflineExhibitInformation(center, recognitionLabel, displayNa
     center: normalizedCenter,
     recognitionLabel: recognitionLabel || label,
     displayName: label,
-    whatIsIt: offlineMeaning(label),
-    purpose: `It is included in the ${normalizedCenter || 'local'} exhibit dataset for visitor learning and demonstration.`,
+    whatIsIt: offlineMeaning(label, language),
+    purpose: (OFFLINE_LANGUAGE_TEXT[language] || OFFLINE_LANGUAGE_TEXT.en).generic(normalizedCenter),
     sources: ['Local exhibit dataset'],
     verified: false,
     offline: true,

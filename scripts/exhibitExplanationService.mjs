@@ -177,8 +177,8 @@ function parseGeneratedContent(content, allowedSources) {
   };
 }
 
-export async function generateExhibitExplanation({ center, recognitionLabel, displayName }) {
-  const key = `${String(center).toUpperCase()}:${recognitionLabel}:${displayName}`;
+export async function generateExhibitExplanation({ center, recognitionLabel, displayName, language = 'en' }) {
+  const key = `${String(center).toUpperCase()}:${recognitionLabel}:${displayName}:${language}`;
   if (pendingRequests.has(key)) return pendingRequests.get(key);
 
   const request = (async () => {
@@ -203,7 +203,7 @@ export async function generateExhibitExplanation({ center, recognitionLabel, dis
     const completion = await withRetry(() => openrouter.chat.completions.create({
       model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
       messages: [
-        { role: 'system', content: 'Return JSON only with keys whatIsIt, purpose, sources. Use only the supplied sources. Keep each explanation concise and visitor-friendly. Clearly separate BulSU-specific facts from general equipment facts. Never infer specifications, capabilities, or uses not supported by a source. Include at least one supplied source in sources.' },
+        { role: 'system', content: `Return JSON only with keys whatIsIt, purpose, sources. Use only the supplied sources. Keep each explanation concise and visitor-friendly. Clearly separate BulSU-specific facts from general equipment facts. Never infer specifications, capabilities, or uses not supported by a source. Include at least one supplied source in sources. Write whatIsIt and purpose entirely in ${language === 'tl' ? 'Filipino (Tagalog)' : language === 'zh' ? 'Simplified Chinese' : 'English'}. Preserve proper names such as ARICC and CAESAR.` },
         { role: 'user', content: `Exhibit center: ${center}\nRecognition label: ${recognitionLabel}\nDisplay name: ${displayName}\n\n${sourceContext}` },
       ],
       temperature: 0.2,
