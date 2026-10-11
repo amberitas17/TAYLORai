@@ -744,6 +744,8 @@
 .navigation-progress i { flex: 1; height: 4px; border-radius: 99px; background: #d7e3e8; }
 .navigation-progress i.is-complete { background: #27c8c8; }
 .navigation-photo { display: block; width: 100%; height: min(58vh, 390px); object-fit: cover; background: #dce8ed; }
+.navigation-photo--bottom-center { object-position: bottom center; }
+.navigation-photo--top-center { object-position: top center; }
 .navigation-photo--placeholder { display: grid; place-content: center; gap: 8px; color: #55717d; text-align: center; background: linear-gradient(135deg, #dce8ed, #f4f8fa); }
 .navigation-photo--placeholder span { color: #28556a; font-size: .8rem; font-weight: 900; letter-spacing: .12em; }
 .navigation-photo--placeholder small { font-size: .76rem; }
