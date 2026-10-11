@@ -371,6 +371,10 @@ function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
       utt.volume = 1.0;
 
       const voice = pickVoice(avatarName, lang, voices);
+      if (!voice && lang !== 'en') {
+        // Do not misrepresent the browser's default (often English) as Filipino.
+        console.warn('[TTS] Native voice unavailable; trying the browser language fallback', { lang, requestedLocale: locales[0] });
+      }
       if (voice) {
         utt.voice = voice;
         utt.lang = voice.lang || locales[0];
@@ -555,6 +559,7 @@ function _responsiveVoiceFilipino(text, avatarName) {
     const params = RV_PARAMS[avatarName] || RV_PARAMS.taylor;
     let started = false;
 
+    try {
     responsiveVoiceLib.speak(text, voiceName, {
       pitch: params.pitch,
       rate: params.rate,
@@ -577,6 +582,11 @@ function _responsiveVoiceFilipino(text, avatarName) {
       },
     });
 
+    } catch (error) {
+      console.warn('[TTS] Filipino ResponsiveVoice unavailable', error);
+      resolve(null);
+      return;
+    }
     setTimeout(() => {
       if (!started) {
         try {
