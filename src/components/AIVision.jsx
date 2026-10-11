@@ -285,7 +285,7 @@ export default function AIVision() {
       emotion: stableEmotion,
       emotionConfidence: result.emotionConfidence,
       allEmotions: result.allEmotions,
-      ageGroup: ageValue === undefined ? (latestProfileRef.current?.ageGroup || 'Unknown') : ageValue < 18 ? 'Child' : ageValue < 65 ? 'Adult' : 'Senior',
+      ageGroup: ageValue === undefined ? (latestProfileRef.current?.ageGroup || 'Unknown') : ageValue < 13 ? 'Child' : 'Adult',
       age: ageValue === undefined ? latestProfileRef.current?.age : ageValue,
       timestamp: new Date().toISOString()
     };
@@ -448,7 +448,7 @@ export default function AIVision() {
             emotion: result.predictions.emotion.label,
             emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
             allEmotions: result.predictions.all_emotions,
-            ageGroup: result.predictions.age.group,
+            ageGroup: Number.isFinite(Number(result.predictions.age.value)) ? (Number(result.predictions.age.value) < 13 ? 'Child' : 'Adult') : 'Unknown',
             timestamp: new Date().toISOString()
           });
           setPersonDetected(true);
