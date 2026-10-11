@@ -1392,6 +1392,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
         }
         if (releaseId !== this.releaseGeneration) return;
         for (const name of ['ariccModel', 'reconModel', 'fablabModel', 'caesarModel', 'gateModel']) {
+            if (releaseId !== this.releaseGeneration) return;
             const session = this[name];
             this[name] = null;
             if (session && typeof session.release === 'function') {
