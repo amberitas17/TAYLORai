@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FiMaximize2 } from 'react-icons/fi';
 import './AINavigation.css';
 import { getPerformanceSettings } from '../services/devicePerformance.js';
 const LeafletMap = lazy(() => import('./LeafletMap'));
@@ -9,9 +10,9 @@ import IndoorNavigationState from '../services/indoorNavigationState.js';
 import { textToSpeech } from '../services/speechAPI.js';
 
 const NAV_LANGUAGE = {
-  en: { language: 'Language', title: 'Indoor directions', start: 'Starting point', destination: 'Destination', previous: 'Previous', next: 'Next', confirm: 'Confirm landmark', arrived: 'Arrived', steps: 'Steps', map: 'Map', from: 'Starting from', to: 'Going to', explore: 'Explore', back: 'Go back', mute: 'Mute', unmute: 'Unmute', collapse: 'Collapse', expand: 'Expand' },
-  tl: { language: 'Wika', title: 'Gabay sa loob ng gusali', start: 'Panimulang lokasyon', destination: 'Pupuntahan', previous: 'Nakaraan', next: 'Susunod', confirm: 'Kumpirmahin ang palatandaan', arrived: 'Nakarating na', steps: 'Mga hakbang', map: 'Mapa', from: 'Mula sa', to: 'Papunta sa', explore: 'Tuklasin ang', back: 'Bumalik', mute: 'I-mute', unmute: 'I-unmute', collapse: 'Itago', expand: 'Ipakita' },
-  zh: { language: '语言', title: '室内导航', start: '起点', destination: '目的地', previous: '上一步', next: '下一步', confirm: '确认地标', arrived: '已到达', steps: '步骤', map: '地图', from: '出发地', to: '前往', explore: '探索', back: '返回', mute: '静音', unmute: '取消静音', collapse: '收起', expand: '展开' },
+  en: { language: 'Language', title: 'Indoor directions', start: 'Starting point', destination: 'Destination', previous: 'Previous', next: 'Next', confirm: 'Confirm landmark', arrived: 'Arrived', steps: 'Steps', map: 'Map', from: 'Starting from', to: 'Going to', scan: 'Scan exhibit', back: 'Go back', mute: 'Mute', unmute: 'Unmute', collapse: 'Collapse', expand: 'Expand' },
+  tl: { language: 'Wika', title: 'Gabay sa loob ng gusali', start: 'Panimulang lokasyon', destination: 'Pupuntahan', previous: 'Nakaraan', next: 'Susunod', confirm: 'Kumpirmahin ang palatandaan', arrived: 'Nakarating na', steps: 'Mga hakbang', map: 'Mapa', from: 'Mula sa', to: 'Papunta sa', scan: 'I-scan ang exhibit', back: 'Bumalik', mute: 'I-mute', unmute: 'I-unmute', collapse: 'Itago', expand: 'Ipakita' },
+  zh: { language: '语言', title: '室内导航', start: '起点', destination: '目的地', previous: '上一步', next: '下一步', confirm: '确认地标', arrived: '已到达', steps: '步骤', map: '地图', from: '出发地', to: '前往', scan: '扫描展览', back: '返回', mute: '静音', unmute: '取消静音', collapse: '收起', expand: '展开' },
 };
 const NAV_INSTRUCTIONS = {
   "tl": {
@@ -159,6 +160,7 @@ const TOUR_CENTERS = {
   RECON: { fullName: 'Resiliency Energy Continuity Center', location: 'CIT - 4th Floor', route: '/machine-vision-recon' },
   RECON_STAIRS: { fullName: 'Resiliency Energy Continuity Center (stairs route)', location: 'CIT - 4th Floor', route: '/machine-vision-recon' },
 };
+const SCANNABLE_DESTINATIONS = new Set(['ARICC', 'FABLAB', 'CAESAR', 'RECON']);
 const LOCATION_OPTIONS = [
   { value: 'manual-cit-entrance', label: 'CIT Entrance', floor: 1, step: 1 },
   { value: 'manual-emh-department', label: 'EMH Department', floor: 1, step: 2 },
@@ -339,14 +341,26 @@ export default function AINavigation({ onBack }) {
     }
   };
 
+  const scanRoute = SCANNABLE_DESTINATIONS.has(selectedDestination) ? destination.route : null;
+
   return <div className="ai-navigation-container navigation-mobile-shell">
+    {scanRoute && <button
+      type="button"
+      className="navigation-scan-fab"
+      onClick={() => navigate(scanRoute, { state: { activeCenter: selectedDestination, tourMode: true } })}
+      aria-label={`${labels.scan} ${selectedDestination}`}
+      title={`${labels.scan} ${selectedDestination}`}
+    >
+      <FiMaximize2 aria-hidden="true" />
+      <span>{labels.scan}</span>
+    </button>}
     <main className="navigation-mobile-page">
       <header className="navigation-mobile-header"><button className="navigation-icon-button" onClick={onBack || (() => navigate('/taylor'))} aria-label={labels.back}>‹</button><div><span className="navigation-kicker">TAYLOR AI</span><h1>{labels.title}</h1></div><button className="navigation-map-button" onClick={() => setMapOpen((open) => !open)}>{mapOpen ? labels.steps : labels.map}</button></header>
       <section className="navigation-route-picker"><label>{labels.language}<select aria-label={labels.language} value={language} onChange={(event) => changeLanguage(event.target.value)}><option value="en">English</option><option value="tl">Filipino (Tagalog)</option><option value="zh">中文 (Mandarin)</option></select></label><label>{labels.start}<select value={manualLocation} onChange={updateLocation}>{LOCATION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{localizedLandmark(option.label, language)}</option>)}</select></label><label>{labels.destination}<select value={selectedDestination} onChange={(event) => { setSelectedDestination(event.target.value); setCurrentStep(1); }}><option value="ARICC">ARICC</option><option>RIO</option><option>FABLAB</option><option>CAESAR</option><option>RECON</option></select></label><label>{language === 'tl' ? 'DAANAN' : language === 'zh' ? '路线方式' : 'ROUTE OPTION'}<select aria-label={language === 'tl' ? 'Piliin ang elevator o hagdan' : language === 'zh' ? '选择电梯或楼梯' : 'Choose elevator or stairs'} value={routeMode} onChange={(event) => changeRouteMode(event.target.value)}><option value="elevator">{language === 'tl' ? 'Elevator' : language === 'zh' ? '电梯' : 'Elevator'}</option><option value="stairs">{language === 'tl' ? 'Hagdan' : language === 'zh' ? '楼梯' : 'Stairs'}</option></select></label><div className="navigation-route-summary"><div><span>{labels.from}</span><strong>{localizedLandmark(location.label, language)}</strong></div><div><span>{labels.to}</span><strong>{selectedDestination}</strong></div></div></section>
       <NavigationAvatar event={navigationEvent} instruction={displayInstruction} language={language} labels={labels} muted={avatarMuted} onMute={() => setAvatarMuted((muted) => !muted)} expanded={avatarExpanded} onToggle={() => setAvatarExpanded((expanded) => !expanded)} />
       {mapOpen ? <section className="navigation-published-map" aria-label={language === 'tl' ? 'Mapa ng CIT' : language === 'zh' ? 'CIT 地图' : 'Geographic CIT map'}><Suspense fallback={<div role="status">Loading map…</div>}><LeafletMap destination={{ destination: selectedDestination }} isTracking /></Suspense></section> : <section className={`navigation-step-view ${['RIO', 'ARICC', 'OVPREI', 'FABLAB', 'CAESAR'].includes(selectedDestination) ? 'navigation-step-view--rio' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-live="polite"><div className="navigation-progress"><span>{language === 'tl' ? 'HAKBANG' : language === 'zh' ? '步骤' : 'STEP'} {currentStep} {language === 'tl' ? 'SA' : language === 'zh' ? '/' : 'OF'} {route.steps.length}</span><div>{route.steps.map((item, index) => <i className={index + 1 <= currentStep ? 'is-complete' : ''} key={item.id} />)}</div></div><StepPhoto evidence={evidence} landmark={localizedLandmark(node.landmark, language)} language={language} /><div className="navigation-step-content"><div className={`navigation-direction navigation-direction--${direction}`}><strong>{directionIcon[direction]}</strong><span>{language === 'tl' ? ({arrival:'Pagdating',elevator:'Paglipat ng palapag',left:'Kaliwa',right:'Kanan',straight:'Diretso'}[direction] || direction) : language === 'zh' ? ({arrival:'到达',elevator:'楼层切换',left:'左转',right:'右转',straight:'直走'}[direction] || direction) : (direction === 'arrival' ? 'Arrive' : direction === 'elevator' ? 'Floor change' : direction)}</span></div><div className="navigation-step-meta"><span>{localizedLandmark(CIT_FLOOR_LABELS[step.floor], language)}</span><span>{evidence.verified ? `${evidence.sourceVideo} · ${evidence.timestamp}` : (language === 'tl' ? 'Sinusuri pa ang ebidensiya' : language === 'zh' ? '证据待审核' : 'Evidence pending review')}</span></div><h2>{localizedLandmark(node.landmark, language)}</h2><p>{displayInstruction}</p><small className="navigation-confidence">{evidence.verified ? `${language === 'tl' ? 'Napatunayang ebidensiya' : language === 'zh' ? '已核实的路线证据' : 'Verified walkthrough evidence'} · ${language === 'tl' ? ({high:'mataas',medium:'katamtaman','medium-high':'katamtaman hanggang mataas'}[evidence.confidence] || evidence.confidence) : language === 'zh' ? ({high:'高可信度',medium:'中等可信度','medium-high':'中高可信度'}[evidence.confidence] || evidence.confidence) : `${evidence.confidence} confidence`}` : (language === 'tl' ? 'Pansamantala ang hakbang hanggang makumpirma ang larawan.' : language === 'zh' ? '在路线画面核实前，此步骤仍为暂定。' : 'Neutral step retained until a walkthrough frame is verified.')}</small>{!route.complete && <small className="navigation-route-incomplete">{language === 'tl' ? `Hindi pa kumpleto ang ruta papunta sa ${route.destination}. Hindi pa kumpirmado ang pagdating.` : language === 'zh' ? `前往 ${route.destination} 的路线尚未完整，无法确认抵达。` : `Route to ${route.destination} is incomplete after this verified step. Arrival is not reported.`}</small>}</div></section>}
       <nav className="navigation-step-controls"><button type="button" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 1}>{labels.previous}</button><button type="button" onClick={confirmCurrentLandmark}>{labels.confirm}</button><button type="button" className="navigation-next-button" onClick={() => goToStep(currentStep + 1)} disabled={currentStep === route.steps.length}>{route.complete && currentStep === route.steps.length ? labels.arrived : labels.next}</button></nav>
-      <footer className="navigation-footer"><span>{language === 'tl' ? 'Manu-manong gabay · walang GPS o kamera' : language === 'zh' ? '手动导航 · 无 GPS 或摄像头' : 'Manual navigation · no GPS or camera'}</span><button type="button" onClick={() => navigate(destination.route, { state: { activeCenter: selectedDestination, tourMode: true } })}>{labels.explore} {selectedDestination}</button></footer>
+      <footer className="navigation-footer"><span>{language === 'tl' ? 'Manu-manong gabay · walang GPS o kamera' : language === 'zh' ? '手动导航 · 无 GPS 或摄像头' : 'Manual navigation · no GPS or camera'}</span></footer>
     </main>
   </div>;
 }
