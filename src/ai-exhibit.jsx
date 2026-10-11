@@ -1014,14 +1014,24 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     };
   }, [classifierMode]);
 
-  useEffect(() => () => {
-    stopRealTimeDetection();
-    stopCameraStream();
-    void exhibitDetectionService.releaseInactiveSessions().catch((error) => console.warn('Recognition cleanup deferred:', error));
-    if (uploadedObjectUrlRef.current) {
-      URL.revokeObjectURL(uploadedObjectUrlRef.current);
-      uploadedObjectUrlRef.current = null;
-    }
+  useEffect(() => {
+    // Cleanup only on unmount. Do not update React state or depend on render-local
+    // callbacks while the component is being torn down.
+    return () => {
+      if (detectionIntervalRef.current !== null) {
+        clearInterval(detectionIntervalRef.current);
+        detectionIntervalRef.current = null;
+      }
+      const stream = cameraStreamRef.current;
+      cameraStreamRef.current = null;
+      stream?.getTracks().forEach((track) => track.stop());
+      if (videoRef.current?.srcObject) videoRef.current.srcObject = null;
+      void exhibitDetectionService.releaseInactiveSessions().catch((error) => console.warn('Recognition cleanup deferred:', error));
+      if (uploadedObjectUrlRef.current) {
+        URL.revokeObjectURL(uploadedObjectUrlRef.current);
+        uploadedObjectUrlRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
