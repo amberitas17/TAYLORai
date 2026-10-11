@@ -47,9 +47,9 @@ const RECON_CORRECTION_LABELS = [
 ];
 
 const EXHIBIT_UI_TEXT = {
-  en: { language: 'Language', recognized: 'EXHIBIT RECOGNIZED', whatIsIt: 'What is it?', purpose: 'What is it used for?', listen: 'Listen', ask: 'Ask TAYLOR', retry: 'Retry Explanation', scan: 'Scan Another Exhibit', preparing: 'TAYLOR is preparing your explanation. The exhibit has been identified successfully.' },
-  tl: { language: 'Wika', recognized: 'NAKILALA ANG EXHIBIT', whatIsIt: 'Ano ito?', purpose: 'Para saan ito?', listen: 'Makinig', ask: 'Magtanong kay TAYLOR', retry: 'Subukan muli ang paliwanag', scan: 'Mag-scan ng Ibang Exhibit', preparing: 'Inihahanda ni TAYLOR ang paliwanag. Matagumpay na nakilala ang exhibit.' },
-  zh: { language: '语言', recognized: '已识别展品', whatIsIt: '这是什么？', purpose: '它有什么用途？', listen: '收听', ask: '询问 TAYLOR', retry: '重试说明', scan: '扫描其他展品', preparing: 'TAYLOR 正在准备说明。展品已成功识别。' },
+  en: { language: 'Language', recognized: 'EXHIBIT RECOGNIZED', whatIsIt: 'What is it?', purpose: 'What is it used for?', listen: 'Listen', ask: 'Ask TAYLOR', retry: 'Retry Explanation', preparing: 'TAYLOR is preparing your explanation. The exhibit has been identified successfully.' },
+  tl: { language: 'Wika', recognized: 'NAKILALA ANG EXHIBIT', whatIsIt: 'Ano ito?', purpose: 'Para saan ito?', listen: 'Makinig', ask: 'Magtanong kay TAYLOR', retry: 'Subukan muli ang paliwanag', preparing: 'Inihahanda ni TAYLOR ang paliwanag. Matagumpay na nakilala ang exhibit.' },
+  zh: { language: '语言', recognized: '已识别展品', whatIsIt: '这是什么？', purpose: '它有什么用途？', listen: '收听', ask: '询问 TAYLOR', retry: '重试说明', preparing: 'TAYLOR 正在准备说明。展品已成功识别。' },
 };
 
 const getKnowledgeEntity = (zone = '') => {
