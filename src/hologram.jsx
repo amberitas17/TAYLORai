@@ -1,3 +1,4 @@
+import { getPerformanceSettings } from './services/devicePerformance.js';
 // Hologram.jsx
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -362,7 +363,7 @@ export default function Hologram({ emotion, isAnimating = false, spokenText = ''
   const [contextGeneration, setContextGeneration] = useState(0);
   const [contextLost, setContextLost] = useState(false);
   const canvasRef = useRef(null);
-  const lowMemoryDevice = typeof navigator !== 'undefined' && Number(navigator.deviceMemory || 8) <= 4;
+  const pixelRatio = getPerformanceSettings().pixelRatio;
 
   const handleCreated = ({ gl }) => {
     const canvas = gl.domElement;
@@ -383,7 +384,7 @@ export default function Hologram({ emotion, isAnimating = false, spokenText = ''
       <Canvas
         key={contextGeneration}
         camera={{ position: [0, 1.3, 4.3], fov: 30 }}
-        dpr={lowMemoryDevice ? 1 : [1, 1.25]}
+        dpr={pixelRatio}
         gl={{ antialias: false, powerPreference: 'low-power', preserveDrawingBuffer: false }}
         performance={{ min: 0.5, max: 1, debounce: 200 }}
         onCreated={handleCreated}
