@@ -2207,7 +2207,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
                 <button onClick={saveReconCorrection} disabled={!correctionLabel}>Save correction</button>
               </>
             )}
-            <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
+            {/* <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button> */}
           </div>
           {renderFeedbackCard()}
         </section>
