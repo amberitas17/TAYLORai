@@ -81,7 +81,7 @@ const CENTER_QUESTION_LABELS = {
   tl: ['Ano ang sentrong ito?', 'Anong mga serbisyo ang inaalok?', 'Anong pagsasanay ang available?', 'Ano ang mga pangunahing gawain?', 'Paano ito makatutulong?'],
   zh: ['这个中心是什么？', '提供哪些服务？', '有哪些培训？', '主要工作是什么？', '如何提供帮助？']
 };
-const interpolate = (template, values) => template.replace(/\\{(\\w+)\\}/g, (_, key) => String(values[key] ?? ''));
+const interpolate = (template, values) => template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ''));
 
 const getSessionContext = () => {
   if (typeof window === 'undefined') return null;
