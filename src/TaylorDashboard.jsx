@@ -118,6 +118,15 @@ export default function TaylorDashboard() {
   const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [language, setLanguage] = useState(() => {
+    if (typeof window === 'undefined') return 'en';
+    const saved = window.localStorage.getItem('taylorLanguage');
+    return ['en', 'tl', 'zh'].includes(saved) ? saved : 'en';
+  });
+  const changeLanguage = (value) => {
+    setLanguage(value);
+    window.localStorage.setItem('taylorLanguage', value);
+  };
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [speechText, setSpeechText] = useState('');
@@ -164,7 +173,7 @@ export default function TaylorDashboard() {
     setSpeechWarning('');
 
     try {
-      const speechStarted = await textToSpeech(text, false, 'taylor', 'en');
+      const speechStarted = await textToSpeech(text, false, 'taylor', language);
       if (!speechStarted) {
         setSpeechWarning('Speech synthesis is unavailable or blocked on this device. Tap the Test Voice button to verify audio.');
       }
@@ -175,7 +184,7 @@ export default function TaylorDashboard() {
       setSpeechStatus(getSpeechSupportState());
       setIsSpeaking(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     const profile = location.state?.detectedProfile || getSessionContext();
@@ -266,6 +275,11 @@ export default function TaylorDashboard() {
     setIsThinking(true);
 
     try {
+      const responseLanguage = language === 'tl' ? 'Filipino (Tagalog)' : 'Simplified Chinese (Mandarin)';
+      const languageInstruction = language === 'en' ? null : {
+        role: 'system',
+        content: `Reply entirely in ${responseLanguage}. Translate explanations naturally; preserve proper names such as ARICC and Bulacan State University. Do not translate into English unless asked.`,
+      };
       const resolution = await resolveLocalFirstChat({
         query: text,
         activeEntity,
@@ -277,13 +291,13 @@ export default function TaylorDashboard() {
             latencyMs: localResult.latencyMs,
           });
           return requestChat({
-            messages: nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText })),
+            messages: [...(languageInstruction ? [languageInstruction] : []), ...nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText }))],
             activeEntity,
           });
         },
       });
 
-      if (resolution.kind === 'local') {
+      if (resolution.kind === 'local' && language === 'en') {
         const reply = resolution.result.match.text;
         setMessages((prev) => [...prev, { speaker: 'guide', text: reply }]);
         speakWithPreferredVoice(reply);
@@ -293,6 +307,20 @@ export default function TaylorDashboard() {
           sourceIds: resolution.result.match.sourceIds,
           latencyMs: resolution.result.latencyMs,
         });
+        return;
+      }
+
+      if (resolution.kind === 'local' && language !== 'en') {
+        // Local knowledge is English-only; ask the backend to translate rather than reading English aloud.
+        const response = await requestChat({
+          messages: [languageInstruction, ...nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText }))],
+          activeEntity,
+        });
+        const data = await response.json();
+        if (!response.ok || data.success === false) throw new Error(data.message || 'Translation unavailable');
+        const reply = data.reply || 'Translation unavailable.';
+        setMessages((prev) => [...prev, { speaker: 'guide', text: reply }]);
+        speakWithPreferredVoice(reply);
         return;
       }
 
@@ -383,6 +411,12 @@ export default function TaylorDashboard() {
             <p className="hero-subtitle">BulSU AI Hologram Guide</p>
           </div>
           <div className="status-card">
+            <label htmlFor="taylor-language" style={{ display: 'block', marginBottom: '0.35rem' }}>Response language</label>
+            <select id="taylor-language" aria-label="TAYLOR response language" value={language} onChange={(event) => changeLanguage(event.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.5rem', marginBottom: '0.75rem' }}>
+              <option value="en">English</option>
+              <option value="tl">Filipino (Tagalog)</option>
+              <option value="zh">中文 (Mandarin)</option>
+            </select>
             <h3>TAYLOR READY</h3>
             <p>Age Detected: {sessionContext?.age ?? '—'}</p>
             <p>Initial Emotion: {sessionContext?.emotion ?? '—'}</p>
