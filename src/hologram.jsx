@@ -104,14 +104,10 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
   const smileRef = useRef(0.55);
   const debugArmBonesRef = useRef(null);
 
-  const { scene: avatarScene, animations: avatarAnims } = useGLTF('/sarah-avatar.glb');
-  const { scene: idleScene, animations: idleAnims } = useGLTF('/sarah-idle.glb');
-  const displayScene = assetPreset === 'idle' ? idleScene : assetPreset === 'avatar' ? avatarScene : (idleScene || avatarScene);
-  const activeAnims = assetPreset === 'idle'
-    ? (idleAnims || [])
-    : assetPreset === 'avatar'
-      ? (avatarAnims || [])
-      : (idleAnims?.length ? idleAnims : avatarAnims);
+  // Only mount the requested asset: React hooks stay unconditional per component.
+  const useIdle = assetPreset !== 'avatar';
+  const selectedAsset = useIdle ? '/sarah-idle.glb' : '/sarah-avatar.glb';
+  const { scene: displayScene, animations: activeAnims } = useGLTF(selectedAsset);
 
   const debugArmBoneTransforms = (scene) => {
     if (!scene) return;
@@ -130,7 +126,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
     });
 
     if (armBones.length > 0) {
-      console.info('[hologram] arm bone transforms', armBones);
+      if (import.meta.env.DEV) console.info('[hologram] arm bone transforms', armBones);
     }
   };
 
@@ -165,8 +161,8 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
     });
 
     const armBones = boneNames.filter((name) => /(upper|fore|hand|wrist|clavicle|shoulder)/i.test(name));
-    console.info('[hologram] all bones', boneNames);
-    console.info('[hologram] armature bones', armBones);
+    if (import.meta.env.DEV) console.info('[hologram] all bones', boneNames);
+    if (import.meta.env.DEV) console.info('[hologram] armature bones', armBones);
 
     if ((assetPreset === 'idle' || !disableAnimations) && activeAnims && activeAnims.length > 0) {
       const idleClip = findIdleClip(activeAnims);
@@ -175,9 +171,9 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
         : [];
       const animatedArmBones = animatedBones.filter((name) => /(upper|fore|hand|wrist|clavicle|shoulder)/i.test(name));
 
-      console.info('[hologram] idle clip', idleClip?.name || 'n/a');
-      console.info('[hologram] idle clip animated bones', animatedBones);
-      console.info('[hologram] idle clip animated arm bones', animatedArmBones);
+      if (import.meta.env.DEV) console.info('[hologram] idle clip', idleClip?.name || 'n/a');
+      if (import.meta.env.DEV) console.info('[hologram] idle clip animated bones', animatedBones);
+      if (import.meta.env.DEV) console.info('[hologram] idle clip animated arm bones', animatedArmBones);
 
       if (idleMixerRef.current) idleMixerRef.current.stopAllAction();
       const mixer = new THREE.AnimationMixer(displayScene);
@@ -329,9 +325,10 @@ function LoadingFallback() {
 }
 
 export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto' }) {
+  const lowEnd = typeof navigator !== 'undefined' && ((navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || (navigator.deviceMemory && navigator.deviceMemory <= 4));
   return (
     <div className="hologram-container">
-      <Canvas camera={{ position: [0, 1.3, 4.3], fov: 30 }} dpr={[1, 1.5]}>
+      <Canvas camera={{ position: [0, 1.3, 4.3], fov: 30 }} dpr={lowEnd ? 1 : [1, 1.5]} gl={{ antialias: !lowEnd, powerPreference: lowEnd ? "low-power" : "high-performance" }}>
         <PerspectiveCamera makeDefault position={[0, 1.35, 2.9]} fov={30} />
         <ambientLight intensity={1.2} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
