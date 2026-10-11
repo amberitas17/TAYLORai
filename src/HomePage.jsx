@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import clientSideFaceAnalysisService from './services/clientSideFaceAnalysis.js';
-import { textToSpeech } from './services/speechAPI.js';
-import Hologram from './hologram.jsx';
+import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
 import './HomePage.css';
 
 const suggestionItems = [
   { key: 'bulsu', label: 'What is BulSU?', answer: 'Bulacan State University is a premier public university in the Philippines, known for academic excellence, innovation, and service to the community.' },
-  { key: 'aricc', label: 'What is ARICC?', answer: 'ARICC is the Academic Research Innovation and Commercialization Center, where BulSU advances research, innovation, and partnerships.' },
+  { key: 'aricc', label: 'What is ARICC?', answer: 'What is ARICC?' },
   { key: 'programs', label: 'Academic Programs', answer: 'BulSU offers strong programs in engineering, education, business, health sciences, information technology, and the arts.' },
   { key: 'facilities', label: 'Campus Facilities', answer: 'BulSU provides modern classrooms, libraries, laboratories, innovation spaces, student centers, and smart campus facilities.' },
   { key: 'research', label: 'Research and Innovation', answer: 'BulSU supports impactful research through laboratories, industry partnerships, technology transfer, and community-driven innovation.' },
@@ -102,6 +101,7 @@ export default function HomePage() {
 
   const speak = (text) => {
     setIsAvatarSpeaking(true);
+    handleSpeechInteraction();
     textToSpeech(text, false, 'taylor', 'en').finally(() => setIsAvatarSpeaking(false));
   };
 

@@ -1,0 +1,16 @@
+{
+  "classes": [
+    "ARICC-1",
+    "ARICC-2",
+    "ARICC-3",
+    "ARICC-4",
+    "ARICC-5",
+    "ARICC-6",
+    "ARICC-7",
+    "ARICC-8"
+  ],
+  "num_classes": 8,
+  "total_samples": 640,
+  "max_per_class": 80,
+  "balanced": true
+}

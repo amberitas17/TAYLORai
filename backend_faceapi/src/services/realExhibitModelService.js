@@ -12,6 +12,8 @@ export class RealExhibitModelService {
     constructor() {
         this.isInitialized = false;
         this.modelPath = join(process.cwd(), 'public', 'models', 'exhibit_yolo_tiny.pt');
+        this.gateModelPath = process.env.EXHIBIT_GATE_MODEL_PATH || join(process.cwd(), 'models', 'exhibit_gate.torchscript');
+        this.gateThreshold = Number(process.env.EXHIBIT_GATE_THRESHOLD || 0.6);
         this.metadataPath = join(process.cwd(), 'public', 'models', 'exhibit_metadata.json');
         this.tempDir = join(process.cwd(), 'temp');
         this.pythonScript = join(process.cwd(), 'scripts', 'real_model_inference.py');
@@ -41,6 +43,9 @@ export class RealExhibitModelService {
             if (!existsSync(this.metadataPath)) {
                 throw new Error(`Metadata file not found: ${this.metadataPath}`);
             }
+            if (!existsSync(this.gateModelPath)) {
+                throw new Error(`Exhibit gate model not found: ${this.gateModelPath}`);
+            }
 
             // Create temp directory
             if (!existsSync(this.tempDir)) {
@@ -52,6 +57,7 @@ export class RealExhibitModelService {
 
             // Test Python environment and model loading
             await this.testModelLoading();
+            await this.testGateModelLoading();
 
             this.isInitialized = true;
             logger.info('REAL Exhibit Model Service initialized successfully');
@@ -226,6 +232,22 @@ except Exception as e:
             writeFileSync(tempImagePath, imageBuffer);
 
             try {
+                const gateResult = await this.runGateInference(tempImagePath);
+                if (gateResult.exhibitConfidence < this.gateThreshold) {
+                    return {
+                        exhibit: null,
+                        confidence: gateResult.exhibitConfidence,
+                        classId: gateResult.classId,
+                        allDetections: [],
+                        rejectedAsBackground: true,
+                        metadata: {
+                            model: 'exhibit_gate.torchscript',
+                            gateThreshold: this.gateThreshold,
+                            gatePrediction: gateResult
+                        }
+                    };
+                }
+
                 // Run inference with REAL model
                 const prediction = await this.runRealModelInference(tempImagePath);
 
@@ -245,6 +267,112 @@ except Exception as e:
             logger.error('❌ REAL model inference failed:', error);
             throw error;
         }
+    }
+
+    async testGateModelLoading() {
+        return new Promise((resolve, reject) => {
+            const testScript = `
+import sys
+import torch
+
+try:
+    model = torch.jit.load(sys.argv[1], map_location='cpu')
+    model.eval()
+    with torch.no_grad():
+        output = model(torch.randn(1, 3, 224, 224))
+    if tuple(output.shape) != (1, 2):
+        raise RuntimeError(f'Unexpected gate output shape: {tuple(output.shape)}')
+    print('EXHIBIT GATE READY')
+except Exception as error:
+    print(f'ERROR: {error}')
+    sys.exit(1)
+            `;
+
+            const pythonProcess = spawn('python', ['-c', testScript, this.gateModelPath]);
+            let output = '';
+            let errorOutput = '';
+
+            pythonProcess.stdout.on('data', (data) => {
+                output += data.toString();
+            });
+
+            pythonProcess.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+            });
+
+            pythonProcess.on('close', (code) => {
+                if (code === 0 && output.includes('EXHIBIT GATE READY')) {
+                    logger.info('Exhibit gate model test passed');
+                    resolve();
+                } else {
+                    reject(new Error(`Exhibit gate test failed: ${errorOutput || output}`));
+                }
+            });
+        });
+    }
+
+    async runGateInference(imagePath) {
+        return new Promise((resolve, reject) => {
+            const inferenceScript = `
+import json
+import sys
+import torch
+from PIL import Image
+import torchvision.transforms as transforms
+
+try:
+    model = torch.jit.load(sys.argv[1], map_location='cpu')
+    model.eval()
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+    ])
+    image = Image.open(sys.argv[2]).convert('RGB')
+    input_tensor = transform(image).unsqueeze(0)
+    with torch.no_grad():
+        probabilities = torch.softmax(model(input_tensor), dim=1)[0]
+    predicted_idx = int(torch.argmax(probabilities).item())
+    print(json.dumps({
+        'classId': predicted_idx,
+        'predictedClass': 'exhibit' if predicted_idx == 1 else 'background',
+        'confidence': float(probabilities[predicted_idx].item()),
+        'exhibitConfidence': float(probabilities[1].item())
+    }))
+except Exception as error:
+    print(json.dumps({'error': str(error)}))
+    sys.exit(1)
+            `;
+
+            const pythonProcess = spawn('python', ['-c', inferenceScript, this.gateModelPath, imagePath]);
+            let output = '';
+            let errorOutput = '';
+
+            pythonProcess.stdout.on('data', (data) => {
+                output += data.toString();
+            });
+
+            pythonProcess.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+            });
+
+            pythonProcess.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error(`Exhibit gate inference failed: ${errorOutput || output}`));
+                    return;
+                }
+
+                try {
+                    const result = JSON.parse(output.trim());
+                    if (result.error) {
+                        reject(new Error(result.error));
+                        return;
+                    }
+                    resolve(result);
+                } catch (error) {
+                    reject(new Error(`Invalid exhibit gate output: ${error.message}`));
+                }
+            });
+        });
     }
 
     async runRealModelInference(imagePath) {

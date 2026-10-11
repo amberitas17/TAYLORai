@@ -23,6 +23,17 @@ node_modules/
 *.njsproj
 *.sln
 *.sw?
+.aricc-venv/
+.recon-venv/
+.venv/
+Documentation/venv/
+__pycache__/
+**/__pycache__/
+Documentation/datasets
+scripts/hierarchical_dataset/ARICC/
+scripts/extracted_dataset/ARICC/
+Documentation/scripts/hierarchical_dataset/ARICC/
+Documentation/scripts/extracted_dataset/ARICC/
 
 # Build/deploy output
 dist/

@@ -206,6 +206,31 @@
   align-items: start;
 }
 
+.center-context {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(116, 213, 255, 0.28);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(39, 200, 200, 0.1);
+}
+
+.center-context-label {
+  color: #bdf8ff;
+  font-weight: 700;
+}
+
+.center-context-prompt {
+  color: #dff6ff;
+  margin-top: 4px;
+}
+
+.center-context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .avatar-card,
 .conversation-card {
   background: rgba(8, 20, 35, 0.92);

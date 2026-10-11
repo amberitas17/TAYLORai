@@ -1,0 +1,2474 @@
+{
+  "model": "public\\models\\caesar\\caesar_classifier.onnx",
+  "metadata_classes": [
+    "analytical_balance",
+    "benchtop_multi_parameter_meter",
+    "biobase_vortex_mixer",
+    "chemical_testing_area",
+    "digital_dry_bath_incubator",
+    "ducted_fumehood",
+    "gravimetrics",
+    "hot_plate_with_stirrer",
+    "img",
+    "incubator",
+    "laboratory_glassware",
+    "microprocessor_centrifuge",
+    "microscope",
+    "nichipet_ex_ii",
+    "nichipet_ex_ii_and_biobase_vortex_mixer",
+    "preparation_area",
+    "shaker_incubator",
+    "spectrophotometer",
+    "velocity_18r_pro_centrifuge"
+  ],
+  "preprocessing": {
+    "mean": [
+      0,
+      0,
+      0
+    ],
+    "std": [
+      1,
+      1,
+      1
+    ],
+    "layout": "NCHW",
+    "input_format": "RGB"
+  },
+  "thresholds": {
+    "confidence": 0.8,
+    "margin": 0.15
+  },
+  "results": [
+    {
+      "video": "Analytical Balance 2.MOV",
+      "expected_class": "analytical_balance",
+      "duration_s": 29.225,
+      "frame_count": 876,
+      "train_frame_count": 88,
+      "validation_frame_count": 53,
+      "samples": [
+        {
+          "timestamp_s": 5.845000000000001,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9991291165351868,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.00019419910677243024,
+              "margin": 0.9989349174284143,
+              "accepted": true,
+              "latency_ms": 7.625199854373932
+            },
+            "center_70": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9854275584220886,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.004516904707998037,
+              "margin": 0.9809106537140906,
+              "accepted": true,
+              "latency_ms": 8.901800028979778
+            },
+            "center_80": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.993817150592804,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0013392063556239009,
+              "margin": 0.99247794423718,
+              "accepted": true,
+              "latency_ms": 9.234099881723523
+            },
+            "approved_balance_box": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9663233757019043,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.010516404174268246,
+              "margin": 0.955806971527636,
+              "accepted": true,
+              "latency_ms": 12.701499974355102
+            }
+          }
+        },
+        {
+          "timestamp_s": 11.690000000000001,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9989792704582214,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.00019092607544735074,
+              "margin": 0.9987883443827741,
+              "accepted": true,
+              "latency_ms": 6.095500197261572
+            },
+            "center_70": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9884441494941711,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.004797936417162418,
+              "margin": 0.9836462130770087,
+              "accepted": true,
+              "latency_ms": 5.356800043955445
+            },
+            "center_80": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9962491393089294,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.0008829501457512379,
+              "margin": 0.9953661891631782,
+              "accepted": true,
+              "latency_ms": 5.28050004504621
+            },
+            "approved_balance_box": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9670504927635193,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.00904136523604393,
+              "margin": 0.9580091275274754,
+              "accepted": true,
+              "latency_ms": 6.919600069522858
+            }
+          }
+        },
+        {
+          "timestamp_s": 17.535,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9989062547683716,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.00017156310786958784,
+              "margin": 0.998734691660502,
+              "accepted": true,
+              "latency_ms": 6.3137998804450035
+            },
+            "center_70": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9868717193603516,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0024000084958970547,
+              "margin": 0.9844717108644545,
+              "accepted": true,
+              "latency_ms": 7.459099870175123
+            },
+            "center_80": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9960464835166931,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.0005841187667101622,
+              "margin": 0.995462364749983,
+              "accepted": true,
+              "latency_ms": 8.50900006480515
+            },
+            "approved_balance_box": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.980736255645752,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0031167538836598396,
+              "margin": 0.9776195017620921,
+              "accepted": true,
+              "latency_ms": 5.949900019913912
+            }
+          }
+        },
+        {
+          "timestamp_s": 23.380000000000003,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9994704127311707,
+              "raw_top2": "hot_plate_with_stirrer",
+              "raw_top2_confidence": 0.00010586099961074069,
+              "margin": 0.9993645517315599,
+              "accepted": true,
+              "latency_ms": 6.40220008790493
+            },
+            "center_70": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9943063855171204,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0016782496822997928,
+              "margin": 0.9926281358348206,
+              "accepted": true,
+              "latency_ms": 6.4426998142153025
+            },
+            "center_80": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9980059266090393,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0006160755874589086,
+              "margin": 0.9973898510215804,
+              "accepted": true,
+              "latency_ms": 6.288800155743957
+            },
+            "approved_balance_box": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.9734668135643005,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.007646003272384405,
+              "margin": 0.9658208102919161,
+              "accepted": true,
+              "latency_ms": 9.622199926525354
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Analytical Balance.MOV",
+      "expected_class": "analytical_balance",
+      "duration_s": 17.548333333333332,
+      "frame_count": 526,
+      "train_frame_count": 88,
+      "validation_frame_count": 53,
+      "samples": [
+        {
+          "timestamp_s": 3.5096666666666665,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.6607714295387268,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.06798365712165833,
+              "margin": 0.5927877724170685,
+              "accepted": false,
+              "latency_ms": 5.986200179904699
+            },
+            "center_70": {
+              "raw_top1": "microscope",
+              "raw_top1_confidence": 0.24229612946510315,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.23942112922668457,
+              "margin": 0.002875000238418579,
+              "accepted": false,
+              "latency_ms": 6.1929000075906515
+            },
+            "center_80": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.4798505902290344,
+              "raw_top2": "digital_dry_bath_incubator",
+              "raw_top2_confidence": 0.09826420992612839,
+              "margin": 0.38158638030290604,
+              "accepted": false,
+              "latency_ms": 7.517500082030892
+            },
+            "approved_balance_box": {
+              "raw_top1": "microscope",
+              "raw_top1_confidence": 0.28014418482780457,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.14785943925380707,
+              "margin": 0.1322847455739975,
+              "accepted": false,
+              "latency_ms": 9.269800037145615
+            }
+          }
+        },
+        {
+          "timestamp_s": 7.019333333333333,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.43312862515449524,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.16481375694274902,
+              "margin": 0.2683148682117462,
+              "accepted": false,
+              "latency_ms": 5.65349985845387
+            },
+            "center_70": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.4487285017967224,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.12647594511508942,
+              "margin": 0.322252556681633,
+              "accepted": false,
+              "latency_ms": 6.132100010290742
+            },
+            "center_80": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.48670095205307007,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.10774707049131393,
+              "margin": 0.37895388156175613,
+              "accepted": false,
+              "latency_ms": 6.1876000836491585
+            },
+            "approved_balance_box": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.2971920967102051,
+              "raw_top2": "digital_dry_bath_incubator",
+              "raw_top2_confidence": 0.13934887945652008,
+              "margin": 0.157843217253685,
+              "accepted": false,
+              "latency_ms": 5.675999913364649
+            }
+          }
+        },
+        {
+          "timestamp_s": 10.528999999999998,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.26084673404693604,
+              "raw_top2": "ducted_fumehood",
+              "raw_top2_confidence": 0.19232217967510223,
+              "margin": 0.0685245543718338,
+              "accepted": false,
+              "latency_ms": 5.049699917435646
+            },
+            "center_70": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.4179697632789612,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.11701422929763794,
+              "margin": 0.30095553398132324,
+              "accepted": false,
+              "latency_ms": 5.87889994494617
+            },
+            "center_80": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.3394016623497009,
+              "raw_top2": "ducted_fumehood",
+              "raw_top2_confidence": 0.14761127531528473,
+              "margin": 0.1917903870344162,
+              "accepted": false,
+              "latency_ms": 5.944799864664674
+            },
+            "approved_balance_box": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.2646912932395935,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.15867364406585693,
+              "margin": 0.10601764917373657,
+              "accepted": false,
+              "latency_ms": 5.384400021284819
+            }
+          }
+        },
+        {
+          "timestamp_s": 14.038666666666666,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.23959961533546448,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.18836060166358948,
+              "margin": 0.051239013671875,
+              "accepted": false,
+              "latency_ms": 6.908799987286329
+            },
+            "center_70": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.3127666115760803,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.2733910381793976,
+              "margin": 0.03937557339668274,
+              "accepted": false,
+              "latency_ms": 5.997400032356381
+            },
+            "center_80": {
+              "raw_top1": "analytical_balance",
+              "raw_top1_confidence": 0.35944631695747375,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.16827614605426788,
+              "margin": 0.19117017090320587,
+              "accepted": false,
+              "latency_ms": 6.816199980676174
+            },
+            "approved_balance_box": {
+              "raw_top1": "microscope",
+              "raw_top1_confidence": 0.302337110042572,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.30096539855003357,
+              "margin": 0.0013717114925384521,
+              "accepted": false,
+              "latency_ms": 5.16449986025691
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Benchtop Multi-Parameter Meter 2.MOV",
+      "expected_class": "benchtop_multi_parameter_meter",
+      "duration_s": 20.185,
+      "frame_count": 605,
+      "train_frame_count": 130,
+      "validation_frame_count": 50,
+      "samples": [
+        {
+          "timestamp_s": 4.037,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.9926849603652954,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0021908688358962536,
+              "margin": 0.9904940915293992,
+              "accepted": true,
+              "latency_ms": 5.426299991086125
+            }
+          }
+        },
+        {
+          "timestamp_s": 8.074,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.955845296382904,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.01251038908958435,
+              "margin": 0.9433349072933197,
+              "accepted": true,
+              "latency_ms": 5.5945999920368195
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.110999999999999,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.7408891320228577,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.07027935236692429,
+              "margin": 0.6706097796559334,
+              "accepted": false,
+              "latency_ms": 5.911600077524781
+            }
+          }
+        },
+        {
+          "timestamp_s": 16.148,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.7309351563453674,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.23680390417575836,
+              "margin": 0.49413125216960907,
+              "accepted": false,
+              "latency_ms": 5.905300145968795
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Benchtop Multi-Parameter Meter.MOV",
+      "expected_class": "benchtop_multi_parameter_meter",
+      "duration_s": 16.448333333333334,
+      "frame_count": 493,
+      "train_frame_count": 130,
+      "validation_frame_count": 50,
+      "samples": [
+        {
+          "timestamp_s": 3.289666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.39834943413734436,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.11783857643604279,
+              "margin": 0.2805108577013016,
+              "accepted": false,
+              "latency_ms": 5.713999969884753
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.579333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.4188016653060913,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.11679046601057053,
+              "margin": 0.3020111992955208,
+              "accepted": false,
+              "latency_ms": 6.9691999815404415
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.869,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.24831782281398773,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.1617467701435089,
+              "margin": 0.08657105267047882,
+              "accepted": false,
+              "latency_ms": 6.045499816536903
+            }
+          }
+        },
+        {
+          "timestamp_s": 13.158666666666669,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "chemical_testing_area",
+              "raw_top1_confidence": 0.26591426134109497,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.26485684514045715,
+              "margin": 0.0010574162006378174,
+              "accepted": false,
+              "latency_ms": 7.3049000930041075
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Benchtop Multi-Paramter Meter 3.MOV",
+      "expected_class": "benchtop_multi_parameter_meter",
+      "duration_s": 22.72,
+      "frame_count": 681,
+      "train_frame_count": 130,
+      "validation_frame_count": 50,
+      "samples": [
+        {
+          "timestamp_s": 4.544,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.9950531125068665,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.0012527292128652334,
+              "margin": 0.9938003832940012,
+              "accepted": true,
+              "latency_ms": 4.68640006147325
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.088,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.9951234459877014,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.0015247102128341794,
+              "margin": 0.9935987357748672,
+              "accepted": true,
+              "latency_ms": 5.9877000749111176
+            }
+          }
+        },
+        {
+          "timestamp_s": 13.632,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.983357846736908,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.00550540816038847,
+              "margin": 0.9778524385765195,
+              "accepted": true,
+              "latency_ms": 4.657299956306815
+            }
+          }
+        },
+        {
+          "timestamp_s": 18.176,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "benchtop_multi_parameter_meter",
+              "raw_top1_confidence": 0.9971145391464233,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.001094460254535079,
+              "margin": 0.9960200788918883,
+              "accepted": true,
+              "latency_ms": 7.01529998332262
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "BIOBASE Vortex Mixer.MOV",
+      "expected_class": "biobase_vortex_mixer",
+      "duration_s": 16.448333333333334,
+      "frame_count": 493,
+      "train_frame_count": 50,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 3.289666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "biobase_vortex_mixer",
+              "raw_top1_confidence": 0.8623588681221008,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.12055636942386627,
+              "margin": 0.7418024986982346,
+              "accepted": true,
+              "latency_ms": 5.056099966168404
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.579333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "biobase_vortex_mixer",
+              "raw_top1_confidence": 0.8805233836174011,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.04086873680353165,
+              "margin": 0.8396546468138695,
+              "accepted": true,
+              "latency_ms": 7.166300201788545
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.869,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "biobase_vortex_mixer",
+              "raw_top1_confidence": 0.7850592732429504,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.08386900275945663,
+              "margin": 0.7011902704834938,
+              "accepted": false,
+              "latency_ms": 6.606800016015768
+            }
+          }
+        },
+        {
+          "timestamp_s": 13.158666666666669,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "biobase_vortex_mixer",
+              "raw_top1_confidence": 0.8918896317481995,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.0952981561422348,
+              "margin": 0.7965914756059647,
+              "accepted": true,
+              "latency_ms": 6.651799893006682
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Chemical Testing Area.MOV",
+      "expected_class": "chemical_testing_area",
+      "duration_s": 32.76166666666667,
+      "frame_count": 982,
+      "train_frame_count": 99,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 6.552333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "spectrophotometer",
+              "raw_top1_confidence": 0.9885170459747314,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.010100586339831352,
+              "margin": 0.9784164596349001,
+              "accepted": true,
+              "latency_ms": 5.071799969300628
+            }
+          }
+        },
+        {
+          "timestamp_s": 13.104666666666668,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "chemical_testing_area",
+              "raw_top1_confidence": 0.9509075880050659,
+              "raw_top2": "velocity_18r_pro_centrifuge",
+              "raw_top2_confidence": 0.010888498276472092,
+              "margin": 0.9400190897285938,
+              "accepted": true,
+              "latency_ms": 6.54519977979362
+            }
+          }
+        },
+        {
+          "timestamp_s": 19.657,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "chemical_testing_area",
+              "raw_top1_confidence": 0.9902799725532532,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.0035754689015448093,
+              "margin": 0.9867045036517084,
+              "accepted": true,
+              "latency_ms": 9.78600000962615
+            }
+          }
+        },
+        {
+          "timestamp_s": 26.209333333333337,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "chemical_testing_area",
+              "raw_top1_confidence": 0.9944050312042236,
+              "raw_top2": "velocity_18r_pro_centrifuge",
+              "raw_top2_confidence": 0.0025433991104364395,
+              "margin": 0.9918616320937872,
+              "accepted": true,
+              "latency_ms": 6.522299954667687
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Digital Dry Bath Incubator 2.MOV",
+      "expected_class": "digital_dry_bath_incubator",
+      "duration_s": 15.546666666666667,
+      "frame_count": 466,
+      "train_frame_count": 67,
+      "validation_frame_count": 47,
+      "samples": [
+        {
+          "timestamp_s": 3.1093333333333337,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.9467344880104065,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.04243379831314087,
+              "margin": 0.9043006896972656,
+              "accepted": true,
+              "latency_ms": 6.836800137534738
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.2186666666666675,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.9157209396362305,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.039951298385858536,
+              "margin": 0.8757696412503719,
+              "accepted": true,
+              "latency_ms": 6.3859999645501375
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.328,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.9675094485282898,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.017151353880763054,
+              "margin": 0.9503580946475267,
+              "accepted": true,
+              "latency_ms": 8.104799780994654
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.437333333333335,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.9771250486373901,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.011111595667898655,
+              "margin": 0.9660134529694915,
+              "accepted": true,
+              "latency_ms": 5.9865000657737255
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Digital Dry Bath Incubator.MOV",
+      "expected_class": "digital_dry_bath_incubator",
+      "duration_s": 22.353333333333335,
+      "frame_count": 670,
+      "train_frame_count": 67,
+      "validation_frame_count": 47,
+      "samples": [
+        {
+          "timestamp_s": 4.470666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.9928390383720398,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.0045560854487121105,
+              "margin": 0.9882829529233277,
+              "accepted": true,
+              "latency_ms": 6.507199956104159
+            }
+          }
+        },
+        {
+          "timestamp_s": 8.941333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.9364839196205139,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.058006081730127335,
+              "margin": 0.8784778378903866,
+              "accepted": true,
+              "latency_ms": 6.429000059142709
+            }
+          }
+        },
+        {
+          "timestamp_s": 13.412,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.9960495829582214,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.0015763122355565429,
+              "margin": 0.9944732707226649,
+              "accepted": true,
+              "latency_ms": 6.754099857062101
+            }
+          }
+        },
+        {
+          "timestamp_s": 17.88266666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "digital_dry_bath_incubator",
+              "raw_top1_confidence": 0.9976117610931396,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.0007315762923099101,
+              "margin": 0.9968801848008297,
+              "accepted": true,
+              "latency_ms": 6.660199956968427
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Ducted Fumehood 2.MOV",
+      "expected_class": "ducted_fumehood",
+      "duration_s": 23.72,
+      "frame_count": 711,
+      "train_frame_count": 72,
+      "validation_frame_count": 49,
+      "samples": [
+        {
+          "timestamp_s": 4.744,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "ducted_fumehood",
+              "raw_top1_confidence": 0.9999468326568604,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 4.4872984290122986e-05,
+              "margin": 0.9999019596725702,
+              "accepted": true,
+              "latency_ms": 6.224100012332201
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.488,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "ducted_fumehood",
+              "raw_top1_confidence": 0.9999849796295166,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 1.060814338416094e-05,
+              "margin": 0.9999743714861324,
+              "accepted": true,
+              "latency_ms": 8.329299977049232
+            }
+          }
+        },
+        {
+          "timestamp_s": 14.232,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "ducted_fumehood",
+              "raw_top1_confidence": 0.9995239973068237,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.0002365932596148923,
+              "margin": 0.9992874040472088,
+              "accepted": true,
+              "latency_ms": 5.925999954342842
+            }
+          }
+        },
+        {
+          "timestamp_s": 18.976,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "ducted_fumehood",
+              "raw_top1_confidence": 0.9999648332595825,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 2.3723308913758956e-05,
+              "margin": 0.9999411099506688,
+              "accepted": true,
+              "latency_ms": 5.055699963122606
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Ducted Fumehood.MOV",
+      "expected_class": "ducted_fumehood",
+      "duration_s": 16.038333333333334,
+      "frame_count": 481,
+      "train_frame_count": 72,
+      "validation_frame_count": 49,
+      "samples": [
+        {
+          "timestamp_s": 3.207666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "ducted_fumehood",
+              "raw_top1_confidence": 0.9966663718223572,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.0012560399482026696,
+              "margin": 0.9954103318741545,
+              "accepted": true,
+              "latency_ms": 5.900799995288253
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.415333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "ducted_fumehood",
+              "raw_top1_confidence": 0.9962509274482727,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.0011608052300289273,
+              "margin": 0.9950901222182438,
+              "accepted": true,
+              "latency_ms": 7.118099834769964
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.623,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "ducted_fumehood",
+              "raw_top1_confidence": 0.9983204007148743,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.0008383869426324964,
+              "margin": 0.9974820137722418,
+              "accepted": true,
+              "latency_ms": 5.542400060221553
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.830666666666668,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "ducted_fumehood",
+              "raw_top1_confidence": 0.9989933371543884,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.0003499324375297874,
+              "margin": 0.9986434047168586,
+              "accepted": true,
+              "latency_ms": 6.030700169503689
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Gravimetrics.MOV",
+      "expected_class": "gravimetrics",
+      "duration_s": 15.513333333333334,
+      "frame_count": 465,
+      "train_frame_count": 47,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 3.102666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "gravimetrics",
+              "raw_top1_confidence": 0.9985789060592651,
+              "raw_top2": "hot_plate_with_stirrer",
+              "raw_top2_confidence": 0.000661439320538193,
+              "margin": 0.9979174667387269,
+              "accepted": true,
+              "latency_ms": 6.467900006100535
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.205333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "gravimetrics",
+              "raw_top1_confidence": 0.9992801547050476,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.00021215531160123646,
+              "margin": 0.9990679993934464,
+              "accepted": true,
+              "latency_ms": 6.322500063106418
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.308,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "gravimetrics",
+              "raw_top1_confidence": 0.9995362758636475,
+              "raw_top2": "hot_plate_with_stirrer",
+              "raw_top2_confidence": 0.00021007406758144498,
+              "margin": 0.999326201796066,
+              "accepted": true,
+              "latency_ms": 4.9190998543053865
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.410666666666668,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "gravimetrics",
+              "raw_top1_confidence": 0.9989799857139587,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.0003554374852683395,
+              "margin": 0.9986245482286904,
+              "accepted": true,
+              "latency_ms": 5.580700002610683
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Hot Plate with Stirrer.MOV",
+      "expected_class": "hot_plate_with_stirrer",
+      "duration_s": 17.881666666666668,
+      "frame_count": 536,
+      "train_frame_count": 54,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 3.576333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "hot_plate_with_stirrer",
+              "raw_top1_confidence": 0.9656392931938171,
+              "raw_top2": "microprocessor_centrifuge",
+              "raw_top2_confidence": 0.019163573160767555,
+              "margin": 0.9464757200330496,
+              "accepted": true,
+              "latency_ms": 8.201599819585681
+            }
+          }
+        },
+        {
+          "timestamp_s": 7.152666666666668,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "hot_plate_with_stirrer",
+              "raw_top1_confidence": 0.9997190833091736,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.00018690555589273572,
+              "margin": 0.9995321777532808,
+              "accepted": true,
+              "latency_ms": 5.609899992123246
+            }
+          }
+        },
+        {
+          "timestamp_s": 10.729000000000001,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "hot_plate_with_stirrer",
+              "raw_top1_confidence": 0.9868279695510864,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.008175946772098541,
+              "margin": 0.9786520227789879,
+              "accepted": true,
+              "latency_ms": 6.579499924555421
+            }
+          }
+        },
+        {
+          "timestamp_s": 14.305333333333335,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "hot_plate_with_stirrer",
+              "raw_top1_confidence": 0.9982878565788269,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.0009692365420050919,
+              "margin": 0.9973186200368218,
+              "accepted": true,
+              "latency_ms": 7.643700111657381
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Incubator 2.MOV",
+      "expected_class": "incubator",
+      "duration_s": 19.316666666666666,
+      "frame_count": 579,
+      "train_frame_count": 58,
+      "validation_frame_count": 41,
+      "samples": [
+        {
+          "timestamp_s": 3.8633333333333333,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "incubator",
+              "raw_top1_confidence": 0.9991301894187927,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.00016123596287798136,
+              "margin": 0.9989689534559147,
+              "accepted": true,
+              "latency_ms": 7.1349001955240965
+            }
+          }
+        },
+        {
+          "timestamp_s": 7.726666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "incubator",
+              "raw_top1_confidence": 0.9990991353988647,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.00035967479925602674,
+              "margin": 0.9987394605996087,
+              "accepted": true,
+              "latency_ms": 5.305300001055002
+            }
+          }
+        },
+        {
+          "timestamp_s": 11.59,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "incubator",
+              "raw_top1_confidence": 0.9993833303451538,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.0001633349893381819,
+              "margin": 0.9992199953558156,
+              "accepted": true,
+              "latency_ms": 5.324600031599402
+            }
+          }
+        },
+        {
+          "timestamp_s": 15.453333333333333,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "incubator",
+              "raw_top1_confidence": 0.9992227554321289,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.00032417388865724206,
+              "margin": 0.9988985815434717,
+              "accepted": true,
+              "latency_ms": 11.558899888768792
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Incubator.MOV",
+      "expected_class": "incubator",
+      "duration_s": 13.445,
+      "frame_count": 403,
+      "train_frame_count": 58,
+      "validation_frame_count": 41,
+      "samples": [
+        {
+          "timestamp_s": 2.689,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "incubator",
+              "raw_top1_confidence": 0.9999239444732666,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 1.4080000255489722e-05,
+              "margin": 0.9999098644730111,
+              "accepted": true,
+              "latency_ms": 6.865000119432807
+            }
+          }
+        },
+        {
+          "timestamp_s": 5.378,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "incubator",
+              "raw_top1_confidence": 0.999868631362915,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 2.9620421628351323e-05,
+              "margin": 0.9998390109412867,
+              "accepted": true,
+              "latency_ms": 9.179600048810244
+            }
+          }
+        },
+        {
+          "timestamp_s": 8.067,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "incubator",
+              "raw_top1_confidence": 0.9999637603759766,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 9.938366929418407e-06,
+              "margin": 0.9999538220090471,
+              "accepted": true,
+              "latency_ms": 5.219500046223402
+            }
+          }
+        },
+        {
+          "timestamp_s": 10.756,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "incubator",
+              "raw_top1_confidence": 0.9999079704284668,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 4.545635965769179e-05,
+              "margin": 0.9998625140688091,
+              "accepted": true,
+              "latency_ms": 9.597500087693334
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Laboratory Glassware 2.MOV",
+      "expected_class": "laboratory_glassware",
+      "duration_s": 14.913333333333332,
+      "frame_count": 447,
+      "train_frame_count": 159,
+      "validation_frame_count": 45,
+      "samples": [
+        {
+          "timestamp_s": 2.982666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.208421528339386,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.19424280524253845,
+              "margin": 0.014178723096847534,
+              "accepted": false,
+              "latency_ms": 12.022300157696009
+            }
+          }
+        },
+        {
+          "timestamp_s": 5.965333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "preparation_area",
+              "raw_top1_confidence": 0.5169782638549805,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.3358573019504547,
+              "margin": 0.18112096190452576,
+              "accepted": false,
+              "latency_ms": 7.346299942582846
+            }
+          }
+        },
+        {
+          "timestamp_s": 8.947999999999999,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.2401212751865387,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.22122161090373993,
+              "margin": 0.018899664282798767,
+              "accepted": false,
+              "latency_ms": 10.15169988386333
+            }
+          }
+        },
+        {
+          "timestamp_s": 11.930666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.3161723017692566,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.26995599269866943,
+              "margin": 0.04621630907058716,
+              "accepted": false,
+              "latency_ms": 11.025599902495742
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Laboratory Glassware 3.MOV",
+      "expected_class": "laboratory_glassware",
+      "duration_s": 12.376666666666667,
+      "frame_count": 371,
+      "train_frame_count": 159,
+      "validation_frame_count": 45,
+      "samples": [
+        {
+          "timestamp_s": 2.4753333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9938040971755981,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.0017174406675621867,
+              "margin": 0.992086656508036,
+              "accepted": true,
+              "latency_ms": 8.27820017002523
+            }
+          }
+        },
+        {
+          "timestamp_s": 4.950666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9941471815109253,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.002295399783179164,
+              "margin": 0.9918517817277461,
+              "accepted": true,
+              "latency_ms": 6.430200068280101
+            }
+          }
+        },
+        {
+          "timestamp_s": 7.426,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9990047812461853,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.0002711153938435018,
+              "margin": 0.9987336658523418,
+              "accepted": true,
+              "latency_ms": 10.277200024574995
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.901333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9985849857330322,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.00033336036722175777,
+              "margin": 0.9982516253658105,
+              "accepted": true,
+              "latency_ms": 10.419600177556276
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Laboratory Glassware.MOV",
+      "expected_class": "laboratory_glassware",
+      "duration_s": 15.18,
+      "frame_count": 455,
+      "train_frame_count": 159,
+      "validation_frame_count": 45,
+      "samples": [
+        {
+          "timestamp_s": 3.036,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9960246086120605,
+              "raw_top2": "preparation_area",
+              "raw_top2_confidence": 0.0010553221218287945,
+              "margin": 0.9949692864902318,
+              "accepted": true,
+              "latency_ms": 10.22749999538064
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.072,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9986372590065002,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.0002955358650069684,
+              "margin": 0.9983417231414933,
+              "accepted": true,
+              "latency_ms": 7.7350998762995005
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.107999999999999,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.99903404712677,
+              "raw_top2": "benchtop_multi_parameter_meter",
+              "raw_top2_confidence": 0.00017874533659778535,
+              "margin": 0.9988553017901722,
+              "accepted": true,
+              "latency_ms": 7.8581999987363815
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.144,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9974486231803894,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.0006519501330330968,
+              "margin": 0.9967966730473563,
+              "accepted": true,
+              "latency_ms": 9.975099936127663
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Laboratory_Glassware 4.MOV",
+      "expected_class": "laboratory_glassware",
+      "duration_s": 24.955000000000002,
+      "frame_count": 748,
+      "train_frame_count": 159,
+      "validation_frame_count": 45,
+      "samples": [
+        {
+          "timestamp_s": 4.9910000000000005,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9971688389778137,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.0011680691968649626,
+              "margin": 0.9960007697809488,
+              "accepted": true,
+              "latency_ms": 8.149400120601058
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.982000000000001,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9833381772041321,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.014241400174796581,
+              "margin": 0.9690967770293355,
+              "accepted": true,
+              "latency_ms": 5.058499984443188
+            }
+          }
+        },
+        {
+          "timestamp_s": 14.973,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9905283451080322,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.006698393262922764,
+              "margin": 0.9838299518451095,
+              "accepted": true,
+              "latency_ms": 8.575200103223324
+            }
+          }
+        },
+        {
+          "timestamp_s": 19.964000000000002,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "laboratory_glassware",
+              "raw_top1_confidence": 0.9967568516731262,
+              "raw_top2": "microscope",
+              "raw_top2_confidence": 0.0012482086895033717,
+              "margin": 0.9955086429836228,
+              "accepted": true,
+              "latency_ms": 15.195799991488457
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Microprocessor Centrifuge.MOV",
+      "expected_class": "microprocessor_centrifuge",
+      "duration_s": 15.813333333333333,
+      "frame_count": 474,
+      "train_frame_count": 48,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 3.1626666666666665,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "microprocessor_centrifuge",
+              "raw_top1_confidence": 0.9807344079017639,
+              "raw_top2": "spectrophotometer",
+              "raw_top2_confidence": 0.004120922181755304,
+              "margin": 0.9766134857200086,
+              "accepted": true,
+              "latency_ms": 6.9339999463409185
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.325333333333333,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "microprocessor_centrifuge",
+              "raw_top1_confidence": 0.9626556038856506,
+              "raw_top2": "velocity_18r_pro_centrifuge",
+              "raw_top2_confidence": 0.011369848623871803,
+              "margin": 0.9512857552617788,
+              "accepted": true,
+              "latency_ms": 14.067400014027953
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.488,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "microprocessor_centrifuge",
+              "raw_top1_confidence": 0.9923101663589478,
+              "raw_top2": "shaker_incubator",
+              "raw_top2_confidence": 0.0016925244126468897,
+              "margin": 0.9906176419463009,
+              "accepted": true,
+              "latency_ms": 10.04990004003048
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.650666666666666,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "microprocessor_centrifuge",
+              "raw_top1_confidence": 0.9491990208625793,
+              "raw_top2": "gravimetrics",
+              "raw_top2_confidence": 0.014492029324173927,
+              "margin": 0.9347069915384054,
+              "accepted": true,
+              "latency_ms": 4.853700054809451
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Microscope.MOV",
+      "expected_class": "microscope",
+      "duration_s": 20.685,
+      "frame_count": 620,
+      "train_frame_count": 62,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 4.137,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "microscope",
+              "raw_top1_confidence": 0.9983718991279602,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 0.0004691403592005372,
+              "margin": 0.9979027587687597,
+              "accepted": true,
+              "latency_ms": 6.975699914619327
+            }
+          }
+        },
+        {
+          "timestamp_s": 8.274,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "microscope",
+              "raw_top1_confidence": 0.9999464750289917,
+              "raw_top2": "analytical_balance",
+              "raw_top2_confidence": 1.5850475392653607e-05,
+              "margin": 0.999930624553599,
+              "accepted": true,
+              "latency_ms": 5.1327000837773085
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.411,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "microscope",
+              "raw_top1_confidence": 0.9986960291862488,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0003985962539445609,
+              "margin": 0.9982974329323042,
+              "accepted": true,
+              "latency_ms": 6.156299961730838
+            }
+          }
+        },
+        {
+          "timestamp_s": 16.548,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "microscope",
+              "raw_top1_confidence": 0.9997356534004211,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.00013355695409700274,
+              "margin": 0.9996020964463241,
+              "accepted": true,
+              "latency_ms": 6.742300000041723
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Nichipet EX II and BIOBASE Vortex MIxer.MOV",
+      "expected_class": "nichipet_ex_ii_and_biobase_vortex_mixer",
+      "duration_s": 15.18,
+      "frame_count": 455,
+      "train_frame_count": 46,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 3.036,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top1_confidence": 0.5187569260597229,
+              "raw_top2": "nichipet_ex_ii",
+              "raw_top2_confidence": 0.48098257184028625,
+              "margin": 0.037774354219436646,
+              "accepted": false,
+              "latency_ms": 6.238700123503804
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.072,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "biobase_vortex_mixer",
+              "raw_top1_confidence": 0.6097238659858704,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.28826817870140076,
+              "margin": 0.3214556872844696,
+              "accepted": false,
+              "latency_ms": 7.532699964940548
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.107999999999999,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "biobase_vortex_mixer",
+              "raw_top1_confidence": 0.7390525937080383,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.23728401958942413,
+              "margin": 0.5017685741186142,
+              "accepted": false,
+              "latency_ms": 7.112600142136216
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.144,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top1_confidence": 0.6455521583557129,
+              "raw_top2": "nichipet_ex_ii",
+              "raw_top2_confidence": 0.35342520475387573,
+              "margin": 0.29212695360183716,
+              "accepted": false,
+              "latency_ms": 6.261599948629737
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Nichipet EX II.MOV",
+      "expected_class": "nichipet_ex_ii",
+      "duration_s": 8.173333333333334,
+      "frame_count": 245,
+      "train_frame_count": 25,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 1.634666666666667,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top1_confidence": 0.5171523690223694,
+              "raw_top2": "nichipet_ex_ii",
+              "raw_top2_confidence": 0.48277464509010315,
+              "margin": 0.034377723932266235,
+              "accepted": false,
+              "latency_ms": 6.039799889549613
+            }
+          }
+        },
+        {
+          "timestamp_s": 3.269333333333334,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "nichipet_ex_ii",
+              "raw_top1_confidence": 0.5003844499588013,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.49926140904426575,
+              "margin": 0.0011230409145355225,
+              "accepted": false,
+              "latency_ms": 7.98140000551939
+            }
+          }
+        },
+        {
+          "timestamp_s": 4.904,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top1_confidence": 0.5283260941505432,
+              "raw_top2": "nichipet_ex_ii",
+              "raw_top2_confidence": 0.47129514813423157,
+              "margin": 0.057030946016311646,
+              "accepted": false,
+              "latency_ms": 9.51370014809072
+            }
+          }
+        },
+        {
+          "timestamp_s": 6.538666666666668,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "nichipet_ex_ii",
+              "raw_top1_confidence": 0.5177701115608215,
+              "raw_top2": "nichipet_ex_ii_and_biobase_vortex_mixer",
+              "raw_top2_confidence": 0.4819166362285614,
+              "margin": 0.03585347533226013,
+              "accepted": false,
+              "latency_ms": 7.2061000391840935
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Preparation Area.MOV",
+      "expected_class": "preparation_area",
+      "duration_s": 21.285,
+      "frame_count": 638,
+      "train_frame_count": 64,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 4.257000000000001,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "preparation_area",
+              "raw_top1_confidence": 0.9660415053367615,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.011588584631681442,
+              "margin": 0.95445292070508,
+              "accepted": true,
+              "latency_ms": 7.501400075852871
+            }
+          }
+        },
+        {
+          "timestamp_s": 8.514000000000001,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "preparation_area",
+              "raw_top1_confidence": 0.9983959794044495,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0008538421243429184,
+              "margin": 0.9975421372801065,
+              "accepted": true,
+              "latency_ms": 12.216700008139014
+            }
+          }
+        },
+        {
+          "timestamp_s": 12.770999999999999,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "preparation_area",
+              "raw_top1_confidence": 0.9966212511062622,
+              "raw_top2": "ducted_fumehood",
+              "raw_top2_confidence": 0.0008310722769238055,
+              "margin": 0.9957901788293384,
+              "accepted": true,
+              "latency_ms": 7.503099972382188
+            }
+          }
+        },
+        {
+          "timestamp_s": 17.028000000000002,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "preparation_area",
+              "raw_top1_confidence": 0.9976373910903931,
+              "raw_top2": "laboratory_glassware",
+              "raw_top2_confidence": 0.0015329935122281313,
+              "margin": 0.9961043975781649,
+              "accepted": true,
+              "latency_ms": 7.037800038233399
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Shaker Incubator.MOV",
+      "expected_class": "shaker_incubator",
+      "duration_s": 18.65,
+      "frame_count": 559,
+      "train_frame_count": 56,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 3.73,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "shaker_incubator",
+              "raw_top1_confidence": 0.9647523164749146,
+              "raw_top2": "digital_dry_bath_incubator",
+              "raw_top2_confidence": 0.011855773627758026,
+              "margin": 0.9528965428471565,
+              "accepted": true,
+              "latency_ms": 8.639900013804436
+            }
+          }
+        },
+        {
+          "timestamp_s": 7.46,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "shaker_incubator",
+              "raw_top1_confidence": 0.9928497076034546,
+              "raw_top2": "microprocessor_centrifuge",
+              "raw_top2_confidence": 0.0025777784176170826,
+              "margin": 0.9902719291858375,
+              "accepted": true,
+              "latency_ms": 5.642300006002188
+            }
+          }
+        },
+        {
+          "timestamp_s": 11.19,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "shaker_incubator",
+              "raw_top1_confidence": 0.9826626777648926,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.0064291153103113174,
+              "margin": 0.9762335624545813,
+              "accepted": true,
+              "latency_ms": 12.17000000178814
+            }
+          }
+        },
+        {
+          "timestamp_s": 14.92,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "shaker_incubator",
+              "raw_top1_confidence": 0.9812801480293274,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.008977559395134449,
+              "margin": 0.9723025886341929,
+              "accepted": true,
+              "latency_ms": 9.696600027382374
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Spectrophotometer.MOV",
+      "expected_class": "spectrophotometer",
+      "duration_s": 22.953333333333333,
+      "frame_count": 688,
+      "train_frame_count": 69,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 4.5906666666666665,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "spectrophotometer",
+              "raw_top1_confidence": 0.9961017370223999,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.00208416860550642,
+              "margin": 0.9940175684168935,
+              "accepted": true,
+              "latency_ms": 7.794100092723966
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.181333333333333,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "spectrophotometer",
+              "raw_top1_confidence": 0.9815409183502197,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.012325108051300049,
+              "margin": 0.9692158102989197,
+              "accepted": true,
+              "latency_ms": 9.833799907937646
+            }
+          }
+        },
+        {
+          "timestamp_s": 13.772,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "spectrophotometer",
+              "raw_top1_confidence": 0.9911919236183167,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.0055059571750462055,
+              "margin": 0.9856859664432704,
+              "accepted": true,
+              "latency_ms": 7.875900017097592
+            }
+          }
+        },
+        {
+          "timestamp_s": 18.362666666666666,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "spectrophotometer",
+              "raw_top1_confidence": 0.995231568813324,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.003890846623107791,
+              "margin": 0.9913407221902162,
+              "accepted": true,
+              "latency_ms": 9.677599882707
+            }
+          }
+        }
+      ]
+    },
+    {
+      "video": "Velocity 18R Pro Centrifuge.MOV",
+      "expected_class": "velocity_18r_pro_centrifuge",
+      "duration_s": 22.55333333333333,
+      "frame_count": 676,
+      "train_frame_count": 68,
+      "validation_frame_count": 0,
+      "samples": [
+        {
+          "timestamp_s": 4.510666666666666,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "velocity_18r_pro_centrifuge",
+              "raw_top1_confidence": 0.9945294260978699,
+              "raw_top2": "microprocessor_centrifuge",
+              "raw_top2_confidence": 0.003457049373537302,
+              "margin": 0.9910723767243326,
+              "accepted": true,
+              "latency_ms": 10.99650003015995
+            }
+          }
+        },
+        {
+          "timestamp_s": 9.021333333333333,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "velocity_18r_pro_centrifuge",
+              "raw_top1_confidence": 0.9980993866920471,
+              "raw_top2": "chemical_testing_area",
+              "raw_top2_confidence": 0.0007341268355958164,
+              "margin": 0.9973652598564513,
+              "accepted": true,
+              "latency_ms": 6.384100066497922
+            }
+          }
+        },
+        {
+          "timestamp_s": 13.531999999999998,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "velocity_18r_pro_centrifuge",
+              "raw_top1_confidence": 0.996522068977356,
+              "raw_top2": "microprocessor_centrifuge",
+              "raw_top2_confidence": 0.000938024721108377,
+              "margin": 0.9955840442562476,
+              "accepted": true,
+              "latency_ms": 9.052400011569262
+            }
+          }
+        },
+        {
+          "timestamp_s": 18.042666666666666,
+          "frame_size": [
+            1080,
+            1920
+          ],
+          "variants": {
+            "full_center_crop": {
+              "raw_top1": "velocity_18r_pro_centrifuge",
+              "raw_top1_confidence": 0.9966093301773071,
+              "raw_top2": "microprocessor_centrifuge",
+              "raw_top2_confidence": 0.0011264128843322396,
+              "margin": 0.9954829172929749,
+              "accepted": true,
+              "latency_ms": 7.410800084471703
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

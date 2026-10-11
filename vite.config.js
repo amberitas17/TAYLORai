@@ -8,10 +8,48 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      includeAssets: [
+        'manifest.json',
+        'icons/icon-192.svg',
+        'icons/icon-512.svg',
+        'models/faceapi/tiny_face_detector_model-weights_manifest.json',
+        'models/faceapi/tiny_face_detector_model-shard1',
+        'models/faceapi/face_expression_model-weights_manifest.json',
+        'models/faceapi/face_expression_model-shard1',
+        'models/faceapi/age_gender_model-weights_manifest.json',
+        'models/faceapi/age_gender_model-shard1',
+        'sarah-avatar.glb'
+      ],
       manifest: false,
       workbox: {
         maximumFileSizeToCacheInBytes: 100 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => (
+              url.pathname === '/api/indoor-map/cit/published' ||
+              url.pathname.startsWith('/indoor-map-assets/') ||
+              url.pathname.startsWith('/indoor-evidence/') ||
+              url.pathname.startsWith('/models/') ||
+              url.pathname.includes('/ort/') ||
+              url.pathname.endsWith('.wasm') ||
+              /\.(json|bin|onnx|tflite|glb|gltf)$/i.test(url.pathname)
+            ),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'taylor-published-map-and-evidence-assets-v2',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          }
+        ]
       },
       devOptions: {
         enabled: false,
@@ -27,5 +65,15 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    // Prevent the file watcher from descending into the Python venv / backend folders
+    watch: {
+      ignored: ['**/Documentation/venv/**', '**/backend/**', '**/backend_faceapi/**'],
+    },
+  },
+  // Without this, Vite's dependency scanner crawls every *.html in the project,
+  // including Documentation/venv/Lib/site-packages (torch/matplotlib/ultralytics),
+  // which makes the dev server hang on the first request.
+  optimizeDeps: {
+    entries: ['index.html'],
   },
 })

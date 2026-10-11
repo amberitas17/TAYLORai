@@ -1,16 +1,45 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
-import { textToSpeech } from './services/speechAPI.js';
-import AiText from './ai-text.jsx';
-import AIVision from './components/AIVision.jsx'; // New web-compatible AI Vision component
-import AiExhibit from './ai-exhibit.jsx';
-import AiVisionTest from './ai-vision-test.jsx';
-import ClientSideAIInterface from './components/ClientSideAIInterface.jsx';
-import FaceApiInterface from './components/FaceApiInterface.jsx';
-import ClientSideFaceAnalysis from './ClientSideFaceAnalysis.jsx';
-import Hologram from './hologram.jsx';
-import HomePage from './HomePage.jsx';
-import TaylorDashboard from './TaylorDashboard.jsx';
+import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
+const AiText = lazy(() => import('./ai-text.jsx'));
+const AIVision = lazy(() => import('./components/AIVision.jsx'));
+const AiExhibit = lazy(() => import('./ai-exhibit.jsx'));
+const AiVisionTest = lazy(() => import('./ai-vision-test.jsx'));
+const ClientSideAIInterface = lazy(() => import('./components/ClientSideAIInterface.jsx'));
+const FaceApiInterface = lazy(() => import('./components/FaceApiInterface.jsx'));
+const ClientSideFaceAnalysis = lazy(() => import('./ClientSideFaceAnalysis.jsx'));
+const Hologram = lazy(() => import('./hologram.jsx'));
+const HomePage = lazy(() => import('./HomePage.jsx'));
+const TaylorDashboard = lazy(() => import('./TaylorDashboard.jsx'));
+const AINavigation = lazy(() => import('./components/AINavigation.jsx'));
+const IndoorMapEditor = lazy(() => import('./components/IndoorMapEditor.jsx'));
+
+function RouteLoading() {
+  return (
+    <div className="route-loading" role="status" aria-live="polite">
+      Loading TAYLOR...
+    </div>
+  );
+}
+
+class RouteErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <main className="route-loading" role="alert" aria-live="assertive">
+        <h1>TAYLOR</h1>
+        <p>The connection interrupted the app download.</p>
+        <button type="button" onClick={() => window.location.reload()}>Retry</button>
+      </main>
+    );
+  }
+}
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -29,6 +58,7 @@ function LandingPage() {
         const parsed = JSON.parse(storedProfile);
         setGuestProfile(parsed);
 
+        handleSpeechInteraction();
         textToSpeech(`Welcome to the exhibition. I detected a ${parsed.emotion || 'friendly'} mood. Let us begin the experience.`, false, 'taylor', 'en');
       }
     } catch (error) {
@@ -84,7 +114,9 @@ function LandingPage() {
             alignItems: 'center',
             gap: 16
           }}>
-            <Hologram emotion={guestProfile.emotion || 'happy'} isAnimating={true} spokenText={`Welcome! I detected a ${guestProfile.emotion || 'friendly'} mood.`} />
+            <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
+              <Hologram emotion={guestProfile.emotion || 'happy'} isAnimating={true} spokenText={`Welcome! I detected a ${guestProfile.emotion || 'friendly'} mood.`} />
+            </Suspense>
             <h2 style={{ margin: 0, color: '#12324a', fontSize: 28 }}>Welcome, Guest!</h2>
             <p style={{ margin: 0, color: '#345d7a', fontSize: 18, lineHeight: 1.5 }}>
               The AI avatar detected your {guestProfile.emotion || 'friendly'} mood and is ready to entertain you.
@@ -182,20 +214,36 @@ function LandingPage() {
   );
 }
 
+function NavigationRoute() {
+  return <AINavigation />;
+}
+
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/taylor" element={<TaylorDashboard />} />
-      <Route path="/landing" element={<LandingPage />} />
-      <Route path="/ai-text" element={<AiText />} />
-      <Route path="/machine-vision" element={<AIVision />} />
-      <Route path="/machine-vision-exhibit" element={<AiExhibit />} />
-      <Route path="/test" element={<AiVisionTest />} />
-      <Route path="/client-ai" element={<ClientSideAIInterface />} />
-      <Route path="/face-api" element={<FaceApiInterface />} />
-      <Route path="/client-side-face-analysis" element={<ClientSideFaceAnalysis />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <RouteErrorBoundary>
+      <Suspense fallback={<RouteLoading />}>
+        <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/taylor" element={<TaylorDashboard />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/ai-text" element={<AiText />} />
+        <Route path="/machine-vision" element={<AIVision />} />
+        <Route path="/ai-navigation" element={<NavigationRoute />} />
+        <Route path="/ai-navigation-admin" element={<IndoorMapEditor onBack={() => window.history.back()} />} />
+        <Route path="/machine-vision-exhibit" element={<AiExhibit classifierMode="recon" />} />
+        <Route path="/machine-vision-recon" element={<AiExhibit classifierMode="recon" />} />
+        <Route path="/machine-vision-exhibit-aricc" element={<AiExhibit classifierMode="aricc" />} />
+        <Route path="/machine-vision-aricc" element={<AiExhibit classifierMode="aricc" />} />
+        <Route path="/machine-vision-fablab" element={<AiExhibit classifierMode="fablab" />} />
+        <Route path="/machine-vision-caesar" element={<AiExhibit classifierMode="caesar" />} />
+        <Route path="/machine-vision-rio" element={<AiExhibit classifierMode="rio" />} />
+        <Route path="/test" element={<AiVisionTest />} />
+        <Route path="/client-ai" element={<ClientSideAIInterface />} />
+        <Route path="/face-api" element={<FaceApiInterface />} />
+        <Route path="/client-side-face-analysis" element={<ClientSideFaceAnalysis />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </RouteErrorBoundary>
   );
 }

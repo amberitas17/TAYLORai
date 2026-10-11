@@ -1,5 +1,6 @@
+import { getPerformanceSettings } from './services/devicePerformance.js';
 // Hologram.jsx
-import React, { Suspense, useEffect, useRef } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -18,76 +19,6 @@ const EYE_LOOK = [
   'eyeLookUpLeft', 'eyeLookDownLeft', 'eyeLookUpRight', 'eyeLookDownRight',
 ];
 
-function capturePose(scene) {
-  const pose = {};
-  scene.traverse((child) => {
-    if (child.isBone) {
-      pose[child.name] = {
-        position: child.position.clone(),
-        quaternion: child.quaternion.clone(),
-        scale: child.scale.clone(),
-      };
-    }
-  });
-  return pose;
-}
-
-function applyPoseWithCorrection(targetScene, pose, alpha, rotationY = 0) {
-  const correction = new THREE.Quaternion();
-  correction.setFromEuler(new THREE.Euler(0, rotationY, 0));
-
-  targetScene.traverse((child) => {
-    if (child.isBone && pose[child.name]) {
-      child.position.lerp(pose[child.name].position, alpha);
-      if (child.name.toLowerCase().includes('hips') || child.name.toLowerCase().includes('root') || (child.name.toLowerCase().includes('spine') && !child.parent?.isBone)) {
-        const corrected = pose[child.name].quaternion.clone().multiply(correction);
-        child.quaternion.slerp(corrected, alpha);
-      } else {
-        child.quaternion.slerp(pose[child.name].quaternion, alpha);
-      }
-      child.scale.lerp(pose[child.name].scale, alpha);
-    }
-  });
-}
-
-function buildNeutralStandingPose(scene) {
-  const pose = capturePose(scene);
-
-  scene.traverse((child) => {
-    if (!child.isBone) return;
-
-    const name = child.name.toLowerCase();
-    const isLeft = name.includes('left');
-    const isRight = name.includes('right');
-
-    if (/upperarm|upper_arm|shoulder|clavicle/.test(name) && pose[child.name]) {
-      const sideSign = isLeft ? 1 : -1;
-      const adjust = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.95, 0, sideSign * 0.18));
-      pose[child.name].quaternion.multiply(adjust);
-    }
-
-    if (/forearm|lowerarm|elbow/.test(name) && pose[child.name]) {
-      const sideSign = isLeft ? 1 : -1;
-      const bend = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.35, 0, sideSign * -0.12));
-      pose[child.name].quaternion.multiply(bend);
-    }
-
-    if (/hand|wrist/.test(name) && pose[child.name]) {
-      const sideSign = isLeft ? 1 : -1;
-      const relax = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.18, 0, sideSign * -0.05));
-      pose[child.name].quaternion.multiply(relax);
-    }
-
-    if (/shoulder|clavicle/.test(name) && pose[child.name]) {
-      const sideSign = isLeft ? 1 : -1;
-      const relaxShoulder = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.08, 0, sideSign * 0.05));
-      pose[child.name].quaternion.multiply(relaxShoulder);
-    }
-  });
-
-  return pose;
-}
-
 function findIdleClip(animations = []) {
   if (!animations?.length) return null;
   return animations.find((clip) => /idle(?:_|\s)?standing/i.test(clip?.name || ''))
@@ -95,7 +26,7 @@ function findIdleClip(animations = []) {
     || animations[0];
 }
 
-function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto' }) {
+function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', onReady }) {
   const groupRef = useRef();
   const idleMixerRef = useRef(null);
   const meshesRef = useRef([]);
@@ -103,15 +34,14 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
   const blinkRef = useRef(0);
   const smileRef = useRef(0.55);
   const debugArmBonesRef = useRef(null);
+  const boneRestPoseRef = useRef(new Map());
+  const gestureStateRef = useRef({ mode: 'neutral', startedAt: 0 });
 
-  const { scene: avatarScene, animations: avatarAnims } = useGLTF('/sarah-avatar.glb');
-  const { scene: idleScene, animations: idleAnims } = useGLTF('/sarah-idle.glb');
-  const displayScene = assetPreset === 'idle' ? idleScene : assetPreset === 'avatar' ? avatarScene : (idleScene || avatarScene);
-  const activeAnims = assetPreset === 'idle'
-    ? (idleAnims || [])
-    : assetPreset === 'avatar'
-      ? (avatarAnims || [])
-      : (idleAnims?.length ? idleAnims : avatarAnims);
+  const modelPaths = [assetPreset === 'avatar' ? '/sarah-avatar.glb' : '/sarah-idle.glb'];
+  const loadedModels = useGLTF(modelPaths);
+  const selectedModel = loadedModels[0];
+  const displayScene = selectedModel.scene;
+  const activeAnims = selectedModel.animations;
 
   const debugArmBoneTransforms = (scene) => {
     if (!scene) return;
@@ -136,12 +66,14 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
 
   useEffect(() => {
     if (!displayScene) return;
+    onReady?.();
     const found = [];
     displayScene.traverse((child) => {
       if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
         child.frustumCulled = false;
         found.push(child);
       }
+      if (child.isBone) boneRestPoseRef.current.set(child.name, child.quaternion.clone());
     });
     meshesRef.current = found;
 
@@ -154,7 +86,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
         if (pascal in dict) inf[dict[pascal]] = 0;
       });
     });
-  }, [displayScene]);
+  }, [displayScene, onReady]);
 
   useEffect(() => {
     if (!displayScene) return;
@@ -199,11 +131,19 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
         idleMixerRef.current = null;
       }
     };
-  }, [displayScene, activeAnims, disableAnimations]);
+  }, [displayScene, activeAnims, assetPreset, disableAnimations]);
 
   useEffect(() => {
     smileRef.current = isAnimating ? 0.25 : 0.55;
   }, [isAnimating]);
+
+  useEffect(() => {
+    if (!poseMode.startsWith('navigation-')) return;
+    gestureStateRef.current = {
+      mode: poseMode,
+      startedAt: clockRef.current.getElapsedTime(),
+    };
+  }, [poseMode]);
 
   const lerpMorph = (name, target, speed = 0.1) => {
     meshesRef.current.forEach((mesh) => {
@@ -221,10 +161,77 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
   };
 
   const clearMorph = (name) => lerpMorph(name, 0, 0.12);
-  const zeroMorph = (name) => lerpMorph(name, 0, 1.0);
+
+  const getBone = (scene, side, segment) => {
+    let result = null;
+    const pattern = new RegExp(`${side}${segment}`, 'i');
+    scene.traverse((child) => {
+      if (!result && child.isBone && pattern.test(child.name)) result = child;
+    });
+    return result;
+  };
+
+  const pointBoneToward = (bone, targetDirection, amount = 0.14) => {
+    const endpoint = bone?.children.find((child) => child.isBone);
+    if (!bone || !endpoint) return null;
+
+    const bonePosition = bone.getWorldPosition(new THREE.Vector3());
+    const endpointPosition = endpoint.getWorldPosition(new THREE.Vector3());
+    const currentDirection = endpointPosition.sub(bonePosition).normalize();
+    const desiredDirection = targetDirection.clone().normalize();
+    const delta = new THREE.Quaternion().setFromUnitVectors(currentDirection, desiredDirection);
+    const currentWorldRotation = bone.getWorldQuaternion(new THREE.Quaternion());
+    const targetWorldRotation = delta.multiply(currentWorldRotation);
+    const parentWorldRotation = bone.parent?.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const targetLocalRotation = parentWorldRotation
+      ? parentWorldRotation.multiply(targetWorldRotation)
+      : targetWorldRotation;
+    bone.quaternion.slerp(targetLocalRotation, amount);
+    bone.updateMatrixWorld(true);
+  };
+
+  const applyPointingPose = (scene, side, screenDirection, gestureWeight) => {
+    scene.updateMatrixWorld(true);
+    const arm = getBone(scene, side, 'Arm');
+    const forearm = getBone(scene, side, 'ForeArm');
+    const hand = getBone(scene, side, 'Hand');
+    const horizontal = new THREE.Vector3(screenDirection, 0, 0);
+
+    // The GLB faces the camera: avatar-left is visitor-right, and vice versa.
+    pointBoneToward(arm, horizontal.clone().multiplyScalar(0.5).add(new THREE.Vector3(0, 0.68, 0)), 0.42 * gestureWeight);
+    scene.updateMatrixWorld(true);
+    pointBoneToward(forearm, horizontal.clone().multiplyScalar(0.58).add(new THREE.Vector3(0, 0.42, 0)), 0.38 * gestureWeight);
+    const handRest = boneRestPoseRef.current.get(hand?.name);
+    if (hand && handRest) {
+      const relaxedWrist = handRest.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -screenDirection * 0.1)));
+      hand.quaternion.slerp(relaxedWrist, 0.12 * gestureWeight);
+    }
+  };
+
+  const getGestureWeight = (time) => {
+    if (!poseMode.startsWith('navigation-')) return 0;
+    const elapsed = Math.max(0, time - gestureStateRef.current.startedAt);
+    const rise = THREE.MathUtils.smoothstep(elapsed, 0, 0.45);
+    if (isAnimating || elapsed < 1.7) return rise;
+    return rise * (1 - THREE.MathUtils.smoothstep(elapsed, 1.7, 2.35));
+  };
 
   const applyPoseMode = (scene, time) => {
     if (!scene) return;
+
+    // The avatar faces the visitor, so its right arm extends toward the visitor's left.
+    const pointingSide = poseMode === 'navigation-right' || poseMode === 'navigation-left' ? 'right' : null;
+    const screenDirection = -1;
+    const gestureWeight = getGestureWeight(time);
+    if (pointingSide && gestureWeight > 0.01) {
+      applyPointingPose(scene, pointingSide, screenDirection, gestureWeight);
+      const head = getBone(scene, '', 'Head');
+      const headRest = boneRestPoseRef.current.get(head?.name);
+      if (head && headRest) {
+        const headTarget = headRest.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, screenDirection * 0.14, 0)));
+        head.quaternion.slerp(headTarget, 0.08 * gestureWeight);
+      }
+    }
 
     scene.traverse((child) => {
       if (!child.isBone) return;
@@ -235,6 +242,21 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
         const tilt = Math.sin(time * 1.8) * 0.02;
         const target = new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, lean, 0));
         child.quaternion.slerp(target, 0.08);
+      }
+
+      if (poseMode === 'navigation-start' && /head|neck/i.test(name)) {
+        const target = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(time * 2) * 0.025, 0, 0));
+        child.quaternion.slerp(target, 0.1);
+      }
+
+      if (poseMode === 'navigation-forward' && /spine|chest|upperbody/i.test(name)) {
+        const target = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.035, 0, 0));
+        child.quaternion.slerp(target, 0.1);
+      }
+
+      if (poseMode === 'navigation-arrived' && /head|neck/i.test(name)) {
+        const target = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(time * 5) * 0.035, 0, 0));
+        child.quaternion.slerp(target, 0.12);
       }
     });
   };
@@ -306,9 +328,18 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
 
     if (groupRef.current) {
       groupRef.current.position.y = 0.08;
-      groupRef.current.rotation.z = 0;
-      groupRef.current.rotation.x = isAnimating ? Math.sin(t * 1.0) * 0.008 : 0;
-      groupRef.current.rotation.y = isAnimating ? Math.sin(t * 1.5) * 0.012 : 0;
+      const poseRotation = {
+        x: poseMode === 'navigation-forward' ? -0.045 : 0,
+        y: 0,
+        z: 0,
+      };
+      groupRef.current.rotation.z = poseRotation.z;
+      groupRef.current.rotation.x = poseRotation.x + (isAnimating ? Math.sin(t * 1.0) * 0.008 : 0);
+      groupRef.current.rotation.y = poseRotation.y + (isAnimating ? Math.sin(t * 1.5) * 0.012 : 0);
+      if (poseMode === 'navigation-start' || poseMode === 'navigation-arrived') {
+        groupRef.current.position.y = 0.08 + Math.max(0, Math.sin(t * 3)) * 0.035;
+        groupRef.current.rotation.z = Math.sin(t * 2.5) * 0.045;
+      }
     }
   });
 
@@ -328,20 +359,47 @@ function LoadingFallback() {
   );
 }
 
-export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto' }) {
+export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', onReady }) {
+  const [contextGeneration, setContextGeneration] = useState(0);
+  const [contextLost, setContextLost] = useState(false);
+  const canvasRef = useRef(null);
+  const pixelRatio = getPerformanceSettings().pixelRatio;
+
+  const handleCreated = ({ gl }) => {
+    const canvas = gl.domElement;
+    if (canvasRef.current === canvas) return;
+    canvasRef.current = canvas;
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      setContextLost(true);
+    }, false);
+    canvas.addEventListener('webglcontextrestored', () => {
+      setContextLost(false);
+      setContextGeneration((generation) => generation + 1);
+    }, false);
+  };
+
   return (
     <div className="hologram-container">
-      <Canvas camera={{ position: [0, 1.3, 4.3], fov: 30 }} dpr={[1, 1.5]}>
-        <PerspectiveCamera makeDefault position={[0, 1.35, 2.9]} fov={30} />
+      <Canvas
+        key={contextGeneration}
+        camera={{ position: [0, 1.3, 4.3], fov: 30 }}
+        dpr={pixelRatio}
+        gl={{ antialias: false, powerPreference: 'low-power', preserveDrawingBuffer: false }}
+        performance={{ min: 0.5, max: 1, debounce: 200 }}
+        onCreated={handleCreated}
+      >
+        <PerspectiveCamera makeDefault position={[0, 1.35, 3.7]} fov={30} />
         <ambientLight intensity={1.2} />
         <directionalLight position={[5, 8, 5]} intensity={1.2} />
         <directionalLight position={[-5, 5, -5]} intensity={0.6} />
         <pointLight position={[0, 3, 3]} intensity={0.4} color="#ffffff" />
         <Suspense fallback={<LoadingFallback />}>
-          <AvatarModel emotion={emotion} isAnimating={isAnimating} spokenText={spokenText} disableAnimations={disableAnimations} poseMode={poseMode} assetPreset={assetPreset} />
+          <AvatarModel onReady={onReady} emotion={emotion} isAnimating={isAnimating} spokenText={spokenText} disableAnimations={disableAnimations} poseMode={poseMode} assetPreset={assetPreset} />
         </Suspense>
         <OrbitControls enableZoom={false} enablePan={false} target={[0, 1.18, 0]} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
       </Canvas>
+      {contextLost && <div className="avatar-placeholder" role="status">Restoring TAYLOR display...</div>}
     </div>
   );
 }

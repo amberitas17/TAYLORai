@@ -6,7 +6,24 @@ import * as faceapi from 'face-api.js';
 class ClientSideFaceAnalysisService {
   constructor() {
     this.isLoaded = false;
-    this.modelPath = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'; // Official models
+    this.initializePromise = null;
+    this.modelPath = '/models/faceapi';
+    this.cacheName = 'taylor-faceapi-models-v1';
+    this.modelTimeoutMs = 20000;
+    this.maxAttempts = 3;
+    this.modelSource = 'NETWORK';
+    this.modelsLoadTime = 0;
+    this.lastError = '';
+    this.resourceDiagnostics = {};
+    this.state = 'FACE_CACHE_CHECK';
+    this.modelResources = [
+      'tiny_face_detector_model-weights_manifest.json',
+      'tiny_face_detector_model-shard1',
+      'face_expression_model-weights_manifest.json',
+      'face_expression_model-shard1',
+      'age_gender_model-weights_manifest.json',
+      'age_gender_model-shard1'
+    ];
     this.emotionLabels = ['angry', 'disgusted', 'fearful', 'happy', 'neutral', 'sad', 'surprised'];
   }
 
@@ -14,27 +31,122 @@ class ClientSideFaceAnalysisService {
    * Initialize face-api.js models in the browser
    */
   async initialize() {
-    console.log('🚀 Initializing face-api.js models in browser...');
+    if (this.isLoaded) return true;
+    if (this.initializePromise) return this.initializePromise;
+
+    this.initializePromise = this.initializeOnce().catch((error) => {
+      this.isLoaded = false;
+      this.state = error.code === 'FACE_MODEL_DOWNLOAD_REQUIRED' ? 'FACE_MODEL_DOWNLOAD_REQUIRED' : 'FACE_MODEL_ERROR';
+      this.lastError = error.message || 'Face models failed to initialize.';
+      console.error('FaceAPI model initialization failed:', error);
+      throw error;
+    }).finally(() => {
+      if (!this.isLoaded) this.initializePromise = null;
+    });
+    return this.initializePromise;
+  }
+
+  async initializeOnce() {
+    const startedAt = performance.now();
+    this.state = 'FACE_CACHE_CHECK';
+    this.lastError = '';
+    console.log('Initializing FaceAPI models from local application assets...');
+
+    const sources = await Promise.all(this.modelResources.map((resource) => this.cacheResource(resource)));
+    this.modelSource = sources.every((source) => source === 'CACHE') ? 'CACHE' : 'NETWORK';
+
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const modelPrefix = new URL(`${this.modelPath}/`, window.location.origin).href;
+    globalThis.fetch = async (input, init) => {
+      const requestUrl = typeof input === 'string' ? input : input.url;
+      if (requestUrl.startsWith(modelPrefix)) {
+        const cached = await caches.match(requestUrl);
+        if (cached) return cached;
+      }
+      return originalFetch(input, init);
+    };
 
     try {
-      // Load all required models from public/models directory
       await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(this.modelPath),
-        faceapi.nets.faceLandmark68Net.loadFromUri(this.modelPath),
-        faceapi.nets.faceRecognitionNet.loadFromUri(this.modelPath),
-        faceapi.nets.faceExpressionNet.loadFromUri(this.modelPath),
-        faceapi.nets.ageGenderNet.loadFromUri(this.modelPath)
+        this.loadModel('tinyFaceDetector', () => faceapi.nets.tinyFaceDetector.loadFromUri(this.modelPath)),
+        this.loadModel('faceExpression', () => faceapi.nets.faceExpressionNet.loadFromUri(this.modelPath)),
+        this.loadModel('ageGender', () => faceapi.nets.ageGenderNet.loadFromUri(this.modelPath))
       ]);
 
-      this.isLoaded = true;
-      console.log('✅ All face-api.js models loaded successfully in browser!');
-      console.log('🏷️ Emotion classes:', this.emotionLabels.join(', '));
-      return true;
+      const warmupCanvas = document.createElement('canvas');
+      warmupCanvas.width = 224;
+      warmupCanvas.height = 224;
+      await faceapi
+        .detectSingleFace(warmupCanvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.2 }))
+        .withFaceExpressions()
+        .withAgeAndGender();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
 
+    this.modelsLoadTime = performance.now() - startedAt;
+    this.isLoaded = true;
+    this.state = this.modelSource === 'CACHE' ? 'OFFLINE_FACE_MODELS_READY' : 'FACE_MODELS_READY';
+    console.log(`FaceAPI models ready from ${this.modelSource} in ${this.modelsLoadTime.toFixed(0)}ms`);
+    return true;
+  }
+
+  async cacheResource(resource) {
+    const url = `${this.modelPath}/${resource}`;
+    const startedAt = performance.now();
+    let cache;
+    try {
+      cache = await caches.open(this.cacheName);
+      const cached = await caches.match(url);
+      if (cached) {
+        this.state = 'FACE_LOADING_FROM_CACHE';
+        await cache.put(url, cached.clone());
+        if (!await cache.match(url)) throw new Error(`${resource} could not be verified in Cache Storage`);
+        this.resourceDiagnostics[resource] = { status: 'CACHE', duration: performance.now() - startedAt };
+        return 'CACHE';
+      }
+
+      this.state = 'FACE_DOWNLOADING';
+      let lastError;
+      for (let attempt = 0; attempt < this.maxAttempts; attempt += 1) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), this.modelTimeoutMs);
+        try {
+          const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+          if (!response.ok) {
+            const error = new Error(`${resource} returned HTTP ${response.status}`);
+            error.retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+            throw error;
+          }
+          await cache.put(url, response.clone());
+          if (!await cache.match(url)) throw new Error(`${resource} could not be verified in Cache Storage`);
+          this.resourceDiagnostics[resource] = { status: 'NETWORK', attempts: attempt + 1, duration: performance.now() - startedAt };
+          return 'NETWORK';
+        } catch (error) {
+          lastError = error;
+          if (attempt + 1 >= this.maxAttempts || error.retryable === false) throw error;
+          await new Promise((resolve) => setTimeout(resolve, 400 * (2 ** attempt)));
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+      throw lastError;
     } catch (error) {
-      console.error('❌ Error loading face-api.js models in browser:', error);
-      this.isLoaded = false;
-      return false;
+      const message = `${resource}: ${error.name === 'AbortError' ? 'timed out' : error.message}`;
+      this.resourceDiagnostics[resource] = { status: 'ERROR', duration: performance.now() - startedAt, error: message };
+      const downloadError = new Error(`Face model download required: ${message}`);
+      downloadError.code = 'FACE_MODEL_DOWNLOAD_REQUIRED';
+      throw downloadError;
+    }
+  }
+
+  async loadModel(name, loader) {
+    try {
+      await loader();
+    } catch (error) {
+      const message = `${name} model failed: ${error.message || error}`;
+      this.lastError = message;
+      throw new Error(message);
     }
   }
 
@@ -43,41 +155,40 @@ class ClientSideFaceAnalysisService {
    * @param {HTMLImageElement|HTMLCanvasElement|HTMLVideoElement} imageElement - Image element to analyze
    * @returns {Promise<Object>} Analysis result
    */
-  async analyzeFaceFromImage(imageElement) {
+  async analyzeFaceFromImage(imageElement, options = {}) {
     if (!this.isLoaded) {
       throw new Error('Face-api.js models not loaded yet. Please wait for initialization.');
     }
 
-    console.log('🧠 Starting client-side face analysis...');
     const startTime = Date.now();
 
+    const {
+      includeAge = true,
+      retryOnMiss = true,
+      inputSize = 224,
+      scoreThreshold = 0.25
+    } = options;
+
     try {
-      // Use more sensitive detection options
       const detectionOptions = new faceapi.TinyFaceDetectorOptions({
-        inputSize: 512,
-        scoreThreshold: 0.2
+        inputSize,
+        scoreThreshold
       });
 
-      // Perform face detection with all features
-      const detections = await faceapi
-        .detectAllFaces(imageElement, detectionOptions)
-        .withFaceLandmarks()
-        .withFaceExpressions()
-        .withAgeAndGender();
+      let detectionTask = faceapi.detectAllFaces(imageElement, detectionOptions).withFaceExpressions();
+      if (includeAge) detectionTask = detectionTask.withAgeAndGender();
+      const detections = await detectionTask;
 
-      // Retry with even more sensitive settings if no faces found
-      if (detections.length === 0) {
+      if (detections.length === 0 && retryOnMiss) {
         console.log('⚠️  No faces detected, retrying with ultra-sensitive settings...');
         const ultraSensitiveOptions = new faceapi.TinyFaceDetectorOptions({
-          inputSize: 320,
+          inputSize: 224,
           scoreThreshold: 0.1
         });
 
-        const retryDetections = await faceapi
-          .detectAllFaces(imageElement, ultraSensitiveOptions)
-          .withFaceLandmarks()
-          .withFaceExpressions()
-          .withAgeAndGender();
+        let retryTask = faceapi.detectAllFaces(imageElement, ultraSensitiveOptions).withFaceExpressions();
+        if (includeAge) retryTask = retryTask.withAgeAndGender();
+        const retryDetections = await retryTask;
 
         return this.formatResults(retryDetections, startTime);
       }
@@ -174,6 +285,7 @@ class ClientSideFaceAnalysisService {
     const detection = detections[0];
     const expressions = detection.expressions;
     const { age, gender, genderProbability } = detection;
+    const safeGender = gender || 'Unknown';
 
     // Find dominant emotion
     const dominantEmotion = Object.keys(expressions).reduce((a, b) =>
@@ -187,13 +299,16 @@ class ClientSideFaceAnalysisService {
     });
 
     console.log(`✅ Client-side face analysis complete in ${processingTime}ms`);
-    console.log(`👤 Detected: ${Math.round(age)} years old ${gender} (${Math.round(genderProbability * 100)}% confidence)`);
+    if (age !== undefined) {
+      console.log(`👤 Detected: ${Math.round(age)} years old ${gender} (${Math.round((genderProbability || 0) * 100)}% confidence)`);
+    }
     console.log(`😊 Emotion: ${this.capitalizeFirst(dominantEmotion)} (${Math.round(expressions[dominantEmotion] * 100)}% confidence)`);
 
     // Determine age group
-    const ageValue = Math.round(age);
+    const ageValue = age === undefined ? 0 : Math.round(age);
     let ageGroup = 'Adult';
-    if (ageValue < 18) ageGroup = 'Child';
+    if (age === undefined) ageGroup = 'Unknown';
+    else if (ageValue < 18) ageGroup = 'Child';
     else if (ageValue < 65) ageGroup = 'Adult';
     else ageGroup = 'Senior';
 
@@ -203,13 +318,13 @@ class ClientSideFaceAnalysisService {
         age: {
           value: ageValue,
           group: ageGroup,
-          confidence: Math.round(genderProbability * 100)
+          confidence: Math.round((genderProbability || 0) * 100)
         },
         gender: {
-          label: this.capitalizeFirst(gender),
-          confidence: Math.round(genderProbability * 100),
-          Male: gender === 'male' ? genderProbability : 1 - genderProbability,
-          Female: gender === 'female' ? genderProbability : 1 - genderProbability
+          label: this.capitalizeFirst(safeGender),
+          confidence: Math.round((genderProbability || 0) * 100),
+          Male: genderProbability === undefined ? 0 : safeGender === 'male' ? genderProbability : 1 - genderProbability,
+          Female: genderProbability === undefined ? 0 : safeGender === 'female' ? genderProbability : 1 - genderProbability
         },
         emotion: {
           label: this.capitalizeFirst(dominantEmotion),
@@ -250,7 +365,24 @@ class ClientSideFaceAnalysisService {
       emotion: this.isLoaded,
       exhibit: false,
       framework: 'face-api.js',
-      mode: 'client-side'
+      mode: 'client-side',
+      state: this.state,
+      modelSource: this.modelSource,
+      modelsLoadTime: this.modelsLoadTime,
+      lastError: this.lastError
+    };
+  }
+
+  getDiagnostics() {
+    return {
+      device: `${navigator.userAgentData?.platform || navigator.platform || 'Unknown'}`,
+      detector: 'TinyFaceDetector',
+      expressionModel: this.isLoaded ? 'READY' : 'WAITING',
+      ageModel: this.isLoaded ? 'READY' : 'WAITING',
+      modelSource: this.modelSource,
+      modelsLoadTime: this.modelsLoadTime,
+      resourceDiagnostics: this.resourceDiagnostics,
+      lastError: this.lastError
     };
   }
 

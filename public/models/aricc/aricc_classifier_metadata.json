@@ -1,0 +1,51 @@
+{
+  "model_name": "aricc_documentation_v10",
+  "classes": [
+    "ARICC-1",
+    "ARICC-2",
+    "ARICC-3",
+    "ARICC-4",
+    "ARICC-5",
+    "ARICC-6",
+    "ARICC-7",
+    "ARICC-8"
+  ],
+  "displayNames": [
+    "3D Printer",
+    "Collaborative Robot",
+    "FDAS",
+    "Industrial Robot",
+    "Pick & Place Machine",
+    "Robotic Arm",
+    "Smart Systems",
+    "Speech Home Automation"
+  ],
+  "trained_at": "2026-09-25T06:53:03.842335",
+  "source_dataset": "E:\\TAYLORai\\Documentation\\datasets\\ARICC\\ARICC",
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "output_shape": [
+    1,
+    8
+  ],
+  "output_type": "logits",
+  "unknown_category": "UNKNOWN",
+  "unknown_display_name": "No exhibit detected",
+  "preprocessing": {
+    "mean": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "std": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "dataset_summary": "runs\\aricc_documentation_dataset_v10\\dataset_summary.json"
+}

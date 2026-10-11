@@ -1,15 +1,53 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { Camera, Shield, User, Smile, Upload, Eye, Zap, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clientSideFaceAnalysisService from '../services/clientSideFaceAnalysis.js';
-import { textToSpeech } from '../services/speechAPI.js';
+import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
+import avatarAssetService from '../services/avatarAssetService.js';
 import './AIVision.css';
-import Hologram from '../../src/hologram'
+const Hologram = lazy(() => import('../../src/hologram.jsx'));
+
+function getFaceStatusLabel(status, avatarReady) {
+  if (['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(status)) {
+    if (!avatarReady) return 'Face analysis ready';
+    return status === 'OFFLINE_FACE_MODELS_READY' ? 'Using offline AI' : 'AI Vision ready';
+  }
+  if (status === 'FACE_MODEL_DOWNLOAD_REQUIRED') return 'Connect once to prepare AI Vision for offline use';
+  if (status === 'FACE_MODEL_ERROR') return 'Face analysis unavailable';
+  return 'Preparing AI Vision...';
+}
+
+function getAvatarStatusLabel(status) {
+  if (status === 'AVATAR_READY') return 'AI Vision ready';
+  if (status === 'AVATAR_ERROR') return 'Avatar unavailable. AI Vision can still use the camera.';
+  if (status === 'AVATAR_CACHE_CHECK' || status === 'AVATAR_LOADING_FROM_CACHE') return 'Loading TAYLOR...';
+  if (status === 'AVATAR_DOWNLOADING') return 'Preparing AI Vision...';
+  return 'Preparing AI Vision...';
+}
+
+class AvatarErrorBoundary extends React.Component {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error) {
+    this.props.onError?.(error);
+  }
+
+  render() {
+    return this.state.hasError
+      ? <div className="avatar-placeholder">Avatar unavailable. AI Vision can still use the camera.</div>
+      : this.props.children;
+  }
+}
 
 export default function AIVision() {
   const navigate = useNavigate();
   const [cameraPermission, setCameraPermission] = useState(null);
-  const [modelStatus, setModelStatus] = useState(null);
+  const [cameraStatus, setCameraStatus] = useState('CAMERA_INITIALIZING');
+  const [modelStatus, setModelStatus] = useState('FACE_CACHE_CHECK');
   const [stream, setStream] = useState(null);
   const [detectedProfile, setDetectedProfile] = useState(null);
   const [personDetected, setPersonDetected] = useState(false);
@@ -18,80 +56,189 @@ export default function AIVision() {
   const [avatarSpeaking, setAvatarSpeaking] = useState(false);
   const [welcomeDone, setWelcomeDone] = useState(false);
   const [flowError, setFlowError] = useState('');
+  const [lastInference, setLastInference] = useState({ status: 'STOPPED', time: 0, rate: 0 });
+  const [inferenceState, setInferenceState] = useState('STOPPED');
+  const [diagnosticsTick, setDiagnosticsTick] = useState(0);
+  const [avatarState, setAvatarState] = useState('AVATAR_CACHE_CHECK');
+  const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
+  const [avatarDiagnostics, setAvatarDiagnostics] = useState(avatarAssetService.getDiagnostics());
+  const faceDebugEnabled = new URLSearchParams(window.location.search).has('faceDebug');
+  const aiVisionReady = ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) && avatarState === 'AVATAR_READY';
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const detectionInterval = useRef(null);
   const hasWelcomedRef = useRef(false);
+  const streamRef = useRef(null);
+  const mountedRef = useRef(false);
+  const cameraPendingRef = useRef(false);
+  const navigationPendingRef = useRef(false);
+  const isProcessingRef = useRef(false);
+  const inferenceCancelledRef = useRef(false);
+  const ageHistoryRef = useRef([]);
+  const emotionCandidateRef = useRef({ label: '', count: 0 });
+  const latestProfileRef = useRef(null);
+  const inferenceCountRef = useRef(0);
+  const inferenceWindowStartedRef = useRef(performance.now());
+  const faceInitializationStartedRef = useRef(false);
+  const startupTimestampsRef = useRef({
+    cameraReady: null,
+    avatarInitializationStart: null,
+    avatarFirstRender: null,
+    faceInitializationStart: null,
+    faceReady: null
+  });
 
   useEffect(() => {
-    initializeModels();
+    mountedRef.current = true;
     startEntertainmentSequence();
+    scheduleFaceInitialization();
+    initializeAvatar();
 
     return () => {
+      mountedRef.current = false;
+      inferenceCancelledRef.current = true;
       if (detectionInterval.current) clearInterval(detectionInterval.current);
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      detectionInterval.current = null;
+      const activeStream = streamRef.current;
+      streamRef.current = null;
+      activeStream?.getTracks().forEach((track) => track.stop());
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const initializeAvatar = async () => {
+    startupTimestampsRef.current.avatarInitializationStart = performance.now();
+    console.info('[machine-vision] avatar initialization start', startupTimestampsRef.current.avatarInitializationStart);
+    setAvatarState('AVATAR_CACHE_CHECK');
+    try {
+      await avatarAssetService.initialize();
+      setAvatarAssetsReady(true);
+      setAvatarDiagnostics(avatarAssetService.getDiagnostics());
+    } catch (error) {
+      setAvatarState('AVATAR_ERROR');
+      setAvatarDiagnostics(avatarAssetService.getDiagnostics());
+      console.error('Avatar initialization failed:', error);
+    }
+  };
+
+  const scheduleFaceInitialization = useRef(() => {
+    if (faceInitializationStartedRef.current) return;
+    faceInitializationStartedRef.current = true;
+    const start = () => initializeModels();
+    if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 1200 });
+    else window.setTimeout(start, 0);
+  }).current;
+
+  const handleAvatarReady = useRef(() => {
+    startupTimestampsRef.current.avatarFirstRender = performance.now();
+    console.info('[machine-vision] avatar first render', startupTimestampsRef.current.avatarFirstRender);
+    setAvatarState('AVATAR_READY');
+    avatarAssetService.markFirstRender();
+    setAvatarDiagnostics(avatarAssetService.getDiagnostics());
+    setDiagnosticsTick((tick) => tick + 1);
+    scheduleFaceInitialization();
+  }).current;
+  const handleAvatarError = useRef((error) => {
+    setAvatarState('AVATAR_ERROR');
+    setAvatarDiagnostics((previous) => ({ ...previous, error: error?.message || 'Avatar render failed.' }));
+  }).current;
+
   useEffect(() => {
-    if (!stream || !videoRef.current) return;
+    if (!stream || !videoRef.current || !mountedRef.current) return;
 
-    videoRef.current.srcObject = stream;
-    videoRef.current.muted = true;
-    videoRef.current.playsInline = true;
+    const video = videoRef.current;
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
 
-    videoRef.current.play().catch((error) => {
+    video.play().then(() => {
+      if (!mountedRef.current || streamRef.current !== stream) return;
+      startupTimestampsRef.current.cameraReady = performance.now();
+      console.info('[machine-vision] camera ready', startupTimestampsRef.current.cameraReady);
+      setCameraStatus('CAMERA_READY');
+    }).catch((error) => {
+      if (!mountedRef.current || streamRef.current !== stream || error?.name === 'AbortError') return;
       console.error('Unable to start video playback:', error);
+      setCameraStatus('CAMERA_ERROR');
       setFlowError('Camera stream connected, but the video could not start automatically.');
     });
+    return () => {
+      video.pause();
+      if (video.srcObject === stream) video.srcObject = null;
+    };
   }, [stream]);
 
   const initializeModels = async () => {
     try {
+      startupTimestampsRef.current.faceInitializationStart = performance.now();
+      console.info('[machine-vision] FaceAPI initialization start', startupTimestampsRef.current.faceInitializationStart);
       console.log('🧠 Loading face-api.js models...');
-      setModelStatus('loading');
+      setModelStatus('FACE_CACHE_CHECK');
       setFlowError('');
 
       const success = await clientSideFaceAnalysisService.initialize();
 
       if (success) {
-        setModelStatus('ready');
+        startupTimestampsRef.current.faceReady = performance.now();
+        console.info('[machine-vision] FaceAPI ready', startupTimestampsRef.current.faceReady);
+        setModelStatus(clientSideFaceAnalysisService.getModelStatus().state);
+        setEntertainmentPhase('analyzing');
         console.log('✅ Face-api.js models loaded successfully!');
       } else {
-        setModelStatus('error');
+        setModelStatus('FACE_MODEL_ERROR');
         setFlowError('Detection models failed to load.');
         console.error('❌ Failed to load face-api.js models');
       }
 
     } catch (error) {
       console.error('❌ Model loading failed:', error);
-      setModelStatus('error');
-      setFlowError('Unable to initialize detection models.');
+      const status = clientSideFaceAnalysisService.getModelStatus();
+      setModelStatus(status.state || 'FACE_MODEL_ERROR');
+      setFlowError(error?.code === 'FACE_MODEL_DOWNLOAD_REQUIRED'
+        ? 'Connect once to prepare AI Vision for offline use.'
+        : 'Face analysis is temporarily unavailable. The camera can still be used.');
     }
   };
 
   const startCamera = async () => {
+    if (!mountedRef.current || cameraPendingRef.current || navigationPendingRef.current) return;
+    const activeTrack = streamRef.current?.getVideoTracks?.()[0];
+    if (activeTrack?.readyState === 'live') return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraPermission('denied');
+      setCameraStatus('CAMERA_ERROR');
       setFlowError('This browser does not support camera access.');
       return;
     }
 
+    cameraPendingRef.current = true;
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
       });
 
+      if (!mountedRef.current || navigationPendingRef.current) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       setCameraPermission('granted');
+      setCameraStatus('CAMERA_READY');
       setFlowError('');
 
       console.log('🎥 Camera started successfully');
     } catch (error) {
+      if (!mountedRef.current || navigationPendingRef.current) return;
       console.error('❌ Camera access denied:', error);
       setCameraPermission('denied');
+      setCameraStatus('CAMERA_ERROR');
 
       if (error.name === 'NotAllowedError') {
         setFlowError('Camera permission was blocked. Please allow camera access and try again.');
@@ -100,6 +247,8 @@ export default function AIVision() {
       } else {
         setFlowError('Camera access is required for emotion detection.');
       }
+    } finally {
+      cameraPendingRef.current = false;
     }
   };
 
@@ -119,109 +268,154 @@ export default function AIVision() {
     };
 
     const text = 'Welcome to Bulacan State University.';
+    handleSpeechInteraction();
     textToSpeech(text, false, 'taylor', 'en').then(() => fallbackComplete()).catch(() => fallbackComplete());
+  };
+
+  const applySmoothedResult = (result, ageValue) => {
+    const emotion = result.emotion;
+    const candidate = emotionCandidateRef.current;
+    if (candidate.label === emotion) candidate.count += 1;
+    else emotionCandidateRef.current = { label: emotion, count: 1 };
+
+    const stableEmotion = emotionCandidateRef.current.count >= 2
+      ? emotion
+      : latestProfileRef.current?.emotion || emotion;
+    const profile = {
+      emotion: stableEmotion,
+      emotionConfidence: result.emotionConfidence,
+      allEmotions: result.allEmotions,
+      ageGroup: ageValue === undefined ? (latestProfileRef.current?.ageGroup || 'Unknown') : ageValue < 18 ? 'Child' : ageValue < 65 ? 'Adult' : 'Senior',
+      age: ageValue === undefined ? latestProfileRef.current?.age : ageValue,
+      timestamp: new Date().toISOString()
+    };
+    latestProfileRef.current = { ...latestProfileRef.current, ...profile };
+    setDetectedProfile(prev => ({ ...prev, ...profile }));
+    setPersonDetected(true);
+    localStorage.setItem('latestDetectedEmotionAge', JSON.stringify(profile));
+    return profile;
+  };
+
+  const analyzeFrame = async (canvas) => {
+    const totalStartedAt = performance.now();
+    const result = await clientSideFaceAnalysisService.analyzeFaceFromImage(canvas, {
+      includeAge: true,
+      retryOnMiss: false,
+      inputSize: 224,
+      scoreThreshold: 0.3
+    });
+    const faceDetectionTime = performance.now() - totalStartedAt;
+    let ageValue;
+    if (result?.success && Number.isFinite(result.predictions.age.value)) {
+      ageHistoryRef.current = [...ageHistoryRef.current, result.predictions.age.value].slice(-3);
+      const sortedAges = [...ageHistoryRef.current].sort((a, b) => a - b);
+      ageValue = sortedAges[Math.floor(sortedAges.length / 2)];
+    }
+
+    const totalInferenceTime = performance.now() - totalStartedAt;
+    inferenceCountRef.current += 1;
+    const elapsed = performance.now() - inferenceWindowStartedRef.current;
+    const inferenceFPS = elapsed >= 1000 ? (inferenceCountRef.current * 1000) / elapsed : 0;
+    console.log({
+      faceDetectionTime: Math.round(faceDetectionTime),
+      emotionInferenceTime: Math.round(faceDetectionTime),
+      ageInferenceTime: Math.round(faceDetectionTime),
+      totalInferenceTime: Math.round(totalInferenceTime),
+      inferenceFPS: Number(inferenceFPS.toFixed(2))
+    });
+    if (elapsed >= 1000) {
+      inferenceCountRef.current = 0;
+      inferenceWindowStartedRef.current = performance.now();
+    }
+    setLastInference({ status: 'RUNNING', time: totalInferenceTime, rate: inferenceFPS });
+    setDiagnosticsTick((tick) => tick + 1);
+    return { result, ageValue };
   };
 
   // Live continuous emotion + age group detection
   useEffect(() => {
-    if (stream && modelStatus === 'ready') {
+    inferenceCancelledRef.current = false;
+    let runInference;
+    if (stream && ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) && !document.hidden) {
       if (!isGreeting) {
         setEntertainmentPhase('analyzing');
       }
 
-      detectionInterval.current = setInterval(async () => {
-        if (!videoRef.current || !canvasRef.current) return;
-
+      runInference = async () => {
+        if (inferenceCancelledRef.current || navigationPendingRef.current || !mountedRef.current || document.hidden || isProcessingRef.current || !videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-
         if (video.videoWidth === 0 || video.videoHeight === 0) return;
+        isProcessingRef.current = true;
+        setInferenceState('FACE_INFERENCE_RUNNING');
+        try {
+          const canvas = canvasRef.current;
+          canvas.width = 224;
+          canvas.height = 224;
+          canvas.getContext('2d').drawImage(video, 0, 0, 224, 224);
+          const { result, ageValue } = await analyzeFrame(canvas);
+          if (!inferenceCancelledRef.current && !navigationPendingRef.current && mountedRef.current && result?.success) {
+            const profile = applySmoothedResult({
+              emotion: result.predictions.emotion.label,
+              emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
+              allEmotions: result.predictions.all_emotions || {}
+            }, ageValue);
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-
-        const result = await analyzeFrame(canvas);
-
-        if (result && result.success) {
-          setPersonDetected(true);
-          const profile = {
-            emotion: result.emotion,
-            emotionConfidence: result.emotionConfidence,
-            allEmotions: result.allEmotions,
-            ageGroup: result.ageGroup, // adult/child
-            timestamp: result.timestamp
-          };
-
-          setDetectedProfile(profile);
-          localStorage.setItem('latestDetectedEmotionAge', JSON.stringify(profile));
-
-          if (!hasWelcomedRef.current) {
-            const profileWithAge = {
-              ...profile,
-              age: result.age,
-              emotion: result.emotion
-            };
-
-            localStorage.setItem('firstDetectedEmotionAge', JSON.stringify(profileWithAge));
-            navigate('/taylor', { replace: true, state: { detectedProfile: profileWithAge } });
-            speakWelcomeOnce();
+            if (!hasWelcomedRef.current) {
+              navigationPendingRef.current = true;
+              inferenceCancelledRef.current = true;
+              if (detectionInterval.current) clearInterval(detectionInterval.current);
+              detectionInterval.current = null;
+              const activeStream = streamRef.current;
+              streamRef.current = null;
+              activeStream?.getTracks().forEach((track) => track.stop());
+              if (videoRef.current) {
+                videoRef.current.pause();
+                videoRef.current.srcObject = null;
+              }
+              localStorage.setItem('firstDetectedEmotionAge', JSON.stringify(profile));
+              navigate('/taylor', { replace: true, state: { detectedProfile: profile } });
+              speakWelcomeOnce();
+            }
           }
-        } else {
-          setPersonDetected(false);
-          setDetectedProfile({
-            emotion: 'No face',
-            emotionConfidence: 0,
-            allEmotions: {},
-            ageGroup: 'Unknown',
-            timestamp: new Date().toISOString()
-          });
+        } catch (error) {
+          if (!inferenceCancelledRef.current) console.error('Analysis error:', error);
+        } finally {
+          isProcessingRef.current = false;
+          if (mountedRef.current && !navigationPendingRef.current) setInferenceState('STOPPED');
         }
-      }, 1000);
+      };
+
+      detectionInterval.current = setInterval(runInference, 400);
+      runInference();
     }
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        inferenceCancelledRef.current = true;
+        if (detectionInterval.current) clearInterval(detectionInterval.current);
+        detectionInterval.current = null;
+      } else if (mountedRef.current && !navigationPendingRef.current && stream && ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus)) {
+        inferenceCancelledRef.current = false;
+        const track = streamRef.current?.getVideoTracks?.()[0];
+        if (!track || track.readyState === 'ended') startCamera();
+        if (runInference && !detectionInterval.current) {
+          detectionInterval.current = setInterval(runInference, 400);
+          runInference();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
+      inferenceCancelledRef.current = true;
       if (detectionInterval.current) clearInterval(detectionInterval.current);
+      detectionInterval.current = null;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [stream, modelStatus, isGreeting]);
-
-  const analyzeFrame = async (canvas) => {
-    try {
-      if (modelStatus !== 'ready') throw new Error('Models not ready');
-
-      const result = await clientSideFaceAnalysisService.analyzeFaceFromImage(canvas);
-
-      if (result && result.success && result.predictions?.face_analysis?.detections_count > 0) {
-        const ageValue = result.predictions.age.value;
-        const ageGroup = ageValue < 18 ? 'Child' : 'Adult';
-
-        return {
-          success: true,
-          age: ageValue,
-          emotion: result.predictions.emotion.label,
-          emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
-          allEmotions: Object.fromEntries(Object.entries(result.predictions.all_emotions || {}).map(([k, v]) => [k, v])),
-          ageGroup: ageGroup,
-          timestamp: new Date().toISOString()
-        };
-      }
-
-      return { success: false };
-    } catch (err) {
-      console.error('Analysis error:', err);
-      return { success: false };
-    }
-  };
 
   const startEntertainmentSequence = async () => {
     console.log('🎭 Starting entertainment sequence...');
     await startCamera();
-    
-    // After camera warms up, start detection
-    setTimeout(() => {
-      setEntertainmentPhase('analyzing'); // UI shows "Analyzing..." immediately // ✅ this will trigger your useEffect
-    }, 800);
   };
 
 
@@ -243,14 +437,19 @@ export default function AIVision() {
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0);
 
-        const result = await analyzeFrame(canvas);
-        if (result && result.success) {
+        const result = await clientSideFaceAnalysisService.analyzeFaceFromImage(canvas, {
+          includeAge: true,
+          retryOnMiss: true,
+          inputSize: 224,
+          scoreThreshold: 0.25
+        });
+        if (result && result.success && result.predictions?.face_analysis?.detections_count > 0) {
           setDetectedProfile({
-            emotion: result.emotion,
-            emotionConfidence: result.emotionConfidence,
-            allEmotions: result.allEmotions,
-            ageGroup: result.ageGroup,
-            timestamp: result.timestamp
+            emotion: result.predictions.emotion.label,
+            emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
+            allEmotions: result.predictions.all_emotions,
+            ageGroup: result.predictions.age.group,
+            timestamp: new Date().toISOString()
           });
           setPersonDetected(true);
         }
@@ -260,23 +459,6 @@ export default function AIVision() {
     };
 
     input.click();
-  };
-
-  const handleReset = () => {
-    if (detectionInterval.current) clearInterval(detectionInterval.current);
-    if (stream) stream.getTracks().forEach(track => track.stop());
-    window.speechSynthesis?.cancel();
-
-    setStream(null);
-    setDetectedProfile(null);
-    setPersonDetected(false);
-    setEntertainmentPhase('detecting');
-    setIsGreeting(false);
-    setWelcomeDone(false);
-    setFlowError('');
-    hasWelcomedRef.current = false;
-
-    startEntertainmentSequence();
   };
 
   if (cameraPermission === null) {
@@ -329,8 +511,8 @@ export default function AIVision() {
               <span>{personDetected ? 'Person Detected' : 'Waiting for visitor...'}</span>
             </div>
             <div className="status-row">
-              <div className={`status-dot ${modelStatus === 'ready' ? 'green' : 'yellow'}`} />
-              <span>{modelStatus === 'ready' ? 'Model ready' : 'Loading models...'}</span>
+              <div className={`status-dot ${['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) ? 'green' : modelStatus === 'FACE_MODEL_ERROR' || modelStatus === 'FACE_MODEL_DOWNLOAD_REQUIRED' ? 'red' : 'yellow'}`} />
+              <span>{getFaceStatusLabel(modelStatus, aiVisionReady)}</span>
             </div>
             <div className="live-profile">
         <h3>Live Detected Emotion & Age</h3>
@@ -349,7 +531,17 @@ export default function AIVision() {
         </div>
       </div>
 
-      <Hologram emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" />
+      <div className="avatar-stage">
+        {avatarAssetsReady && avatarState !== 'AVATAR_ERROR' ? (
+          <AvatarErrorBoundary onError={handleAvatarError}>
+            <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
+              <Hologram onReady={handleAvatarReady} emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" />
+            </Suspense>
+          </AvatarErrorBoundary>
+        ) : (
+          <div className="avatar-placeholder">{getAvatarStatusLabel(avatarState)}</div>
+        )}
+      </div>
 
       <div className="camera-container">
         <div className="camera-frame">
@@ -357,6 +549,45 @@ export default function AIVision() {
           <canvas ref={canvasRef} style={{ display: 'none' }} />
         </div>
       </div>
+      {faceDebugEnabled && (
+        <div data-testid="face-diagnostics" style={{
+          position: 'fixed',
+          right: 12,
+          bottom: 12,
+          zIndex: 100,
+          maxWidth: 320,
+          padding: '10px 12px',
+          background: 'rgba(0, 0, 0, 0.82)',
+          color: '#fff',
+          borderRadius: 6,
+          font: '11px/1.45 monospace'
+        }}>
+          <div>Device: {clientSideFaceAnalysisService.getDiagnostics().device}</div>
+          <div>Camera: {cameraStatus}</div>
+          <div>Face detector: {clientSideFaceAnalysisService.getDiagnostics().detector}</div>
+          <div>Expression model: {clientSideFaceAnalysisService.getDiagnostics().expressionModel}</div>
+          <div>Age model: {clientSideFaceAnalysisService.getDiagnostics().ageModel}</div>
+          <div>Model source: {clientSideFaceAnalysisService.getDiagnostics().modelSource}</div>
+          <div>Models load time: {Math.round(clientSideFaceAnalysisService.getDiagnostics().modelsLoadTime)} ms</div>
+          <div>Inference: {inferenceState === 'FACE_INFERENCE_RUNNING' ? 'RUNNING' : 'STOPPED'}</div>
+          <div>Last inference time: {Math.round(lastInference.time)} ms</div>
+          <div>FPS/inference rate: {lastInference.rate.toFixed(2)}</div>
+          <div>Last error: {clientSideFaceAnalysisService.getDiagnostics().lastError || 'None'}</div>
+          <div>Avatar state: {avatarState}</div>
+          <div>Avatar source: {avatarDiagnostics.source}</div>
+          <div>Avatar download time: {Math.round(avatarDiagnostics.downloadTime)} ms</div>
+          <div>Avatar initialization time: {Math.round(avatarDiagnostics.initializationTime)} ms</div>
+          <div>Avatar first-render time: {Math.round(avatarDiagnostics.firstRenderTime)} ms</div>
+          <div>Avatar cache hits/misses: {avatarDiagnostics.cacheHits}/{avatarDiagnostics.cacheMisses}</div>
+          <div>Avatar error: {avatarDiagnostics.error || 'None'}</div>
+          <div>Camera ready at: {startupTimestampsRef.current.cameraReady ? Math.round(startupTimestampsRef.current.cameraReady) : 'Pending'}</div>
+          <div>Avatar init started at: {startupTimestampsRef.current.avatarInitializationStart ? Math.round(startupTimestampsRef.current.avatarInitializationStart) : 'Pending'}</div>
+          <div>Avatar first render at: {startupTimestampsRef.current.avatarFirstRender ? Math.round(startupTimestampsRef.current.avatarFirstRender) : 'Pending'}</div>
+          <div>FaceAPI init started at: {startupTimestampsRef.current.faceInitializationStart ? Math.round(startupTimestampsRef.current.faceInitializationStart) : 'Pending'}</div>
+          <div>FaceAPI ready at: {startupTimestampsRef.current.faceReady ? Math.round(startupTimestampsRef.current.faceReady) : 'Pending'}</div>
+          <div aria-hidden="true">refresh:{diagnosticsTick}</div>
+        </div>
+      )}
     </div>
   );
 }

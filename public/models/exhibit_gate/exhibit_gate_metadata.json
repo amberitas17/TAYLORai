@@ -2,7 +2,7 @@
   "model": "exhibit_gate.onnx",
   "type": "binary_classification_gate",
   "inputSize": 224,
-  "threshold": 0.35,
+  "threshold": 0.60,
   "classes": ["background", "exhibit"],
   "classToIdx": {
     "background": 0,
