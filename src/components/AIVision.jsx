@@ -330,9 +330,17 @@ export default function AIVision() {
             }, ageValue);
 
             if (!hasWelcomedRef.current) {
+              // Lock the handoff before navigation: pending inference callbacks must
+              // not navigate twice or start speech on the unmounting camera route.
+              hasWelcomedRef.current = true;
+              inferenceCancelledRef.current = true;
+              if (detectionInterval.current) {
+                clearInterval(detectionInterval.current);
+                detectionInterval.current = null;
+              }
               localStorage.setItem('firstDetectedEmotionAge', JSON.stringify(profile));
+              // TaylorDashboard owns the welcome audio after the route transition.
               navigate('/taylor', { replace: true, state: { detectedProfile: profile } });
-              speakWelcomeOnce();
             }
           }
         } catch (error) {
