@@ -7,6 +7,24 @@ import { getCITWalkthroughEvidence } from '../navigation/citWalkthroughEvidence.
 import IndoorNavigationState from '../services/indoorNavigationState.js';
 import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
 
+const NAV_LANGUAGE = {
+  en: { language: 'Language', title: 'Indoor directions', start: 'Starting point', destination: 'Destination', previous: 'Previous', next: 'Next', confirm: 'Confirm landmark', arrived: 'Arrived', steps: 'Steps', map: 'Map', from: 'Starting from', to: 'Going to', explore: 'Explore', back: 'Go back', mute: 'Mute', unmute: 'Unmute', collapse: 'Collapse', expand: 'Expand' },
+  tl: { language: 'Wika', title: 'Gabay sa loob ng gusali', start: 'Panimulang lokasyon', destination: 'Pupuntahan', previous: 'Nakaraan', next: 'Susunod', confirm: 'Kumpirmahin ang palatandaan', arrived: 'Nakarating na', steps: 'Mga hakbang', map: 'Mapa', from: 'Mula sa', to: 'Papunta sa', explore: 'Tuklasin ang', back: 'Bumalik', mute: 'I-mute', unmute: 'I-unmute', collapse: 'Itago', expand: 'Ipakita' },
+  zh: { language: '语言', title: '室内导航', start: '起点', destination: '目的地', previous: '上一步', next: '下一步', confirm: '确认地标', arrived: '已到达', steps: '步骤', map: '地图', from: '出发地', to: '前往', explore: '探索', back: '返回', mute: '静音', unmute: '取消静音', collapse: '收起', expand: '展开' },
+};
+const NAV_SPEECH = {
+  tl: { 'Turn left': 'Kumaliwa', 'Turn right': 'Kumanan', 'Go straight': 'Dumiretso', 'Walk forward': 'Magpatuloy sa paglakad', 'Take the elevator': 'Sumakay sa elevator', 'fourth floor': 'ikaapat na palapag', '4th floor': 'ikaapat na palapag', 'first floor': 'unang palapag', '1st floor': 'unang palapag', 'You have arrived': 'Nakarating na kayo', 'You are now at': 'Nasa', 'Continue straight': 'Magpatuloy nang diretso' },
+  zh: { 'Turn left': '向左转', 'Turn right': '向右转', 'Go straight': '直走', 'Walk forward': '继续向前走', 'Take the elevator': '乘坐电梯', 'fourth floor': '四楼', '4th floor': '四楼', 'first floor': '一楼', '1st floor': '一楼', 'You have arrived': '您已到达', 'You are now at': '您现在位于', 'Continue straight': '继续直走' },
+};
+function navigationSpeech(instruction, language) {
+  if (language === 'en' || !instruction) return instruction;
+  const translations = NAV_SPEECH[language] || {};
+  return Object.entries(translations).reduce(
+    (result, [english, translated]) => result.replace(new RegExp(english.replace(/[.*+?^${}()|[\]\\]/g, '\\const Hologram = lazy'), 'gi'), translated),
+    instruction
+  );
+}
+
 const Hologram = lazy(() => import('../hologram.jsx'));
 
 const TOUR_CENTERS = {
@@ -37,28 +55,28 @@ class NavigationAvatarBoundary extends React.Component {
   }
 }
 
-function NavigationAvatar({ event, instruction, muted, onMute, expanded, onToggle }) {
+function NavigationAvatar({ event, instruction, language, labels, muted, onMute, expanded, onToggle }) {
   const [speaking, setSpeaking] = useState(false);
   const previousEvent = useRef('');
 
   useEffect(() => {
-    if (muted || !instruction || previousEvent.current === `${event}:${instruction}`) return undefined;
-    previousEvent.current = `${event}:${instruction}`;
+    if (muted || !instruction || previousEvent.current === `${language}:${event}:${instruction}`) return undefined;
+    previousEvent.current = `${language}:${event}:${instruction}`;
     let active = true;
     setSpeaking(true);
     handleSpeechInteraction();
-    textToSpeech(instruction, false, 'taylor', 'en').finally(() => {
+    textToSpeech(navigationSpeech(instruction, language), false, 'taylor', language).finally(() => {
       if (active) setSpeaking(false);
     });
     return () => { active = false; };
-  }, [event, instruction, muted]);
+  }, [event, instruction, language, muted]);
 
   return <aside className={`navigation-avatar-panel ${expanded ? 'is-expanded' : 'is-collapsed'}`} aria-label="TAYLOR navigation guide">
     <div className="navigation-avatar-toolbar">
       <strong>TAYLOR guide</strong>
       <div>
-        <button type="button" onClick={onMute} aria-label={muted ? 'Unmute TAYLOR' : 'Mute TAYLOR'}>{muted ? 'Unmute' : 'Mute'}</button>
-        <button type="button" onClick={onToggle} aria-expanded={expanded}>{expanded ? 'Collapse' : 'Expand'}</button>
+        <button type="button" onClick={onMute} aria-label={muted ? 'Unmute TAYLOR' : 'Mute TAYLOR'}>{muted ? labels.unmute : labels.mute}</button>
+        <button type="button" onClick={onToggle} aria-expanded={expanded}>{expanded ? labels.collapse : labels.expand}</button>
       </div>
     </div>
     {expanded && <>
@@ -81,6 +99,15 @@ function StepPhoto({ evidence, landmark }) {
 
 export default function AINavigation({ onBack }) {
   const navigate = useNavigate();
+  const [language, setLanguage] = useState(() => {
+    try { const saved = window.localStorage.getItem('taylorLanguage'); return ['en', 'tl', 'zh'].includes(saved) ? saved : 'en'; }
+    catch { return 'en'; }
+  });
+  const labels = NAV_LANGUAGE[language] || NAV_LANGUAGE.en;
+  const changeLanguage = (next) => {
+    setLanguage(next);
+    try { window.localStorage.setItem('taylorLanguage', next); } catch {}
+  };
   const [selectedDestination, setSelectedDestination] = useState('ARICC');
   const [manualLocation, setManualLocation] = useState('manual-cit-entrance');
   const [currentStep, setCurrentStep] = useState(1);
@@ -165,12 +192,12 @@ export default function AINavigation({ onBack }) {
 
   return <div className="ai-navigation-container navigation-mobile-shell">
     <main className="navigation-mobile-page">
-      <header className="navigation-mobile-header"><button className="navigation-icon-button" onClick={onBack || (() => navigate(-1))} aria-label="Go back">‹</button><div><span className="navigation-kicker">TAYLOR AI</span><h1>Indoor directions</h1></div><button className="navigation-map-button" onClick={() => setMapOpen((open) => !open)}>{mapOpen ? 'Steps' : 'Map'}</button></header>
-      <section className="navigation-route-picker"><label>Starting point<select value={manualLocation} onChange={updateLocation}>{LOCATION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><label>Destination<select value={selectedDestination} onChange={(event) => { setSelectedDestination(event.target.value); setCurrentStep(1); }}><option>ARICC</option><option>RIO</option><option>FABLAB</option><option>CAESAR</option><option>RECON</option></select></label><div className="navigation-route-summary"><div><span>Starting from</span><strong>{location.label}</strong></div><div><span>Going to</span><strong>{selectedDestination}</strong></div></div></section>
-      <NavigationAvatar event={navigationEvent} instruction={instruction} muted={avatarMuted} onMute={() => setAvatarMuted((muted) => !muted)} expanded={avatarExpanded} onToggle={() => setAvatarExpanded((expanded) => !expanded)} />
+      <header className="navigation-mobile-header"><button className="navigation-icon-button" onClick={onBack || (() => navigate(-1))} aria-label="Go back">‹</button><div><span className="navigation-kicker">TAYLOR AI</span><h1>{labels.title}</h1></div><button className="navigation-map-button" onClick={() => setMapOpen((open) => !open)}>{mapOpen ? labels.steps : labels.map}</button></header>
+      <section className="navigation-route-picker"><label>{labels.language}<select aria-label={labels.language} value={language} onChange={(event) => changeLanguage(event.target.value)}><option value="en">English</option><option value="tl">Filipino (Tagalog)</option><option value="zh">中文 (Mandarin)</option></select></label><label>{labels.start}<select value={manualLocation} onChange={updateLocation}>{LOCATION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><label>{labels.destination}<select value={selectedDestination} onChange={(event) => { setSelectedDestination(event.target.value); setCurrentStep(1); }}><option>ARICC</option><option>RIO</option><option>FABLAB</option><option>CAESAR</option><option>RECON</option></select></label><div className="navigation-route-summary"><div><span>{labels.from}</span><strong>{location.label}</strong></div><div><span>{labels.to}</span><strong>{selectedDestination}</strong></div></div></section>
+      <NavigationAvatar event={navigationEvent} instruction={instruction} language={language} labels={labels} muted={avatarMuted} onMute={() => setAvatarMuted((muted) => !muted)} expanded={avatarExpanded} onToggle={() => setAvatarExpanded((expanded) => !expanded)} />
       {mapOpen ? <section className="navigation-published-map" aria-label="Geographic CIT map"><LeafletMap destination={{ destination: selectedDestination }} isTracking /></section> : <section className={`navigation-step-view ${['RIO', 'ARICC', 'OVPREI', 'FABLAB', 'CAESAR'].includes(selectedDestination) ? 'navigation-step-view--rio' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-live="polite"><div className="navigation-progress"><span>STEP {currentStep} OF {route.steps.length}</span><div>{route.steps.map((item, index) => <i className={index + 1 <= currentStep ? 'is-complete' : ''} key={item.id} />)}</div></div><StepPhoto evidence={evidence} landmark={node.landmark} /><div className="navigation-step-content"><div className={`navigation-direction navigation-direction--${direction}`}><strong>{directionIcon[direction]}</strong><span>{direction === 'arrival' ? 'Arrive' : direction === 'elevator' ? 'Floor change' : direction}</span></div><div className="navigation-step-meta"><span>{CIT_FLOOR_LABELS[step.floor]}</span><span>{evidence.verified ? `${evidence.sourceVideo} · ${evidence.timestamp}` : 'Evidence pending review'}</span></div><h2>{node.landmark}</h2><p>{instruction}</p><small className="navigation-confidence">{evidence.verified ? `Verified walkthrough evidence · ${evidence.confidence} confidence` : 'Neutral step retained until a walkthrough frame is verified.'}</small>{!route.complete && <small className="navigation-route-incomplete">Route to {route.destination} is incomplete after this verified step. Arrival is not reported.</small>}</div></section>}
-      <nav className="navigation-step-controls"><button type="button" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 1}>Previous</button><button type="button" onClick={confirmCurrentLandmark}>Confirm landmark</button><button type="button" className="navigation-next-button" onClick={() => goToStep(currentStep + 1)} disabled={currentStep === route.steps.length}>{route.complete && currentStep === route.steps.length ? 'Arrived' : 'Next'}</button></nav>
-      <footer className="navigation-footer"><span>Manual navigation · no GPS or camera</span><button type="button" onClick={() => navigate(destination.route, { state: { activeCenter: selectedDestination, tourMode: true } })}>Explore {selectedDestination}</button></footer>
+      <nav className="navigation-step-controls"><button type="button" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 1}>{labels.previous}</button><button type="button" onClick={confirmCurrentLandmark}>{labels.confirm}</button><button type="button" className="navigation-next-button" onClick={() => goToStep(currentStep + 1)} disabled={currentStep === route.steps.length}>{route.complete && currentStep === route.steps.length ? labels.arrived : labels.next}</button></nav>
+      <footer className="navigation-footer"><span>Manual navigation · no GPS or camera</span><button type="button" onClick={() => navigate(destination.route, { state: { activeCenter: selectedDestination, tourMode: true } })}>{labels.explore} {selectedDestination}</button></footer>
     </main>
   </div>;
 }
