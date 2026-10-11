@@ -234,6 +234,7 @@ const RV_PARAMS = {
 const VOICE_CONFIG = {
   taylor: {
     gender: 'female',
+    tl: { pitch: 1.05, rate: 0.88, prefer: ['Filipino', 'Tagalog', 'Filipina'] },
     en: { pitch: 1.05, rate: 0.90, prefer: ['Samantha', 'Victoria', 'Google US English Female', 'Microsoft Zira Desktop', 'Karen', 'Hazel'] },
     zh: { pitch: 1.08, rate: 0.86, prefer: ['Ting-Ting', 'Meijia', 'Google 普通话（中国大陆）', 'Microsoft Huihui Desktop'] },
     ja: { pitch: 1.06, rate: 0.88, prefer: ['Kyoko', 'Google 日本語', 'Microsoft Haruka Desktop', 'Ayumi'] },
@@ -241,6 +242,7 @@ const VOICE_CONFIG = {
   },
   daisy: {
     gender: 'female',
+    tl: { pitch: 1.08, rate: 0.90, prefer: ['Filipino', 'Tagalog', 'Filipina'] },
     en: { pitch: 1.08, rate: 0.92, prefer: ['Samantha', 'Kate', 'Google UK English Female', 'Microsoft Hazel Desktop', 'Victoria'] },
     zh: { pitch: 1.10, rate: 0.88, prefer: ['Ting-Ting', 'Meijia', 'Google 普通话（中国大陆）', 'Microsoft Yaoyao Desktop'] },
     ja: { pitch: 1.08, rate: 0.90, prefer: ['Kyoko', 'Google 日本語', 'Microsoft Haruka Desktop'] },
@@ -248,6 +250,7 @@ const VOICE_CONFIG = {
   },
   john: {
     gender: 'male',
+    tl: { pitch: 0.75, rate: 0.88, prefer: ['Filipino', 'Tagalog'] },
     en: { pitch: 0.75, rate: 0.90, prefer: ['Microsoft David', 'David', 'Microsoft Mark', 'Mark'] },
     zh: { pitch: 0.35, rate: 0.80, prefer: ['Microsoft Kangkang', 'Kangkang'] },
     ja: { pitch: 0.38, rate: 0.80, prefer: ['Microsoft Ichiro', 'Ichiro', 'Otoya'] },
@@ -370,6 +373,7 @@ function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
       const voice = pickVoice(avatarName, lang, voices);
       if (voice) {
         utt.voice = voice;
+        utt.lang = voice.lang || locales[0];
         console.info('[TTS] selected voice', { name: voice.name, lang: voice.lang });
       } else {
         console.warn('[TTS] selected voice', { name: 'none', lang: locales[0] });
@@ -593,10 +597,12 @@ function pickVoice(avatarName, lang, voices = _cachedVoices) {
   const isFemale = cfg.gender === 'female';
   const isJohn = avatarName === 'john';
 
-  const englishVoices = voiceList.filter((voice) => (voice.lang || '').toLowerCase().startsWith('en'));
+  const matchingVoices = voiceList.filter((voice) => locales.some((locale) => (voice.lang || '').toLowerCase().startsWith(locale.split('-')[0].toLowerCase())));
+  // Never prefer an English voice when a matching Filipino or Chinese voice exists.
+  const preferredVoices = lang === 'en' ? voiceList : matchingVoices;
 
   for (const name of (lCfg.prefer || [])) {
-    for (const voice of englishVoices.length ? englishVoices : voiceList) {
+    for (const voice of preferredVoices) {
       const vname = voice.name.toLowerCase();
       if (isJohn && (vname.includes('female') || vname.includes('woman') || vname.includes('girl'))) continue;
       if (vname.includes(name.toLowerCase())) return voice;
@@ -626,7 +632,11 @@ function pickVoice(avatarName, lang, voices = _cachedVoices) {
     }
   }
 
-  return voiceList[0] || null;
+  if (lang !== 'en' && !matchingVoices.length) {
+    console.warn('[TTS] No matching installed language voice; device may pronounce text incorrectly', { lang, locales });
+    return null;
+  }
+  return (lang === 'en' ? voiceList[0] : matchingVoices[0]) || null;
 }
 
 export function getPhonemeData(text) {
