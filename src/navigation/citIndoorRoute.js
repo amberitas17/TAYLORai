@@ -44,7 +44,7 @@ export const CIT_ROUTE_NODES = [
   { id: 'teecs-right-turn', floor: 3, landmark: 'TEECS right turn', instruction: 'Near the TEECS Bulletin Board, turn right.', connections: ['caesar-after-right-straight'] },
   { id: 'caesar-after-right-straight', floor: 3, landmark: 'Corridor after right turn', instruction: 'Go straight along the corridor.', connections: ['caesar-last-bench-left'] },
   { id: 'caesar-last-bench-left', floor: 3, landmark: 'Last bench', instruction: 'After the last bench, turn left and go toward the stairs.', connections: ['fourth-floor-stairs'] },
-  { id: 'fourth-floor-stairs', floor: 3, landmark: 'Stairs toward 4th floor', instruction: 'Turn left and go up to the 4th floor via the stairs.', connections: ['caesar-fourth-floor-left', 'fablab-fourth-floor-straight', 'aricc-stairs-rio-office', 'recon-stairs-window'] },
+  { id: 'fourth-floor-stairs', floor: 3, landmark: 'Stairs toward 4th floor', instruction: 'Go up to the 4th floor via the stairs.', connections: ['caesar-fourth-floor-left', 'fablab-fourth-floor-straight', 'aricc-stairs-rio-office', 'recon-stairs-window'] },
   { id: 'caesar-fourth-floor-left', floor: 4, landmark: '4th-floor stair landing', instruction: 'After reaching the 4th floor, turn left and go straight.', connections: ['caesar-first-door-right'] },
   { id: 'caesar-first-door-right', floor: 4, landmark: 'First door on the right', instruction: 'The first door on your right is CAESAR.', connections: ['caesar'] },
   { id: 'fablab-fourth-floor-straight', floor: 4, landmark: '4th-floor stair landing', instruction: 'After reaching the 4th floor, go straight along the corridor.', connections: ['fablab-first-door-left', 'rio-fablab-landmark'] },
@@ -80,12 +80,12 @@ export const CIT_THIRD_FLOOR_APPROACH_STEPS = Object.freeze([
   { id: 'teecs-right-turn-step', from: 'teecs-right-turn', to: 'caesar-after-right-straight', floor: 3, instruction: 'Near the TEECS Bulletin Board, turn right.', landmark: 'TEECS right turn', transition: false },
   { id: 'caesar-after-right-straight-step', from: 'caesar-after-right-straight', to: 'caesar-last-bench-left', floor: 3, instruction: 'Go straight along the corridor.', landmark: 'Corridor after right turn', transition: false },
   { id: 'caesar-last-bench-left-step', from: 'caesar-last-bench-left', to: 'fourth-floor-stairs', floor: 3, instruction: 'After the last bench, turn left and go toward the stairs.', landmark: 'Last bench', transition: false },
-  { id: 'fourth-floor-stairs-step', from: 'fourth-floor-stairs', to: 'fourth-floor-stairs', floor: 3, instruction: 'Turn left and go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
+  { id: 'fourth-floor-stairs-step', from: 'fourth-floor-stairs', to: 'fourth-floor-stairs', floor: 3, instruction: 'Go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
 ]);
 
 export const CIT_CAESAR_STAIRS_STEPS = Object.freeze([
   ...CIT_THIRD_FLOOR_APPROACH_STEPS.slice(0, -1),
-  { id: 'fourth-floor-stairs-step', from: 'fourth-floor-stairs', to: 'caesar-fourth-floor-left', floor: 3, instruction: 'Turn left and go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
+  { id: 'fourth-floor-stairs-step', from: 'fourth-floor-stairs', to: 'caesar-fourth-floor-left', floor: 3, instruction: 'Go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
   { id: 'caesar-fourth-floor-left-step', from: 'caesar-fourth-floor-left', to: 'caesar-first-door-right', floor: 4, instruction: 'After reaching the 4th floor, turn left and go straight.', landmark: '4th-floor stair landing', transition: true },
   { id: 'caesar-first-door-right-step', from: 'caesar-first-door-right', to: 'caesar', floor: 4, instruction: 'The first door on your right is CAESAR.', landmark: 'First door on the right', transition: false },
   { id: 'caesar-stairs-arrival', from: 'caesar', to: 'caesar', floor: 4, instruction: 'Arrive at CAESAR.', landmark: 'CAESAR', transition: false },
@@ -93,7 +93,7 @@ export const CIT_CAESAR_STAIRS_STEPS = Object.freeze([
 
 export const CIT_FABLAB_STAIRS_STEPS = Object.freeze([
   ...CIT_THIRD_FLOOR_APPROACH_STEPS.slice(0, -1),
-  { id: 'fourth-floor-stairs-to-fablab-step', from: 'fourth-floor-stairs', to: 'fablab-fourth-floor-straight', floor: 3, instruction: 'Turn left and go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
+  { id: 'fourth-floor-stairs-to-fablab-step', from: 'fourth-floor-stairs', to: 'fablab-fourth-floor-straight', floor: 3, instruction: 'Go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
   { id: 'fablab-fourth-floor-straight-step', from: 'fablab-fourth-floor-straight', to: 'fablab-first-door-left', floor: 4, instruction: 'After reaching the 4th floor, go straight along the corridor.', landmark: '4th-floor stair landing', transition: true },
   { id: 'fablab-first-door-left-step', from: 'fablab-first-door-left', to: 'fablab-entrance', floor: 4, instruction: 'The first door on your left is FABLAB.', landmark: 'First door on the left', transition: false },
   { id: 'fablab-stairs-arrival', from: 'fablab-entrance', to: 'fablab-entrance', floor: 4, instruction: 'Arrive at FABLAB.', landmark: 'FABLAB', transition: false },
@@ -101,7 +101,7 @@ export const CIT_FABLAB_STAIRS_STEPS = Object.freeze([
 
 export const CIT_RIO_STAIRS_STEPS = Object.freeze([
   ...CIT_THIRD_FLOOR_APPROACH_STEPS.slice(0, -1),
-  { id: 'fourth-floor-stairs-to-rio-step', from: 'fourth-floor-stairs', to: 'fablab-fourth-floor-straight', floor: 3, instruction: 'Turn left and go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
+  { id: 'fourth-floor-stairs-to-rio-step', from: 'fourth-floor-stairs', to: 'fablab-fourth-floor-straight', floor: 3, instruction: 'Go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
   { id: 'rio-corridor-to-fablab-step', from: 'fablab-fourth-floor-straight', to: 'rio-fablab-landmark', floor: 4, instruction: 'Go straight along the corridor. The nearest landmark is FABLAB.', landmark: '4th-floor corridor', transition: false },
   { id: 'rio-fablab-landmark-step', from: 'rio-fablab-landmark', to: 'rio-second-door-right', floor: 4, instruction: 'From FABLAB, go straight along the corridor.', landmark: 'FABLAB', transition: false },
   { id: 'rio-second-door-right-step', from: 'rio-second-door-right', to: 'rio-entrance', floor: 4, instruction: 'The second door on your right is RIO.', landmark: 'Second door on the right', transition: false },
@@ -110,7 +110,7 @@ export const CIT_RIO_STAIRS_STEPS = Object.freeze([
 
 export const CIT_ARICC_STAIRS_STEPS = Object.freeze([
   ...CIT_THIRD_FLOOR_APPROACH_STEPS.slice(0, -1),
-  { id: 'fourth-floor-stairs-to-aricc-step', from: 'fourth-floor-stairs', to: 'aricc-stairs-rio-office', floor: 3, instruction: 'Turn left and go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
+  { id: 'fourth-floor-stairs-to-aricc-step', from: 'fourth-floor-stairs', to: 'aricc-stairs-rio-office', floor: 3, instruction: 'Go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
   { id: 'aricc-stairs-rio-office-step', from: 'aricc-stairs-rio-office', to: 'aricc-stairs-plaque', floor: 4, instruction: 'Go straight along the corridor. The nearest landmark is the RIO Office.', landmark: 'RIO Office', transition: false },
   { id: 'aricc-stairs-plaque-step', from: 'aricc-stairs-plaque', to: 'aricc-stairs-entrance', floor: 4, instruction: 'Look for the plaque near ARICC.', landmark: 'ARICC plaque', transition: false },
   { id: 'aricc-stairs-entrance-step', from: 'aricc-stairs-entrance', to: 'aricc', floor: 4, instruction: 'Continue to the ARICC entrance.', landmark: 'ARICC entrance', transition: false },
@@ -119,7 +119,7 @@ export const CIT_ARICC_STAIRS_STEPS = Object.freeze([
 
 export const CIT_RECON_STAIRS_STEPS = Object.freeze([
   ...CIT_THIRD_FLOOR_APPROACH_STEPS.slice(0, -1),
-  { id: 'fourth-floor-stairs-to-recon-step', from: 'fourth-floor-stairs', to: 'recon-stairs-window', floor: 3, instruction: 'Turn left and go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
+  { id: 'fourth-floor-stairs-to-recon-step', from: 'fourth-floor-stairs', to: 'recon-stairs-window', floor: 3, instruction: 'Go up to the 4th floor via the stairs.', landmark: 'Stairs toward 4th floor', transition: true },
   { id: 'recon-stairs-window-step', from: 'recon-stairs-window', to: 'recon-male-restroom', floor: 4, instruction: 'When you reach the window near the restroom, turn left.', landmark: 'Window near restroom', transition: false },
   { id: 'recon-male-restroom-step', from: 'recon-male-restroom', to: 'recon-stairs-right-turn', floor: 4, instruction: "Use the male's restroom as your nearest landmark, then turn right.", landmark: "Male's restroom", transition: false },
   { id: 'recon-stairs-right-turn-step', from: 'recon-stairs-right-turn', to: 'recon', floor: 4, instruction: 'Turn right toward RECON.', landmark: 'RECON right turn', transition: false },
