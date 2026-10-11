@@ -414,6 +414,7 @@ export default function TaylorDashboard() {
     <div className="homepage-shell taylor-shell">
       <div className="homepage-panel taylor-panel">
         <section className="taylor-header">
+          <button type="button" onClick={() => navigate("/")} aria-label="Back to homepage" style={{ alignSelf: "flex-start", padding: "0.55rem 0.9rem", borderRadius: "0.6rem", cursor: "pointer" }}>← Home</button>
           <div>
             <div className="eyebrow">Bulacan State University • ARICC</div>
             <h1>TAYLOR</h1>
