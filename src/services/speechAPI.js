@@ -234,6 +234,7 @@ const RV_PARAMS = {
 const VOICE_CONFIG = {
   taylor: {
     gender: 'female',
+    tl: { pitch: 1.05, rate: 0.92, prefer: ['Filipino Female', 'Tagalog Female', 'Blessica'] },
     en: { pitch: 1.05, rate: 0.90, prefer: ['Samantha', 'Victoria', 'Google US English Female', 'Microsoft Zira Desktop', 'Karen', 'Hazel'] },
     zh: { pitch: 1.08, rate: 0.86, prefer: ['Ting-Ting', 'Meijia', 'Google 普通话（中国大陆）', 'Microsoft Huihui Desktop'] },
     ja: { pitch: 1.06, rate: 0.88, prefer: ['Kyoko', 'Google 日本語', 'Microsoft Haruka Desktop', 'Ayumi'] },
@@ -369,6 +370,7 @@ function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
 
       const voice = pickVoice(avatarName, lang, voices);
       if (voice) {
+        utt.lang = voice.lang || locales[0];
         utt.voice = voice;
         console.info('[TTS] selected voice', { name: voice.name, lang: voice.lang });
       } else {
@@ -416,14 +418,8 @@ function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
         console.log('[TTS] Short filler — skipping ElevenLabs to save credits');
       }
 
-      if (isFilipino && !isJohn) {
-        const ok = await _responsiveVoiceFilipino(text, avatarName);
-        if (ok) {
-          resolve(ok);
-          return;
-        }
-      }
-
+      // Browser speech is the zero-cost, lightweight default, including Filipino.
+      // Do not route Filipino speech through ResponsiveVoice first.
       attemptBrowserTTS().catch((error) => {
         console.error('[TTS] speech error', error);
         finish(false);
@@ -592,6 +588,22 @@ function pickVoice(avatarName, lang, voices = _cachedVoices) {
   const voiceList = voices?.length ? voices : _cachedVoices;
   const isFemale = cfg.gender === 'female';
   const isJohn = avatarName === 'john';
+
+  if (lang === 'tl' || lang === 'fil') {
+    const filipino = voiceList.filter((v) => /^(fil|tl)(-|$)/i.test(v.lang || ''));
+    const femaleNames = /female|woman|blessica/i;
+    const maleNames = /male|man|angelo/i;
+    if (isFemale) {
+      const female = filipino.find((v) => femaleNames.test(v.name || '') && !maleNames.test((v.name || '').replace(/female/ig, '')));
+      if (female) return female;
+    }
+    if (filipino.length) return filipino[0];
+    if (isFemale) {
+      const femaleEnglish = voiceList.find((v) => /^en(-|$)/i.test(v.lang || '') &&
+        /samantha|victoria|zira|karen|hazel|kate|female/i.test(v.name || ''));
+      if (femaleEnglish) return femaleEnglish;
+    }
+  }
 
   const englishVoices = voiceList.filter((voice) => (voice.lang || '').toLowerCase().startsWith('en'));
 
