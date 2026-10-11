@@ -164,6 +164,24 @@ export default function TaylorDashboard() {
         ? 'Give a technically detailed, accurate explanation, including mechanisms and relevant engineering terminology. Do not invent specifications.'
         : 'Explain clearly at a general visitor level, balancing accessible language with accurate technical details.',
   };
+  const [tourInterest, setTourInterest] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem('taylorTourInterest');
+      return ['general', 'robotics', 'fabrication', 'environment', 'research'].includes(saved) ? saved : 'general';
+    } catch { return 'general'; }
+  });
+  const changeTourInterest = (value) => {
+    setTourInterest(value);
+    try { window.localStorage.setItem('taylorTourInterest', value); } catch {}
+  };
+  const TOUR_INTERESTS = {
+    general: { label: 'General exploration', destination: null },
+    robotics: { label: 'Robotics and AI', destination: 'ARICC' },
+    fabrication: { label: 'Fabrication and prototyping', destination: 'FABLAB' },
+    environment: { label: 'Environmental science', destination: 'CAESAR' },
+    research: { label: 'Research and innovation', destination: 'RIO' },
+  };
+  const selectedTourInterest = TOUR_INTERESTS[tourInterest];
   const t = UI_TEXT[language] || UI_TEXT.en;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -471,6 +489,16 @@ export default function TaylorDashboard() {
               <option value="standard">Standard</option>
               <option value="technical">Technical</option>
             </select>
+            <label htmlFor="taylor-tour-interest" style={{ display: 'block', marginBottom: '0.35rem' }}>Tour interest</label>
+            <select id="taylor-tour-interest" aria-label="Preferred tour interest" value={tourInterest} onChange={(event) => changeTourInterest(event.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.5rem', marginBottom: '0.75rem' }}>
+              {Object.entries(TOUR_INTERESTS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
+            </select>
+            {selectedTourInterest.destination && (
+              <p role="status" style={{ marginBottom: '0.75rem' }}>
+                Suggested destination: <strong>{selectedTourInterest.destination}</strong>
+                {' '}<button type="button" onClick={() => navigate('/ai-navigation')} style={{ cursor: 'pointer' }}>View directions</button>
+              </p>
+            )}
             <h3>{t.status}</h3>
             <p>{t.age}: {sessionContext?.age ?? '—'}</p>
             <p>{t.emotion}: {sessionContext?.emotion ?? '—'}</p>
