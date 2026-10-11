@@ -145,6 +145,24 @@ export default function TaylorDashboard() {
     setLanguage(value);
     window.localStorage.setItem('taylorLanguage', value);
   };
+  const [explanationLevel, setExplanationLevel] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem('taylorExplanationLevel');
+      return ['simple', 'standard', 'technical'].includes(saved) ? saved : 'standard';
+    } catch { return 'standard'; }
+  });
+  const changeExplanationLevel = (value) => {
+    setExplanationLevel(value);
+    try { window.localStorage.setItem('taylorExplanationLevel', value); } catch {}
+  };
+  const explanationInstruction = {
+    role: 'system',
+    content: explanationLevel === 'simple'
+      ? 'Explain clearly in short sentences using familiar examples. Avoid jargon; define necessary technical terms. Preserve factual accuracy.'
+      : explanationLevel === 'technical'
+        ? 'Give a technically detailed, accurate explanation, including mechanisms and relevant engineering terminology. Do not invent specifications.'
+        : 'Explain clearly at a general visitor level, balancing accessible language with accurate technical details.',
+  };
   const t = UI_TEXT[language] || UI_TEXT.en;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -309,7 +327,7 @@ export default function TaylorDashboard() {
             latencyMs: localResult.latencyMs,
           });
           return requestChat({
-            messages: [...(languageInstruction ? [languageInstruction] : []), ...nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText }))],
+            messages: [explanationInstruction, ...(languageInstruction ? [languageInstruction] : []), ...nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText }))],
             activeEntity,
           });
         },
@@ -331,7 +349,7 @@ export default function TaylorDashboard() {
       if (resolution.kind === 'local' && language !== 'en') {
         // Local knowledge is English-only; ask the backend to translate rather than reading English aloud.
         const response = await requestChat({
-          messages: [languageInstruction, ...nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText }))],
+          messages: [explanationInstruction, languageInstruction, ...nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText }))],
           activeEntity,
         });
         const data = await response.json();
@@ -435,6 +453,12 @@ export default function TaylorDashboard() {
               <option value="en">English</option>
               <option value="tl">Filipino (Tagalog)</option>
               <option value="zh">中文 (Mandarin)</option>
+            </select>
+            <label htmlFor="taylor-explanation-level" style={{ display: 'block', marginBottom: '0.35rem' }}>Explanation level</label>
+            <select id="taylor-explanation-level" aria-label="Preferred explanation level" value={explanationLevel} onChange={(event) => changeExplanationLevel(event.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.5rem', marginBottom: '0.75rem' }}>
+              <option value="simple">Simple</option>
+              <option value="standard">Standard</option>
+              <option value="technical">Technical</option>
             </select>
             <h3>{t.status}</h3>
             <p>{t.age}: {sessionContext?.age ?? '—'}</p>
