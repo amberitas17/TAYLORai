@@ -595,48 +595,34 @@ function pickVoice(avatarName, lang, voices = _cachedVoices) {
   const locales = LANG_LOCALES[lang] || ['en-US'];
   const voiceList = voices?.length ? voices : _cachedVoices;
   const isFemale = cfg.gender === 'female';
-  const isJohn = avatarName === 'john';
-
-  const matchingVoices = voiceList.filter((voice) => locales.some((locale) => (voice.lang || '').toLowerCase().startsWith(locale.split('-')[0].toLowerCase())));
-  // Never prefer an English voice when a matching Filipino or Chinese voice exists.
-  const preferredVoices = lang === 'en' ? voiceList : matchingVoices;
-
+  const matchingVoices = voiceList.filter((voice) =>
+    locales.some((locale) => (voice.lang || '').toLowerCase().startsWith(locale.split('-')[0].toLowerCase()))
+  );
+  const candidates = lang === 'en' ? voiceList : matchingVoices;
+  const femaleNames = ['female', 'woman', 'girl', 'filipina', 'samantha', 'victoria', 'hazel', 'kate', 'kyoko', 'yuna', 'ting', 'zira', 'mei', 'aria', 'jenny', 'siri'];
+  const maleNames = ['male', 'man', 'boy', 'david', 'mark', 'daniel', 'alex', 'jorge', 'john'];
+  const soundsFemale = (voice) => {
+    const name = (voice.name || '').toLowerCase();
+    return femaleNames.some((word) => name.includes(word));
+  };
+  const soundsMale = (voice) => {
+    const name = (voice.name || '').toLowerCase();
+    return maleNames.some((word) => name.includes(word));
+  };
+  // TAYLOR and DAISY must never knowingly select a male voice.
+  const genderCandidates = candidates.filter((voice) => isFemale ? !soundsMale(voice) : !soundsFemale(voice));
+  const explicitlyMatched = genderCandidates.filter((voice) => isFemale ? soundsFemale(voice) : soundsMale(voice));
   for (const name of (lCfg.prefer || [])) {
-    for (const voice of preferredVoices) {
-      const vname = voice.name.toLowerCase();
-      if (isJohn && (vname.includes('female') || vname.includes('woman') || vname.includes('girl'))) continue;
-      if (vname.includes(name.toLowerCase())) return voice;
-    }
+    const preferred = explicitlyMatched.find((voice) => voice.name.toLowerCase().includes(name.toLowerCase()));
+    if (preferred) return preferred;
   }
-
-  if (isJohn) {
-    for (const locale of locales) {
-      const localeVoices = voiceList.filter((v) => (v.lang || '').toLowerCase().startsWith(locale.split('-')[0].toLowerCase()));
-      const maleVoices = localeVoices.filter((v) => {
-        const name = v.name.toLowerCase();
-        return !name.includes('female') && !name.includes('woman') && !name.includes('girl');
-      });
-      if (maleVoices.length > 0) return maleVoices[0];
-    }
+  if (explicitlyMatched.length) return explicitlyMatched[0];
+  if (genderCandidates.length) {
+    console.warn('[TTS] Voice gender could not be verified from metadata', { avatarName, lang, available: genderCandidates.map((v) => v.name) });
+    return genderCandidates[0];
   }
-
-  if (isFemale) {
-    for (const locale of locales) {
-      const localeVoices = voiceList.filter((v) => (v.lang || '').toLowerCase().startsWith(locale.split('-')[0].toLowerCase()));
-      const femaleKw = ['female', 'woman', 'girl', 'samantha', 'victoria', 'hazel', 'kate', 'kyoko', 'yuna', 'ting', 'zira'];
-      for (const kw of femaleKw) {
-        const v = localeVoices.find((voice) => voice.name.toLowerCase().includes(kw));
-        if (v) return v;
-      }
-      if (localeVoices[0]) return localeVoices[0];
-    }
-  }
-
-  if (lang !== 'en' && !matchingVoices.length) {
-    console.warn('[TTS] No matching installed language voice; device may pronounce text incorrectly', { lang, locales });
-    return null;
-  }
-  return (lang === 'en' ? voiceList[0] : matchingVoices[0]) || null;
+  console.warn('[TTS] No compatible voice for requested language and gender', { avatarName, lang });
+  return null;
 }
 
 export function getPhonemeData(text) {
