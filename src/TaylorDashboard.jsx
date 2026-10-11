@@ -16,6 +16,18 @@ const CHAT_ENDPOINT = API_URL && (!/localhost|127\.0\.0\.1/i.test(API_URL) || IS
   ? `${API_URL.replace(/\/$/, '')}/chat`
   : '/api/chat';
 const CHAT_TIMEOUT_MS = 15000;
+const LANGUAGES = {
+  en: { label: 'English', instruction: 'Respond in English.' },
+  tl: { label: 'Filipino', instruction: 'Sumagot sa natural na Filipino (Tagalog). Panatilihin ang mga opisyal na pangalan at teknikal na termino kung kinakailangan.' },
+  zh: { label: '中文', instruction: '请用简体中文回答。保留机构的正式名称和必要的技术术语。' },
+};
+const LANGUAGE_KEY = 'taylorPreferredLanguage';
+const readPreferredLanguage = () => {
+  try {
+    const value = window.localStorage.getItem(LANGUAGE_KEY);
+    return LANGUAGES[value] ? value : 'en';
+  } catch { return 'en'; }
+};
 const CHAT_MAX_ATTEMPTS = 2;
 const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
 
@@ -117,6 +129,12 @@ export default function TaylorDashboard() {
   const [sessionContext, setSessionContext] = useState(getSessionContext);
   const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
   const [messages, setMessages] = useState([]);
+  const [language, setLanguage] = useState(readPreferredLanguage);
+  const changeLanguage = (next) => {
+    if (!LANGUAGES[next]) return;
+    setLanguage(next);
+    try { window.localStorage.setItem(LANGUAGE_KEY, next); } catch { /* private browsing */ }
+  };
   const [inputText, setInputText] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -164,7 +182,7 @@ export default function TaylorDashboard() {
     setSpeechWarning('');
 
     try {
-      const speechStarted = await textToSpeech(text, false, 'taylor', 'en');
+      const speechStarted = await textToSpeech(text, false, 'taylor', language);
       if (!speechStarted) {
         setSpeechWarning('Speech synthesis is unavailable or blocked on this device. Tap the Test Voice button to verify audio.');
       }
@@ -175,7 +193,7 @@ export default function TaylorDashboard() {
       setSpeechStatus(getSpeechSupportState());
       setIsSpeaking(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     const profile = location.state?.detectedProfile || getSessionContext();
@@ -198,7 +216,11 @@ export default function TaylorDashboard() {
     if (!greetingPlayed && typeof window !== 'undefined') {
       window.sessionStorage.setItem('taylorGreetingPlayed', 'true');
       setGreetingPlayed(true);
-      const greeting = `Welcome to Bulacan State University. I am TAYLOR, your AI hologram guide. I estimate that you are approximately ${context.age} years old. Your initial emotion appears to be ${context.emotion}. I am here to help you learn more about Bulacan State University and ARICC. How may I assist you today?`;
+      const greeting = language === 'tl'
+        ? `Maligayang pagdating sa Bulacan State University! Ako si TAYLOR, ang inyong AI guide. Tinataya kong ${context.age} taong gulang kayo, at ang unang nakitang emosyon ay ${context.emotion}. Ano ang maitutulong ko sa inyo?`
+        : language === 'zh'
+          ? `欢迎来到布拉干州立大学！我是人工智能导览员 TAYLOR。估计您的年龄约为 ${context.age} 岁，初步识别的情绪为 ${context.emotion}。有什么可以帮您？`
+          : `Welcome to Bulacan State University. I am TAYLOR, your AI hologram guide. I estimate that you are approximately ${context.age} years old. Your initial emotion appears to be ${context.emotion}. I am here to help you learn more about Bulacan State University and ARICC. How may I assist you today?`;
       speakWithPreferredVoice(greeting);
     }
 
@@ -212,7 +234,7 @@ export default function TaylorDashboard() {
         { speaker: 'guide', text: 'How may I assist you today?' }
       ];
     });
-  }, [location.state, greetingPlayed, speakWithPreferredVoice]);
+  }, [location.state, greetingPlayed, speakWithPreferredVoice, language]);
 
   useEffect(() => {
     const syncSpeechStatus = () => setSpeechStatus(getSpeechSupportState());
@@ -266,6 +288,8 @@ export default function TaylorDashboard() {
     setIsThinking(true);
 
     try {
+      const languageInstruction = LANGUAGES[language].instruction;
+      // Offline knowledge is authored in English. Do not present it as translated.
       const resolution = await resolveLocalFirstChat({
         query: text,
         activeEntity,
@@ -277,7 +301,10 @@ export default function TaylorDashboard() {
             latencyMs: localResult.latencyMs,
           });
           return requestChat({
-            messages: nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText })),
+            messages: [
+              { role: 'system', content: languageInstruction },
+              ...nextMessages.map(({ speaker, text: messageText }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: messageText }))
+            ],
             activeEntity,
           });
         },
@@ -383,6 +410,10 @@ export default function TaylorDashboard() {
             <p className="hero-subtitle">BulSU AI Hologram Guide</p>
           </div>
           <div className="status-card">
+            <label htmlFor="taylor-language" style={{ display: 'block', marginBottom: 6 }}>Language / Wika / 语言</label>
+            <select id="taylor-language" value={language} onChange={(event) => changeLanguage(event.target.value)} aria-label="Choose TAYLOR language" style={{ width: '100%', padding: 8, borderRadius: 8 }}>
+              {Object.entries(LANGUAGES).map(([code, option]) => <option key={code} value={code}>{option.label}</option>)}
+            </select>
             <h3>TAYLOR READY</h3>
             <p>Age Detected: {sessionContext?.age ?? '—'}</p>
             <p>Initial Emotion: {sessionContext?.emotion ?? '—'}</p>
