@@ -269,23 +269,27 @@ export default function AINavigation({ onBack }) {
   const touchStart = useRef(null);
   const locationOptions = routeMode === 'stairs' ? STAIR_LOCATION_OPTIONS : LOCATION_OPTIONS;
   const location = locationOptions.find((option) => option.value === manualLocation) || locationOptions[0];
-  const route = getDestinationRoute(routeDestination);
-  // Start at the selected landmark in the active destination's route, not at step one.
-  const selectedStartStep = (() => {
-    const landmarkByOption = {
-      'manual-cit-entrance': 'cit-entrance',
-      'manual-emh-department': 'emh-department',
-      'manual-elevator-1f': 'elevator-1f',
-      'manual-4f-elevator': 'elevator-4f',
-      'manual-olcpd': 'olcpd-office',
-      'manual-4f-hallway': 'hallway-straight',
-      'stairs-cit-entrance': 'second-floor-stairs',
-      'stairs-deans-office': 'deans-office-2f',
-      'stairs-eec-bulletin-board': 'teecs-department',
-    };
-    const index = route.steps.findIndex((item) => item.from === landmarkByOption[manualLocation]);
-    return index >= 0 ? index + 1 : 1;
-  })();
+  const fullRoute = getDestinationRoute(routeDestination);
+  const landmarkByOption = {
+    'manual-cit-entrance': 'cit-entrance',
+    'manual-emh-department': 'emh-department',
+    'manual-elevator-1f': 'elevator-1f',
+    'manual-4f-elevator': 'elevator-4f',
+    'manual-olcpd': 'olcpd-office',
+    'manual-4f-hallway': 'hallway-straight',
+    'stairs-cit-entrance': 'second-floor-stairs',
+    'stairs-deans-office': 'deans-office-2f',
+    'stairs-eec-bulletin-board': 'teecs-department',
+  };
+  const startIndex = fullRoute.steps.findIndex((item) => item.from === landmarkByOption[manualLocation]);
+  // Renumber the visible route from the visitor's selected starting point.
+  // Never silently show CIT Entrance when a different start was requested.
+  const startUnavailable = startIndex < 0;
+  const route = {
+    ...fullRoute,
+    steps: startUnavailable ? [] : fullRoute.steps.slice(startIndex),
+  };
+  const selectedStartStep = 1;
   const step = route.steps[currentStep - 1];
   const node = getNode(step?.from);
   const evidence = getCITWalkthroughEvidence(node.id);
@@ -296,7 +300,7 @@ export default function AINavigation({ onBack }) {
     ? route.arrivalInstruction || step?.instruction
     : step?.instruction;
   const destination = TOUR_CENTERS[selectedDestination];
-  const displayInstruction = localizedInstruction(instruction, language);
+  const displayInstruction = startUnavailable ? 'No verified route begins at this starting point for the selected destination and route option. Choose another starting point.' : localizedInstruction(instruction, language);
 
   useEffect(() => {
     navigationStateRef.current = new IndoorNavigationState({ destination: selectedDestination, startFloor: location.floor, targetFloor: 4 });
@@ -315,6 +319,7 @@ export default function AINavigation({ onBack }) {
   function goToStep(nextStep) {
     const bounded = Math.min(Math.max(nextStep, 1), route.steps.length);
     setCurrentStep(bounded);
+    if (startUnavailable || !route.steps.length) return;
     const nextRouteStep = route.steps[bounded - 1];
     const nextNode = getNode(nextRouteStep?.from);
     const nextEvidence = getCITWalkthroughEvidence(nextNode.id);
@@ -342,6 +347,7 @@ export default function AINavigation({ onBack }) {
   }
 
   const confirmCurrentLandmark = () => {
+    if (startUnavailable || !route.steps.length) return;
     const confirmedLandmark = node.id === 'elevator-1f' ? 'elevator' : node.landmark;
     const confirmation = navigationStateRef.current?.confirmLandmark(confirmedLandmark);
     const isDestination = confirmation?.state?.current_landmark === selectedDestination;
@@ -374,8 +380,8 @@ export default function AINavigation({ onBack }) {
       <header className="navigation-mobile-header"><button className="navigation-icon-button" onClick={onBack || (() => navigate('/taylor'))} aria-label={labels.back}>‹</button><div><span className="navigation-kicker">TAYLOR AI</span><h1>{labels.title}</h1></div><button className="navigation-map-button" onClick={() => setMapOpen((open) => !open)}>{mapOpen ? labels.steps : labels.map}</button></header>
       <section className="navigation-route-picker"><label>{labels.language}<select aria-label={labels.language} value={language} onChange={(event) => changeLanguage(event.target.value)}><option value="en">English</option><option value="tl">Filipino (Tagalog)</option><option value="zh">中文 (Mandarin)</option></select></label><label>{labels.start}<select value={manualLocation} onChange={updateLocation}>{locationOptions.map((option) => <option key={option.value} value={option.value}>{localizedLandmark(option.label, language)}</option>)}</select></label><label>{labels.destination}<select value={selectedDestination} onChange={(event) => { setSelectedDestination(event.target.value); setCurrentStep(1); }}><option value="ARICC">ARICC</option><option>RIO</option><option>FABLAB</option><option>CAESAR</option><option>RECON</option></select></label><label>{language === 'tl' ? 'DAANAN' : language === 'zh' ? '路线方式' : 'ROUTE OPTION'}<select aria-label={language === 'tl' ? 'Piliin ang elevator o hagdan' : language === 'zh' ? '选择电梯或楼梯' : 'Choose elevator or stairs'} value={routeMode} onChange={(event) => changeRouteMode(event.target.value)}><option value="elevator">{language === 'tl' ? 'Elevator' : language === 'zh' ? '电梯' : 'Elevator'}</option><option value="stairs">{language === 'tl' ? 'Hagdan' : language === 'zh' ? '楼梯' : 'Stairs'}</option></select></label><div className="navigation-route-summary"><div><span>{labels.from}</span><strong>{localizedLandmark(location.label, language)}</strong></div><div><span>{labels.to}</span><strong>{selectedDestination}</strong></div></div></section>
       <NavigationAvatar event={navigationEvent} instruction={displayInstruction} language={language} labels={labels} muted={avatarMuted} onMute={() => setAvatarMuted((muted) => !muted)} expanded={avatarExpanded} onToggle={() => setAvatarExpanded((expanded) => !expanded)} />
-      {mapOpen ? <section className="navigation-published-map" aria-label={language === 'tl' ? 'Mapa ng CIT' : language === 'zh' ? 'CIT 地图' : 'Geographic CIT map'}><Suspense fallback={<div role="status">Loading map…</div>}><LeafletMap destination={{ destination: selectedDestination }} isTracking /></Suspense></section> : <section className={`navigation-step-view ${['RIO', 'ARICC', 'OVPREI', 'FABLAB', 'CAESAR'].includes(selectedDestination) ? 'navigation-step-view--rio' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-live="polite"><div className="navigation-progress"><span>{language === 'tl' ? 'HAKBANG' : language === 'zh' ? '步骤' : 'STEP'} {currentStep} {language === 'tl' ? 'SA' : language === 'zh' ? '/' : 'OF'} {route.steps.length}</span><div>{route.steps.map((item, index) => <i className={index + 1 <= currentStep ? 'is-complete' : ''} key={item.id} />)}</div></div><StepPhoto evidence={evidence} landmark={localizedLandmark(node.landmark, language)} language={language} /><div className="navigation-step-content"><div className={`navigation-direction navigation-direction--${direction}`}><strong>{directionIcon[direction]}</strong><span>{language === 'tl' ? ({arrival:'Pagdating',elevator:'Paglipat ng palapag',left:'Kaliwa',right:'Kanan',straight:'Diretso'}[direction] || direction) : language === 'zh' ? ({arrival:'到达',elevator:'楼层切换',left:'左转',right:'右转',straight:'直走'}[direction] || direction) : (direction === 'arrival' ? 'Arrive' : direction === 'elevator' ? 'Floor change' : direction)}</span></div><div className="navigation-step-meta"><span>{localizedLandmark(CIT_FLOOR_LABELS[step.floor], language)}</span><span>{evidence.verified ? `${evidence.sourceVideo} · ${evidence.timestamp}` : (language === 'tl' ? 'Sinusuri pa ang ebidensiya' : language === 'zh' ? '证据待审核' : 'Evidence pending review')}</span></div><h2>{localizedLandmark(node.landmark, language)}</h2><p>{displayInstruction}</p><small className="navigation-confidence">{evidence.verified ? `${language === 'tl' ? 'Napatunayang ebidensiya' : language === 'zh' ? '已核实的路线证据' : 'Verified walkthrough evidence'} · ${language === 'tl' ? ({high:'mataas',medium:'katamtaman','medium-high':'katamtaman hanggang mataas'}[evidence.confidence] || evidence.confidence) : language === 'zh' ? ({high:'高可信度',medium:'中等可信度','medium-high':'中高可信度'}[evidence.confidence] || evidence.confidence) : `${evidence.confidence} confidence`}` : (language === 'tl' ? 'Pansamantala ang hakbang hanggang makumpirma ang larawan.' : language === 'zh' ? '在路线画面核实前，此步骤仍为暂定。' : 'Neutral step retained until a walkthrough frame is verified.')}</small>{!route.complete && <small className="navigation-route-incomplete">{language === 'tl' ? `Hindi pa kumpleto ang ruta papunta sa ${route.destination}. Hindi pa kumpirmado ang pagdating.` : language === 'zh' ? `前往 ${route.destination} 的路线尚未完整，无法确认抵达。` : `Route to ${route.destination} is incomplete after this verified step. Arrival is not reported.`}</small>}</div></section>}
-      <nav className="navigation-step-controls"><button type="button" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 1}>{labels.previous}</button><button type="button" onClick={confirmCurrentLandmark}>{labels.confirm}</button><button type="button" className="navigation-next-button" onClick={() => goToStep(currentStep + 1)} disabled={currentStep === route.steps.length}>{route.complete && currentStep === route.steps.length ? labels.arrived : labels.next}</button></nav>
+      {startUnavailable ? <section className="navigation-step-view" role="status" style={{ padding: 20 }}><h2>Starting point unavailable</h2><p>{displayInstruction}</p></section> : mapOpen ? <section className="navigation-published-map" aria-label={language === 'tl' ? 'Mapa ng CIT' : language === 'zh' ? 'CIT 地图' : 'Geographic CIT map'}><Suspense fallback={<div role="status">Loading map…</div>}><LeafletMap destination={{ destination: selectedDestination }} isTracking /></Suspense></section> : <section className={`navigation-step-view ${['RIO', 'ARICC', 'OVPREI', 'FABLAB', 'CAESAR'].includes(selectedDestination) ? 'navigation-step-view--rio' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-live="polite"><div className="navigation-progress"><span>{language === 'tl' ? 'HAKBANG' : language === 'zh' ? '步骤' : 'STEP'} {currentStep} {language === 'tl' ? 'SA' : language === 'zh' ? '/' : 'OF'} {route.steps.length}</span><div>{route.steps.map((item, index) => <i className={index + 1 <= currentStep ? 'is-complete' : ''} key={item.id} />)}</div></div><StepPhoto evidence={evidence} landmark={localizedLandmark(node.landmark, language)} language={language} /><div className="navigation-step-content"><div className={`navigation-direction navigation-direction--${direction}`}><strong>{directionIcon[direction]}</strong><span>{language === 'tl' ? ({arrival:'Pagdating',elevator:'Paglipat ng palapag',left:'Kaliwa',right:'Kanan',straight:'Diretso'}[direction] || direction) : language === 'zh' ? ({arrival:'到达',elevator:'楼层切换',left:'左转',right:'右转',straight:'直走'}[direction] || direction) : (direction === 'arrival' ? 'Arrive' : direction === 'elevator' ? 'Floor change' : direction)}</span></div><div className="navigation-step-meta"><span>{localizedLandmark(CIT_FLOOR_LABELS[step.floor], language)}</span><span>{evidence.verified ? `${evidence.sourceVideo} · ${evidence.timestamp}` : (language === 'tl' ? 'Sinusuri pa ang ebidensiya' : language === 'zh' ? '证据待审核' : 'Evidence pending review')}</span></div><h2>{localizedLandmark(node.landmark, language)}</h2><p>{displayInstruction}</p><small className="navigation-confidence">{evidence.verified ? `${language === 'tl' ? 'Napatunayang ebidensiya' : language === 'zh' ? '已核实的路线证据' : 'Verified walkthrough evidence'} · ${language === 'tl' ? ({high:'mataas',medium:'katamtaman','medium-high':'katamtaman hanggang mataas'}[evidence.confidence] || evidence.confidence) : language === 'zh' ? ({high:'高可信度',medium:'中等可信度','medium-high':'中高可信度'}[evidence.confidence] || evidence.confidence) : `${evidence.confidence} confidence`}` : (language === 'tl' ? 'Pansamantala ang hakbang hanggang makumpirma ang larawan.' : language === 'zh' ? '在路线画面核实前，此步骤仍为暂定。' : 'Neutral step retained until a walkthrough frame is verified.')}</small>{!route.complete && <small className="navigation-route-incomplete">{language === 'tl' ? `Hindi pa kumpleto ang ruta papunta sa ${route.destination}. Hindi pa kumpirmado ang pagdating.` : language === 'zh' ? `前往 ${route.destination} 的路线尚未完整，无法确认抵达。` : `Route to ${route.destination} is incomplete after this verified step. Arrival is not reported.`}</small>}</div></section>}
+      <nav className="navigation-step-controls"><button type="button" onClick={() => goToStep(currentStep - 1)} disabled={startUnavailable || currentStep === 1}>{labels.previous}</button><button type="button" onClick={confirmCurrentLandmark} disabled={startUnavailable}>{labels.confirm}</button><button type="button" className="navigation-next-button" onClick={() => goToStep(currentStep + 1)} disabled={startUnavailable || currentStep === route.steps.length}>{route.complete && currentStep === route.steps.length ? labels.arrived : labels.next}</button></nav>
       {/* <footer className="navigation-footer"><span>{language === 'tl' ? 'Manu-manong gabay · walang GPS o kamera' : language === 'zh' ? '手动导航 · 无 GPS 或摄像头' : 'Manual navigation · no GPS or camera'}</span></footer> */}
     </main>
   </div>;
