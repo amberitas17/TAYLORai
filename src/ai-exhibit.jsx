@@ -2450,7 +2450,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             {learningCaptureStatus}
           </div>
         )}
-        <label style={{
+        {/* <label style={{
           background: "rgba(0,0,0,0.72)",
           color: "#fff",
           borderRadius: 8,
@@ -2466,7 +2466,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             onChange={handleVideoUpload}
             style={{ display: "none" }}
           />
-        </label>
+        </label> */}
       </div>}
 
       {/* Video element now driven by an uploaded file instead of the live camera */}
