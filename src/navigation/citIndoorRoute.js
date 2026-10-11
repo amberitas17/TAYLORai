@@ -182,7 +182,18 @@ export const CIT_ROUTE_SEGMENTS = Object.freeze({
   FABLAB_TO_CAESAR: Object.freeze({ id: 'fablab-to-stairs-right-caesar', from: 'FABLAB', to: 'CAESAR', status: 'user-confirmed', continuousVideoVerified: false }),
 });
 const reconSteps = [
-  ...CIT_ROUTE_STEPS.slice(0, 5),
+  // Share the CIT Entrance → fourth-floor elevator → OLCPD approach with
+  // other elevator routes, so a selected 4F starting point is available.
+  ...CIT_ROUTE_STEPS.slice(0, 7),
+  {
+    id: 'recon-olcpd-to-elevator-approach',
+    from: 'olcpd-office',
+    to: 'recon-elevator',
+    floor: 4,
+    instruction: 'From OLCPD, return toward the fourth-floor elevator area to follow the RECON corridor.',
+    landmark: 'OLCPD',
+    transition: false,
+  },
   {
     id: 'recon-step-1',
     from: 'recon-elevator',
