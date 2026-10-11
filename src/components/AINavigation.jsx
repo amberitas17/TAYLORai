@@ -166,6 +166,14 @@ const LOCATION_OPTIONS = [
   { value: 'manual-4f-elevator', label: '4th Floor Elevator', floor: 4, step: 6 },
   { value: 'manual-olcpd', label: 'OLCPD', floor: 4, step: 7 },
   { value: 'manual-4f-hallway', label: '4th Floor Hallway', floor: 4, step: 9 },
+  { value: 'stairs-cit-entrance', label: 'CIT Entrance', floor: 1, step: 1 },
+  { value: 'stairs-deans-office', label: "2nd Floor Dean's Office", floor: 2, step: 2 },
+  { value: 'stairs-eec-bulletin-board', label: 'EEC Department (Via the TEECS Bulletin Board)', floor: 3, step: 7 },
+];
+const STAIR_LOCATION_OPTIONS = [
+  { value: 'stairs-cit-entrance', label: 'CIT Entrance', floor: 1, step: 1 },
+  { value: 'stairs-deans-office', label: "2nd Floor Dean's Office", floor: 2, step: 2 },
+  { value: 'stairs-eec-bulletin-board', label: 'EEC Department (Via the TEECS Bulletin Board)', floor: 3, step: 7 },
 ];
 const directionIcon = { left: '←', right: '→', straight: '↑', elevator: '↕', arrival: '●' };
 const eventPose = { START: 'navigation-start', TURN_LEFT: 'navigation-left', TURN_RIGHT: 'navigation-right', WALK_FORWARD: 'navigation-forward', LANDMARK_CONFIRMED: 'navigation-start', ARRIVED: 'navigation-arrived', UNCERTAIN: 'neutral', IDLE: 'neutral' };
@@ -219,7 +227,7 @@ function NavigationAvatar({ event, instruction, language, labels, muted, onMute,
 }
 
 function StepPhoto({ evidence, landmark, language }) {
-  if (evidence.verified && evidence.photo) return <img className="navigation-photo" src={evidence.photo} alt={landmark} />;
+  if (evidence.verified && evidence.photo) return <img className={`navigation-photo${evidence.photo.endsWith('/second-floor-u-turn.jpg') ? ' navigation-photo--bottom-center' : ''}${evidence.photo.endsWith('/recon-stairs-right-turn.jpg') ? ' navigation-photo--top-center' : ''}`} src={evidence.photo} alt={landmark} />;
   return <div className="navigation-photo navigation-photo--placeholder" role="img" aria-label={`Verified photograph pending for ${landmark}`}><span>{language === 'tl' ? 'WALA PANG LARAWAN' : language === 'zh' ? '照片待补充' : 'PHOTO PENDING'}</span><small>{language === 'tl' ? 'Naghihintay ng napatunayang larawan ng CIT' : language === 'zh' ? '等待已核实的 CIT 路线画面' : 'Awaiting verified CIT walkthrough frame'}</small></div>;
 }
 
@@ -238,6 +246,7 @@ export default function AINavigation({ onBack }) {
     setCurrentStep(1);
     setNavigationEvent('START');
     navigationStateRef.current = null;
+    setManualLocation(nextMode === 'stairs' ? STAIR_LOCATION_OPTIONS[0].value : LOCATION_OPTIONS[0].value);
     setRouteMode(nextMode);
   };
   const changeLanguage = (next) => {
@@ -256,7 +265,8 @@ export default function AINavigation({ onBack }) {
   const navigationStateRef = useRef(null);
   const [navigationEvent, setNavigationEvent] = useState('IDLE');
   const touchStart = useRef(null);
-  const location = LOCATION_OPTIONS.find((option) => option.value === manualLocation) || LOCATION_OPTIONS[0];
+  const locationOptions = routeMode === 'stairs' ? STAIR_LOCATION_OPTIONS : LOCATION_OPTIONS;
+  const location = locationOptions.find((option) => option.value === manualLocation) || locationOptions[0];
   const route = getDestinationRoute(routeDestination);
   const step = route.steps[currentStep - 1];
   const node = getNode(step?.from);
@@ -295,7 +305,7 @@ export default function AINavigation({ onBack }) {
   }
 
   function updateLocation(event) {
-    const next = LOCATION_OPTIONS.find((option) => option.value === event.target.value) || LOCATION_OPTIONS[0];
+    const next = locationOptions.find((option) => option.value === event.target.value) || locationOptions[0];
     setManualLocation(next.value);
     setCurrentStep(next.step);
     setDestinationConfirmed(false);
