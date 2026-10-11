@@ -6,7 +6,7 @@ const LeafletMap = lazy(() => import('./LeafletMap'));
 import { CIT_FLOOR_LABELS, getDestinationRoute, getNode } from '../navigation/citIndoorRoute.js';
 import { getCITWalkthroughEvidence } from '../navigation/citWalkthroughEvidence.js';
 import IndoorNavigationState from '../services/indoorNavigationState.js';
-import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
+import { textToSpeech } from '../services/speechAPI.js';
 
 const NAV_LANGUAGE = {
   en: { language: 'Language', title: 'Indoor directions', start: 'Starting point', destination: 'Destination', previous: 'Previous', next: 'Next', confirm: 'Confirm landmark', arrived: 'Arrived', steps: 'Steps', map: 'Map', from: 'Starting from', to: 'Going to', explore: 'Explore', back: 'Go back', mute: 'Mute', unmute: 'Unmute', collapse: 'Collapse', expand: 'Expand' },
@@ -190,7 +190,6 @@ function NavigationAvatar({ event, instruction, language, labels, muted, onMute,
     previousEvent.current = `${language}:${event}:${instruction}`;
     let active = true;
     setSpeaking(true);
-    handleSpeechInteraction();
     textToSpeech(instruction, false, 'taylor', language).finally(() => {
       if (active) setSpeaking(false);
     });
