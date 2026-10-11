@@ -364,8 +364,8 @@ function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
       const locales = LANG_LOCALES[lang] || ['en-US'];
       const utt = new SpeechSynthesisUtterance(text);
       utt.lang = locales[0];
-      utt.pitch = lCfg.pitch;
-      utt.rate = lCfg.rate;
+      utt.pitch = lang === 'tl' ? 1.0 : lCfg.pitch;
+      utt.rate = lang === 'tl' ? 0.94 : lCfg.rate;
       utt.volume = 1.0;
 
       const voice = pickVoice(avatarName, lang, voices);
@@ -597,12 +597,24 @@ function pickVoice(avatarName, lang, voices = _cachedVoices) {
       const female = filipino.find((v) => femaleNames.test(v.name || '') && !maleNames.test((v.name || '').replace(/female/ig, '')));
       if (female) return female;
     }
-    if (filipino.length) return filipino[0];
+    if (filipino.length) return filipino.find((v) => v.localService && !/male|angelo/i.test((v.name || '').replace(/female/ig, ''))) || filipino[0];
+    // No native Filipino voice is installed. Prefer Philippine English pronunciation
+    // over US English when available; browser voices cannot guarantee Tagalog accuracy.
+    const philippineEnglish = voiceList.find((v) => /^en-PH$/i.test(v.lang || '') &&
+      (!isFemale || !/male|man/i.test((v.name || '').replace(/female/ig, ''))));
+    if (philippineEnglish) return philippineEnglish;
     if (isFemale) {
       const femaleEnglish = voiceList.find((v) => /^en(-|$)/i.test(v.lang || '') &&
         /samantha|victoria|zira|karen|hazel|kate|female/i.test(v.name || ''));
       if (femaleEnglish) return femaleEnglish;
     }
+  }
+
+  if (lang === 'zh') {
+    const mandarin = voiceList.filter((v) => /^zh(-|$)/i.test(v.lang || ''));
+    const preferred = mandarin.find((v) => /xiaoxiao|female|ting-ting|meijia/i.test(v.name || ''));
+    if (preferred) return preferred;
+    if (mandarin.length) return mandarin[0];
   }
 
   const englishVoices = voiceList.filter((voice) => (voice.lang || '').toLowerCase().startsWith('en'));
