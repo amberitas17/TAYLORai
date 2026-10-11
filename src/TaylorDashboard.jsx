@@ -1,6 +1,6 @@
 import { getPerformanceSettings } from './services/devicePerformance.js';
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 const Hologram = lazy(() => import('./hologram.jsx'));
 import { handleSpeechInteraction, onSpeechStarted, textToSpeech, getSpeechSupportState } from './services/speechAPI.js';
 import { subscribePwaBootstrap } from './services/pwaBootstrapService.js';
@@ -130,6 +130,7 @@ async function requestChat(payload) {
 }
 
 export default function TaylorDashboard() {
+  const navigate = useNavigate();
   const location = useLocation();
   const [sessionContext, setSessionContext] = useState(getSessionContext);
   const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
