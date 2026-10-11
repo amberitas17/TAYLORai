@@ -70,6 +70,9 @@ export default function AIVision() {
   const detectionInterval = useRef(null);
   const hasWelcomedRef = useRef(false);
   const streamRef = useRef(null);
+  const mountedRef = useRef(false);
+  const cameraPendingRef = useRef(false);
+  const navigationPendingRef = useRef(false);
   const isProcessingRef = useRef(false);
   const inferenceCancelledRef = useRef(false);
   const ageHistoryRef = useRef([]);
@@ -87,14 +90,23 @@ export default function AIVision() {
   });
 
   useEffect(() => {
+    mountedRef.current = true;
     startEntertainmentSequence();
     scheduleFaceInitialization();
     initializeAvatar();
 
     return () => {
-      if (detectionInterval.current) clearInterval(detectionInterval.current);
+      mountedRef.current = false;
       inferenceCancelledRef.current = true;
-      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      if (detectionInterval.current) clearInterval(detectionInterval.current);
+      detectionInterval.current = null;
+      const activeStream = streamRef.current;
+      streamRef.current = null;
+      activeStream?.getTracks().forEach((track) => track.stop());
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -137,21 +149,28 @@ export default function AIVision() {
   }).current;
 
   useEffect(() => {
-    if (!stream || !videoRef.current) return;
+    if (!stream || !videoRef.current || !mountedRef.current) return;
 
-    videoRef.current.srcObject = stream;
-    videoRef.current.muted = true;
-    videoRef.current.playsInline = true;
+    const video = videoRef.current;
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
 
-    videoRef.current.play().then(() => {
+    video.play().then(() => {
+      if (!mountedRef.current || streamRef.current !== stream) return;
       startupTimestampsRef.current.cameraReady = performance.now();
       console.info('[machine-vision] camera ready', startupTimestampsRef.current.cameraReady);
       setCameraStatus('CAMERA_READY');
     }).catch((error) => {
+      if (!mountedRef.current || streamRef.current !== stream || error?.name === 'AbortError') return;
       console.error('Unable to start video playback:', error);
       setCameraStatus('CAMERA_ERROR');
       setFlowError('Camera stream connected, but the video could not start automatically.');
     });
+    return () => {
+      video.pause();
+      if (video.srcObject === stream) video.srcObject = null;
+    };
   }, [stream]);
 
   const initializeModels = async () => {
@@ -187,6 +206,9 @@ export default function AIVision() {
   };
 
   const startCamera = async () => {
+    if (!mountedRef.current || cameraPendingRef.current || navigationPendingRef.current) return;
+    const activeTrack = streamRef.current?.getVideoTracks?.()[0];
+    if (activeTrack?.readyState === 'live') return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraPermission('denied');
       setCameraStatus('CAMERA_ERROR');
@@ -194,19 +216,26 @@ export default function AIVision() {
       return;
     }
 
+    cameraPendingRef.current = true;
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
       });
 
-      setStream(mediaStream);
+      if (!mountedRef.current || navigationPendingRef.current) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = mediaStream;
+      setStream(mediaStream);
       setCameraPermission('granted');
       setCameraStatus('CAMERA_READY');
       setFlowError('');
 
       console.log('🎥 Camera started successfully');
     } catch (error) {
+      if (!mountedRef.current || navigationPendingRef.current) return;
       console.error('❌ Camera access denied:', error);
       setCameraPermission('denied');
       setCameraStatus('CAMERA_ERROR');
@@ -218,6 +247,8 @@ export default function AIVision() {
       } else {
         setFlowError('Camera access is required for emotion detection.');
       }
+    } finally {
+      cameraPendingRef.current = false;
     }
   };
 
@@ -311,7 +342,7 @@ export default function AIVision() {
       }
 
       runInference = async () => {
-        if (inferenceCancelledRef.current || document.hidden || isProcessingRef.current || !videoRef.current || !canvasRef.current) return;
+        if (inferenceCancelledRef.current || navigationPendingRef.current || !mountedRef.current || document.hidden || isProcessingRef.current || !videoRef.current || !canvasRef.current) return;
         const video = videoRef.current;
         if (video.videoWidth === 0 || video.videoHeight === 0) return;
         isProcessingRef.current = true;
@@ -322,7 +353,7 @@ export default function AIVision() {
           canvas.height = 224;
           canvas.getContext('2d').drawImage(video, 0, 0, 224, 224);
           const { result, ageValue } = await analyzeFrame(canvas);
-          if (!inferenceCancelledRef.current && result?.success) {
+          if (!inferenceCancelledRef.current && !navigationPendingRef.current && mountedRef.current && result?.success) {
             const profile = applySmoothedResult({
               emotion: result.predictions.emotion.label,
               emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
@@ -330,6 +361,17 @@ export default function AIVision() {
             }, ageValue);
 
             if (!hasWelcomedRef.current) {
+              navigationPendingRef.current = true;
+              inferenceCancelledRef.current = true;
+              if (detectionInterval.current) clearInterval(detectionInterval.current);
+              detectionInterval.current = null;
+              const activeStream = streamRef.current;
+              streamRef.current = null;
+              activeStream?.getTracks().forEach((track) => track.stop());
+              if (videoRef.current) {
+                videoRef.current.pause();
+                videoRef.current.srcObject = null;
+              }
               localStorage.setItem('firstDetectedEmotionAge', JSON.stringify(profile));
               navigate('/taylor', { replace: true, state: { detectedProfile: profile } });
               speakWelcomeOnce();
@@ -339,7 +381,7 @@ export default function AIVision() {
           if (!inferenceCancelledRef.current) console.error('Analysis error:', error);
         } finally {
           isProcessingRef.current = false;
-          setInferenceState('STOPPED');
+          if (mountedRef.current && !navigationPendingRef.current) setInferenceState('STOPPED');
         }
       };
 
@@ -352,7 +394,7 @@ export default function AIVision() {
         inferenceCancelledRef.current = true;
         if (detectionInterval.current) clearInterval(detectionInterval.current);
         detectionInterval.current = null;
-      } else if (stream && ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus)) {
+      } else if (mountedRef.current && !navigationPendingRef.current && stream && ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus)) {
         inferenceCancelledRef.current = false;
         const track = streamRef.current?.getVideoTracks?.()[0];
         if (!track || track.readyState === 'ended') startCamera();
