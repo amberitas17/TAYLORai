@@ -219,9 +219,9 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
   const applyPoseMode = (scene, time) => {
     if (!scene) return;
 
-    // The avatar faces the visitor, so its right arm extends toward the visitor's left.
-    const pointingSide = poseMode === 'navigation-right' || poseMode === 'navigation-left' ? 'right' : null;
-    const screenDirection = -1;
+    // Mirror the gesture so the avatar points to the visitor's requested side.
+    const pointingSide = poseMode === 'navigation-left' ? 'right' : poseMode === 'navigation-right' ? 'left' : null;
+    const screenDirection = poseMode === 'navigation-left' ? -1 : 1;
     const gestureWeight = getGestureWeight(time);
     if (pointingSide && gestureWeight > 0.01) {
       applyPointingPose(scene, pointingSide, screenDirection, gestureWeight);

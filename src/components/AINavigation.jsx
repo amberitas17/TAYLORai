@@ -49,7 +49,32 @@ const NAV_INSTRUCTIONS = {
     "Continue straight, then turn right at the corridor corner.": "Dumiretso, pagkatapos ay kumanan sa kanto ng pasilyo.",
     "Turn right toward the RECON entrance.": "Kumanan papunta sa pasukan ng RECON.",
     "Arrive at RIO.": "Nakarating na kayo sa RIO.",
-    "Arrive at FABLAB.": "Nakarating na kayo sa FABLAB."
+    "Arrive at FABLAB.": "Nakarating na kayo sa FABLAB.",
+    "Continue up the stairs to the 2nd floor.": "Umakyat sa hagdan papunta sa ika-2 palapag.",
+    "Use the Dean's Office as your landmark, then turn left into the U-shaped stairwell.": "Gawing palatandaan ang Tanggapan ng Dean, pagkatapos ay kumaliwa papunta sa hagdanang hugis U.",
+    "At the Dean's Office, turn left through the U-shaped stairwell.": "Sa Tanggapan ng Dean, kumaliwa sa hagdanang hugis U.",
+    "Climb the next flight to the 3rd floor.": "Umakyat sa susunod na hagdan papunta sa ika-3 palapag.",
+    "On the 3rd floor, turn right.": "Sa ika-3 palapag, kumanan.",
+    "Go straight through the EEC Department corridor.": "Dumiretso sa pasilyo ng Departamento ng EEC.",
+    "Continue straight to the TEECS Bulletin Board.": "Dumiretso papunta sa bulletin board ng TEECS.",
+    "Near the TEECS Bulletin Board, turn right.": "Malapit sa bulletin board ng TEECS, kumanan.",
+    "Go straight along the corridor.": "Dumiretso sa pasilyo.",
+    "After the last bench, turn left and go toward the stairs.": "Pagkatapos ng huling bangko, kumaliwa at pumunta papunta sa hagdan.",
+    "Go up to the 4th floor via the stairs.": "Umakyat sa ika-4 na palapag gamit ang hagdan.",
+    "After reaching the 4th floor, turn left and go straight.": "Pagdating sa ika-4 na palapag, kumaliwa at dumiretso.",
+    "The first door on your right is CAESAR.": "Ang unang pinto sa iyong kanan ay CAESAR.",
+    "After reaching the 4th floor, go straight along the corridor.": "Pagdating sa ika-4 na palapag, dumiretso sa pasilyo.",
+    "The first door on your left is FABLAB.": "Ang unang pinto sa iyong kaliwa ay FABLAB.",
+    "Go straight along the corridor. The nearest landmark is the RIO Office.": "Dumiretso sa pasilyo. Ang pinakamalapit na palatandaan ay ang Tanggapan ng RIO.",
+    "Look for the plaque near ARICC.": "Hanapin ang plake malapit sa ARICC.",
+    "Continue to the ARICC entrance.": "Magpatuloy papunta sa pasukan ng ARICC.",
+    "Use FABLAB as the nearest landmark, then continue straight along the corridor.": "Gawing pinakamalapit na palatandaan ang FABLAB, pagkatapos ay dumiretso sa pasilyo.",
+    "The second door on your right is RIO.": "Ang ikalawang pinto sa iyong kanan ay RIO.",
+    "When you reach the window near the restroom, turn left.": "Pagdating sa bintana malapit sa palikuran, kumaliwa.",
+    "Use the male's restroom as your nearest landmark, then turn right.": "Gawing pinakamalapit na palatandaan ang palikuran ng lalaki, pagkatapos ay kumanan.",
+    "Turn right toward RECON.": "Kumanan papunta sa RECON.",
+    "Continue straight. The male's restroom will be on your left as the nearest landmark.": "Dumiretso. Ang palikuran ng lalaki ay nasa iyong kaliwa bilang pinakamalapit na palatandaan.",
+    "Near OLCPD office, continue toward the corridor.": "Malapit sa tanggapan ng OLCPD, magpatuloy papunta sa pasilyo."
   },
   "zh": {
     "At the CIT Entrance, go right toward the EMH Department.": "在 CIT 入口处右转，前往 EMH 部门。",
@@ -85,7 +110,32 @@ const NAV_INSTRUCTIONS = {
     "Continue straight, then turn right at the corridor corner.": "直走，然后在走廊转角右转。",
     "Turn right toward the RECON entrance.": "右转前往 RECON 入口。",
     "Arrive at RIO.": "您已到达 RIO。",
-    "Arrive at FABLAB.": "您已到达 FABLAB。"
+    "Arrive at FABLAB.": "您已到达 FABLAB。",
+    "Continue up the stairs to the 2nd floor.": "沿楼梯上到二楼。",
+    "Use the Dean's Office as your landmark, then turn left into the U-shaped stairwell.": "以院长办公室为地标，然后左转进入 U 形楼梯间。",
+    "At the Dean's Office, turn left through the U-shaped stairwell.": "在院长办公室处左转，经过 U 形楼梯间。",
+    "Climb the next flight to the 3rd floor.": "继续上楼到三楼。",
+    "On the 3rd floor, turn right.": "在三楼右转。",
+    "Go straight through the EEC Department corridor.": "直走穿过 EEC 部门走廊。",
+    "Continue straight to the TEECS Bulletin Board.": "直走前往 TEECS 公告栏。",
+    "Near the TEECS Bulletin Board, turn right.": "在 TEECS 公告栏附近右转。",
+    "Go straight along the corridor.": "沿走廊直走。",
+    "After the last bench, turn left and go toward the stairs.": "经过最后一张长椅后左转，前往楼梯。",
+    "Go up to the 4th floor via the stairs.": "沿楼梯上到四楼。",
+    "After reaching the 4th floor, turn left and go straight.": "到达四楼后左转并直走。",
+    "The first door on your right is CAESAR.": "右侧第一扇门是 CAESAR。",
+    "After reaching the 4th floor, go straight along the corridor.": "到达四楼后沿走廊直走。",
+    "The first door on your left is FABLAB.": "左侧第一扇门是 FABLAB。",
+    "Go straight along the corridor. The nearest landmark is the RIO Office.": "沿走廊直走。最近的地标是 RIO 办公室。",
+    "Look for the plaque near ARICC.": "寻找 ARICC 附近的牌匾。",
+    "Continue to the ARICC entrance.": "继续前往 ARICC 入口。",
+    "Use FABLAB as the nearest landmark, then continue straight along the corridor.": "以 FABLAB 为最近的地标，然后沿走廊直走。",
+    "The second door on your right is RIO.": "右侧第二扇门是 RIO。",
+    "When you reach the window near the restroom, turn left.": "到达洗手间附近的窗户后左转。",
+    "Use the male's restroom as your nearest landmark, then turn right.": "以男洗手间为最近的地标，然后右转。",
+    "Turn right toward RECON.": "右转前往 RECON。",
+    "Continue straight. The male's restroom will be on your left as the nearest landmark.": "直走，男洗手间会在你的左侧，作为最近的地标。",
+    "Near OLCPD office, continue toward the corridor.": "在 OLCPD 办公室附近继续前往走廊。"
   }
 };
 const NAV_LANDMARKS = {
@@ -114,7 +164,28 @@ const NAV_LANDMARKS = {
     "4th Floor Elevator": "Elevator sa ikaapat na palapag",
     "4th Floor Hallway": "Pasilyo sa ikaapat na palapag",
     "1st Floor": "Unang palapag",
-    "4th Floor": "Ikaapat na palapag"
+    "4th Floor": "Ikaapat na palapag",
+    "Stairs to 2nd floor": "Hagdan papunta sa ika-2 palapag",
+    "Dean's Office": "Tanggapan ng Dean",
+    "U-shaped stair turn": "Hagdanang hugis U",
+    "Stairs to 3rd floor": "Hagdan papunta sa ika-3 palapag",
+    "3rd-floor right turn": "Kanan sa ika-3 palapag",
+    "EEC Department": "Departamento ng EEC",
+    "TEECS Bulletin Board": "Bulletin board ng TEECS",
+    "TEECS right turn": "Kanan sa TEECS",
+    "Corridor after right turn": "Pasilyo pagkatapos ng kanan",
+    "Last bench": "Huling bangko",
+    "Stairs toward 4th floor": "Hagdan papunta sa ika-4 na palapag",
+    "4th-floor stair landing": "Landing ng hagdan sa ika-4 na palapag",
+    "First door on the right": "Unang pinto sa kanan",
+    "First door on the left": "Unang pinto sa kaliwa",
+    "RIO Office": "Tanggapan ng RIO",
+    "ARICC plaque": "Plake ng ARICC",
+    "ARICC entrance": "Pasukan ng ARICC",
+    "Second door on the right": "Ikalawang pinto sa kanan",
+    "Male's restroom": "Palikuran ng lalaki",
+    "RECON right turn": "Kanan papunta sa RECON",
+    "RECON": "RECON"
   },
   "zh": {
     "CIT Entrance": "CIT 入口",
@@ -141,7 +212,28 @@ const NAV_LANDMARKS = {
     "4th Floor Elevator": "四楼电梯",
     "4th Floor Hallway": "四楼走廊",
     "1st Floor": "一楼",
-    "4th Floor": "四楼"
+    "4th Floor": "四楼",
+    "Stairs to 2nd floor": "通往二楼的楼梯",
+    "Dean's Office": "院长办公室",
+    "U-shaped stair turn": "U 形楼梯转弯处",
+    "Stairs to 3rd floor": "通往三楼的楼梯",
+    "3rd-floor right turn": "三楼右转处",
+    "EEC Department": "EEC 部门",
+    "TEECS Bulletin Board": "TEECS 公告栏",
+    "TEECS right turn": "TEECS 右转处",
+    "Corridor after right turn": "右转后的走廊",
+    "Last bench": "最后一张长椅",
+    "Stairs toward 4th floor": "通往四楼的楼梯",
+    "4th-floor stair landing": "四楼楼梯平台",
+    "First door on the right": "右侧第一扇门",
+    "First door on the left": "左侧第一扇门",
+    "RIO Office": "RIO 办公室",
+    "ARICC plaque": "ARICC 牌匾",
+    "ARICC entrance": "ARICC 入口",
+    "Second door on the right": "右侧第二扇门",
+    "Male's restroom": "男洗手间",
+    "RECON right turn": "通往 RECON 的右转处",
+    "RECON": "RECON"
   }
 };
 const localizedInstruction = (text, language) => language === 'en' || !text ? text : (NAV_INSTRUCTIONS[language]?.[text] || text);
@@ -229,7 +321,7 @@ function NavigationAvatar({ event, instruction, language, labels, muted, onMute,
 }
 
 function StepPhoto({ evidence, landmark, language }) {
-  if (evidence.verified && evidence.photo) return <img className={`navigation-photo${evidence.photo.endsWith('/second-floor-u-turn.jpg') ? ' navigation-photo--bottom-center' : ''}${evidence.photo.endsWith('/recon-stairs-right-turn.jpg') ? ' navigation-photo--top-center' : ''}`} src={evidence.photo} alt={landmark} />;
+  if (evidence.verified && evidence.photo) return <img className={`navigation-photo navigation-photo--center-center${evidence.photo.endsWith('/second-floor-u-turn.jpg') ? ' navigation-photo--bottom-center' : ''}${evidence.photo.endsWith('/recon-stairs-right-turn.jpg') ? ' navigation-photo--top-center' : ''}`} src={evidence.photo} alt={landmark} />;
   return <div className="navigation-photo navigation-photo--placeholder" role="img" aria-label={`Verified photograph pending for ${landmark}`}><span>{language === 'tl' ? 'WALA PANG LARAWAN' : language === 'zh' ? '照片待补充' : 'PHOTO PENDING'}</span><small>{language === 'tl' ? 'Naghihintay ng napatunayang larawan ng CIT' : language === 'zh' ? '等待已核实的 CIT 路线画面' : 'Awaiting verified CIT walkthrough frame'}</small></div>;
 }
 
