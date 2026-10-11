@@ -2098,7 +2098,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       {tourMode && (
         <>
           <header className="exhibit-tour-header" data-testid="exhibit-tour-panel">
-            <button className="exhibit-tour-header__exit" onClick={() => navigate(-1)} aria-label="Exit tour">
+            <button className="exhibit-tour-header__exit" onClick={() => navigate('/taylor')} aria-label="Exit tour">
               <FiArrowLeft aria-hidden="true" />
               <span>Exit Tour</span>
             </button>
