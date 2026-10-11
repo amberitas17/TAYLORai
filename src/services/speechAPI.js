@@ -333,6 +333,18 @@ function _shouldTryElevenLabs() {
   return false;
 }
 
+
+// Keep Filipino function words as complete words for speech synthesis.
+// In particular, "sa" is one syllable (/sa/), not the letter names S and A.
+// Browser TTS has no phoneme override; the installed voice ultimately determines pronunciation.
+export function normalizeFilipinoSpeechText(text) {
+  return String(text ?? '')
+    .normalize('NFC')
+    .replace(/\b([sS])\s*[-.]\s*([aA])\b/g, (match, first, second) =>
+      first === 'S' && second === 'A' ? 'SA' : match)
+    .replace(/([.!?])(?=[^\s])/g, '$1 ');
+}
+
 function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
   return new Promise((resolve) => {
     const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
@@ -362,7 +374,8 @@ function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
       const cfg = VOICE_CONFIG[avatarName] || VOICE_CONFIG.taylor;
       const lCfg = cfg[lang] || cfg.en;
       const locales = LANG_LOCALES[lang] || ['en-US'];
-      const utt = new SpeechSynthesisUtterance(text);
+      const speechText = isFilipino ? normalizeFilipinoSpeechText(text) : text;
+      const utt = new SpeechSynthesisUtterance(speechText);
       utt.lang = locales[0];
       utt.pitch = lang === 'tl' ? 1.0 : lCfg.pitch;
       utt.rate = lang === 'tl' ? 0.94 : lCfg.rate;
@@ -375,6 +388,9 @@ function _playSpeech(text, avatarName = 'taylor', lang = 'en') {
         console.info('[TTS] selected voice', { name: voice.name, lang: voice.lang });
       } else {
         console.warn('[TTS] selected voice', { name: 'none', lang: locales[0] });
+      }
+      if (isFilipino && !/^(fil|tl)(-|$)/i.test(voice?.lang || '')) {
+        console.warn('[TTS] No native Filipino voice available; the selected browser voice may pronounce words such as sa with an English accent.');
       }
 
       utt.onstart = () => {
