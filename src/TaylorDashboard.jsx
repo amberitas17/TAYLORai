@@ -67,6 +67,22 @@ const CENTER_PROMPTS = {
   ]
 };
 
+
+const UI_TEXT = {
+  en: {ready:'TAYLOR is ready.', offline:'Preparing TAYLOR for offline use...', connection:'This AI feature needs a one-time connection to prepare for offline use.', subtitle:'BulSU AI Hologram Guide', language:'Language', status:'TAYLOR READY', age:'Age Detected', emotion:'Initial Emotion', voice:'Status', voiceReady:'Voice ready', voiceUnavailable:'Voice unavailable', recognized:'Recognized', askCenter:'Ask TAYLOR about this center', preparing:'Preparing AI Vision...', placeholder:'Ask TAYLOR anything about Bulacan State University...', send:'Send', thinking:'TAYLOR is thinking...', greeting:'Welcome to Bulacan State University. I am TAYLOR, your AI hologram guide.', question:'How may I assist you today?', estimate:'I estimate that you are approximately {age} years old.', feeling:'Your initial emotion appears to be {emotion}.', speakWarning:'Speech is unavailable on this device. Tap the screen and try again.', failed:'TAYLOR could not complete your request. Please try again.'},
+  tl: {ready:'Handa na si TAYLOR.', offline:'Inihahanda si TAYLOR para sa offline na paggamit...', connection:'Kailangan ng isang beses na koneksyon upang maihanda ang AI para sa offline na paggamit.', subtitle:'AI Hologram Guide ng BulSU', language:'Wika', status:'HANDA NA SI TAYLOR', age:'Natukoy na Edad', emotion:'Paunang Emosyon', voice:'Katayuan', voiceReady:'Handa ang boses', voiceUnavailable:'Hindi available ang boses', recognized:'Nakilala', askCenter:'Magtanong kay TAYLOR tungkol sa sentrong ito', preparing:'Inihahanda ang AI Vision...', placeholder:'Magtanong kay TAYLOR tungkol sa Bulacan State University...', send:'Ipadala', thinking:'Nag-iisip si TAYLOR...', greeting:'Maligayang pagdating sa Bulacan State University. Ako si TAYLOR, ang inyong AI hologram guide.', question:'Paano kita matutulungan ngayon?', estimate:'Tinataya kong humigit-kumulang {age} taong gulang ka.', feeling:'Ang iyong unang emosyon ay {emotion}.', speakWarning:'Hindi available ang boses sa device na ito. Pindutin ang screen at subukang muli.', failed:'Hindi nakumpleto ni TAYLOR ang kahilingan. Pakisubukang muli.'},
+  zh: {ready:'TAYLOR 已准备就绪。', offline:'正在准备 TAYLOR 的离线功能...', connection:'此 AI 功能需要连接一次网络才能准备离线使用。', subtitle:'BulSU AI 全息导览助手', language:'语言', status:'TAYLOR 已就绪', age:'检测年龄', emotion:'初始情绪', voice:'状态', voiceReady:'语音已就绪', voiceUnavailable:'语音不可用', recognized:'已识别', askCenter:'向 TAYLOR 询问该中心的信息', preparing:'正在准备 AI 视觉...', placeholder:'向 TAYLOR 询问有关布拉干州立大学的问题...', send:'发送', thinking:'TAYLOR 正在思考...', greeting:'欢迎来到布拉干州立大学。我是您的 AI 全息导览助手 TAYLOR。', question:'今天有什么可以帮您？', estimate:'我估计您的年龄约为 {age} 岁。', feeling:'您最初的情绪似乎是 {emotion}。', speakWarning:'此设备无法使用语音。请点击屏幕后重试。', failed:'TAYLOR 无法完成请求，请重试。'}
+};
+const SUGGESTION_LABELS = {
+  tl: ['Ano ang BulSU?', 'Ano ang ARICC?', 'Mga programang akademiko', 'Mga pasilidad ng kampus', 'Pananaliksik at inobasyon', 'Mga serbisyo sa mag-aaral', 'Mga scholarship'],
+  zh: ['什么是 BulSU？', '什么是 ARICC？', '学术课程', '校园设施', '研究与创新', '学生服务', '奖学金']
+};
+const CENTER_QUESTION_LABELS = {
+  tl: ['Ano ang sentrong ito?', 'Anong mga serbisyo ang inaalok?', 'Anong pagsasanay ang available?', 'Ano ang mga pangunahing gawain?', 'Paano ito makatutulong?'],
+  zh: ['这个中心是什么？', '提供哪些服务？', '有哪些培训？', '主要工作是什么？', '如何提供帮助？']
+};
+const interpolate = (template, values) => template.replace(/\\{(\\w+)\\}/g, (_, key) => String(values[key] ?? ''));
+
 const getSessionContext = () => {
   if (typeof window === 'undefined') return null;
   try {
@@ -127,6 +143,7 @@ export default function TaylorDashboard() {
     setLanguage(value);
     window.localStorage.setItem('taylorLanguage', value);
   };
+  const t = UI_TEXT[language] || UI_TEXT.en;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [speechText, setSpeechText] = useState('');
@@ -175,11 +192,11 @@ export default function TaylorDashboard() {
     try {
       const speechStarted = await textToSpeech(text, false, 'taylor', language);
       if (!speechStarted) {
-        setSpeechWarning('Speech synthesis is unavailable or blocked on this device. Tap the Test Voice button to verify audio.');
+        setSpeechWarning((UI_TEXT[language] || UI_TEXT.en).speakWarning);
       }
     } catch (error) {
       console.error('[taylor] speech request failed', error);
-      setSpeechWarning('Speech synthesis failed. Try the Test Voice button after tapping the screen.');
+      setSpeechWarning((UI_TEXT[language] || UI_TEXT.en).speakWarning);
     } finally {
       setSpeechStatus(getSpeechSupportState());
       setIsSpeaking(false);
@@ -207,18 +224,17 @@ export default function TaylorDashboard() {
     if (!greetingPlayed && typeof window !== 'undefined') {
       window.sessionStorage.setItem('taylorGreetingPlayed', 'true');
       setGreetingPlayed(true);
-      const greeting = `Welcome to Bulacan State University. I am TAYLOR, your AI hologram guide. I estimate that you are approximately ${context.age} years old. Your initial emotion appears to be ${context.emotion}. I am here to help you learn more about Bulacan State University and ARICC. How may I assist you today?`;
+      const greeting = [t.greeting, interpolate(t.estimate, context), interpolate(t.feeling, context), t.question].join(' ');
       speakWithPreferredVoice(greeting);
     }
 
     setMessages((prev) => {
       if (prev.length > 0) return prev;
       return [
-        { speaker: 'guide', text: 'Welcome to Bulacan State University.' },
-        { speaker: 'guide', text: `I am TAYLOR, your AI hologram guide.` },
-        { speaker: 'guide', text: `I estimate that you are approximately ${context.age} years old.` },
-        { speaker: 'guide', text: `Your initial emotion appears to be ${context.emotion}.` },
-        { speaker: 'guide', text: 'How may I assist you today?' }
+        { speaker: 'guide', greetingKey: 'greeting' },
+        { speaker: 'guide', greetingKey: 'estimate', values: { age: context.age } },
+        { speaker: 'guide', greetingKey: 'feeling', values: { emotion: context.emotion } },
+        { speaker: 'guide', greetingKey: 'question' }
       ];
     });
   }, [location.state, greetingPlayed, speakWithPreferredVoice]);
@@ -402,25 +418,25 @@ export default function TaylorDashboard() {
             {bootstrap.state !== 'BOOTSTRAP_READY' && (
               <p aria-live="polite">
                 {bootstrap.state === 'BOOTSTRAP_NEEDS_CONNECTION'
-                  ? 'This AI feature needs a one-time connection to prepare for offline use.'
-                  : 'Preparing TAYLOR for offline use...'}
+                  ? t.connection
+                  : t.offline}
                 {' '}{bootstrap.completed}/{bootstrap.total}
               </p>
             )}
-            {bootstrap.state === 'BOOTSTRAP_READY' && <p aria-live="polite">TAYLOR is ready.</p>}
-            <p className="hero-subtitle">BulSU AI Hologram Guide</p>
+            {bootstrap.state === 'BOOTSTRAP_READY' && <p aria-live="polite">{t.ready}</p>}
+            <p className="hero-subtitle">{t.subtitle}</p>
           </div>
           <div className="status-card">
-            <label htmlFor="taylor-language" style={{ display: 'block', marginBottom: '0.35rem' }}>Response language</label>
+            <label htmlFor="taylor-language" style={{ display: 'block', marginBottom: '0.35rem' }}>{t.language}</label>
             <select id="taylor-language" aria-label="TAYLOR response language" value={language} onChange={(event) => changeLanguage(event.target.value)} style={{ width: '100%', padding: '0.5rem', borderRadius: '0.5rem', marginBottom: '0.75rem' }}>
               <option value="en">English</option>
               <option value="tl">Filipino (Tagalog)</option>
               <option value="zh">中文 (Mandarin)</option>
             </select>
-            <h3>TAYLOR READY</h3>
-            <p>Age Detected: {sessionContext?.age ?? '—'}</p>
-            <p>Initial Emotion: {sessionContext?.emotion ?? '—'}</p>
-            <p>Status: {speechStatus?.available ? 'Voice ready' : 'Voice unavailable'}</p>
+            <h3>{t.status}</h3>
+            <p>{t.age}: {sessionContext?.age ?? '—'}</p>
+            <p>{t.emotion}: {sessionContext?.emotion ?? '—'}</p>
+            <p>{t.voice}: {speechStatus?.available ? t.voiceReady : t.voiceUnavailable}</p>
           </div>
         </section>
 
@@ -433,33 +449,33 @@ export default function TaylorDashboard() {
         <section className="guide-section">
           {activeEntity && (
             <section className="center-context" aria-live="polite">
-              <div className="center-context-label">✓ {activeEntity} Recognized</div>
-              <div className="center-context-prompt">Ask TAYLOR about this center</div>
+              <div className="center-context-label">✓ {activeEntity} {t.recognized}</div>
+              <div className="center-context-prompt">{t.askCenter}</div>
               <div className="center-context-actions">
-                {centerPrompts.map((prompt) => (
+                {centerPrompts.map((prompt, index) => (
                   <button key={prompt} className="suggestion-chip" onClick={() => handleSendMessage(prompt)}>
-                    {prompt}
+                    {language === 'en' ? prompt : CENTER_QUESTION_LABELS[language]?.[index] || prompt}
                   </button>
                 ))}
               </div>
             </section>
           )}
           <div className="avatar-card">
-            <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
+            <Suspense fallback={<div className="avatar-placeholder">{t.preparing}</div>}>
               <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
             </Suspense>
           </div>
           {!activeEntity && <div className="suggestion-row">
                 {suggestionItems.map((item) => (
                   <button key={item.key} className="suggestion-chip" onClick={() => handleSuggestion(item)}>
-                    {item.label}
+                    {language === 'en' ? item.label : SUGGESTION_LABELS[language]?.[suggestionItems.findIndex((candidate) => candidate.key === item.key)] || item.label}
                   </button>
                 ))}
               </div>}
             <div className="chat-log">
                 {messages.map((message, index) => (
                   <div key={`${message.speaker}-${index}`} className={`bubble ${message.speaker}`}>
-                    {message.text}
+                    {message.greetingKey ? interpolate(t[message.greetingKey], message.values || {}) : message.text}
                   </div>
                 ))}
               </div>
@@ -471,11 +487,11 @@ export default function TaylorDashboard() {
                   value={inputText}
                   onChange={(event) => setInputText(event.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask TAYLOR anything about Bulacan State University..."
+                  placeholder={t.placeholder}
                 />
-                <button className="chat-send" onClick={() => handleSendMessage()}>Send</button>
+                <button className="chat-send" onClick={() => handleSendMessage()}>{t.send}</button>
               </div>
-              {isThinking && <div className="typing-pill">TAYLOR is thinking...</div>}
+              {isThinking && <div className="typing-pill">{t.thinking}</div>}
             </div>
           </div>
         </section>
