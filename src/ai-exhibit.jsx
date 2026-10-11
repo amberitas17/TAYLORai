@@ -1017,6 +1017,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   useEffect(() => () => {
     stopRealTimeDetection();
     stopCameraStream();
+    void exhibitDetectionService.releaseInactiveSessions().catch((error) => console.warn('Recognition cleanup deferred:', error));
     if (uploadedObjectUrlRef.current) {
       URL.revokeObjectURL(uploadedObjectUrlRef.current);
       uploadedObjectUrlRef.current = null;
