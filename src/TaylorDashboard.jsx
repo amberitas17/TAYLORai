@@ -1,6 +1,7 @@
 import { getPerformanceSettings } from './services/devicePerformance.js';
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { FiMapPin } from 'react-icons/fi';
 const Hologram = lazy(() => import('./hologram.jsx'));
 import { handleSpeechInteraction, onSpeechStarted, textToSpeech, getSpeechSupportState } from './services/speechAPI.js';
 import { subscribePwaBootstrap } from './services/pwaBootstrapService.js';
@@ -70,9 +71,9 @@ const CENTER_PROMPTS = {
 
 
 const UI_TEXT = {
-  en: {ready:'TAYLOR is ready.', offline:'Preparing TAYLOR for offline use...', connection:'This AI feature needs a one-time connection to prepare for offline use.', subtitle:'BulSU AI Hologram Guide', language:'Language', status:'TAYLOR READY', age:'Age Detected', emotion:'Initial Emotion', voice:'Status', voiceReady:'Voice ready', voiceUnavailable:'Voice unavailable', recognized:'Recognized', askCenter:'Ask TAYLOR about this center', preparing:'Preparing AI Vision...', placeholder:'Ask TAYLOR anything about Bulacan State University...', send:'Send', thinking:'TAYLOR is thinking...', greeting:'Welcome to Bulacan State University. I am TAYLOR, your AI hologram guide.', question:'How may I assist you today?', estimate:'I estimate that you are approximately {age} years old.', feeling:'Your initial emotion appears to be {emotion}.', speakWarning:'Speech is unavailable on this device. Tap the screen and try again.', failed:'TAYLOR could not complete your request. Please try again.'},
-  tl: {ready:'Handa na si TAYLOR.', offline:'Inihahanda si TAYLOR para sa offline na paggamit...', connection:'Kailangan ng isang beses na koneksyon upang maihanda ang AI para sa offline na paggamit.', subtitle:'AI Hologram Guide ng BulSU', language:'Wika', status:'HANDA NA SI TAYLOR', age:'Natukoy na Edad', emotion:'Paunang Emosyon', voice:'Katayuan', voiceReady:'Handa ang boses', voiceUnavailable:'Hindi available ang boses', recognized:'Nakilala', askCenter:'Magtanong kay TAYLOR tungkol sa sentrong ito', preparing:'Inihahanda ang AI Vision...', placeholder:'Magtanong kay TAYLOR tungkol sa Bulacan State University...', send:'Ipadala', thinking:'Nag-iisip si TAYLOR...', greeting:'Maligayang pagdating sa Bulacan State University. Ako si TAYLOR, ang inyong AI hologram guide.', question:'Paano kita matutulungan ngayon?', estimate:'Tinataya kong humigit-kumulang {age} taong gulang ka.', feeling:'Ang iyong unang emosyon ay {emotion}.', speakWarning:'Hindi available ang boses sa device na ito. Pindutin ang screen at subukang muli.', failed:'Hindi nakumpleto ni TAYLOR ang kahilingan. Pakisubukang muli.'},
-  zh: {ready:'TAYLOR 已准备就绪。', offline:'正在准备 TAYLOR 的离线功能...', connection:'此 AI 功能需要连接一次网络才能准备离线使用。', subtitle:'BulSU AI 全息导览助手', language:'语言', status:'TAYLOR 已就绪', age:'检测年龄', emotion:'初始情绪', voice:'状态', voiceReady:'语音已就绪', voiceUnavailable:'语音不可用', recognized:'已识别', askCenter:'向 TAYLOR 询问该中心的信息', preparing:'正在准备 AI 视觉...', placeholder:'向 TAYLOR 询问有关布拉干州立大学的问题...', send:'发送', thinking:'TAYLOR 正在思考...', greeting:'欢迎来到布拉干州立大学。我是您的 AI 全息导览助手 TAYLOR。', question:'今天有什么可以帮您？', estimate:'我估计您的年龄约为 {age} 岁。', feeling:'您最初的情绪似乎是 {emotion}。', speakWarning:'此设备无法使用语音。请点击屏幕后重试。', failed:'TAYLOR 无法完成请求，请重试。'}
+  en: {ready:'TAYLOR is ready.', offline:'Preparing TAYLOR for offline use...', connection:'This AI feature needs a one-time connection to prepare for offline use.', subtitle:'BulSU AI Hologram Guide', language:'Language', navigation:'Indoor navigation', status:'TAYLOR READY', age:'Age Detected', emotion:'Initial Emotion', voice:'Status', voiceReady:'Voice ready', voiceUnavailable:'Voice unavailable', recognized:'Recognized', askCenter:'Ask TAYLOR about this center', preparing:'Preparing AI Vision...', placeholder:'Ask TAYLOR anything about Bulacan State University...', send:'Send', thinking:'TAYLOR is thinking...', greeting:'Welcome to Bulacan State University. I am TAYLOR, your AI hologram guide.', question:'How may I assist you today?', estimate:'I estimate that you are approximately {age} years old.', feeling:'Your initial emotion appears to be {emotion}.', speakWarning:'Speech is unavailable on this device. Tap the screen and try again.', failed:'TAYLOR could not complete your request. Please try again.'},
+  tl: {ready:'Handa na si TAYLOR.', offline:'Inihahanda si TAYLOR para sa offline na paggamit...', connection:'Kailangan ng isang beses na koneksyon upang maihanda ang AI para sa offline na paggamit.', subtitle:'AI Hologram Guide ng BulSU', language:'Wika', navigation:'Panloob na nabigasyon', status:'HANDA NA SI TAYLOR', age:'Natukoy na Edad', emotion:'Paunang Emosyon', voice:'Katayuan', voiceReady:'Handa ang boses', voiceUnavailable:'Hindi available ang boses', recognized:'Nakilala', askCenter:'Magtanong kay TAYLOR tungkol sa sentrong ito', preparing:'Inihahanda ang AI Vision...', placeholder:'Magtanong kay TAYLOR tungkol sa Bulacan State University...', send:'Ipadala', thinking:'Nag-iisip si TAYLOR...', greeting:'Maligayang pagdating sa Bulacan State University. Ako si TAYLOR, ang inyong AI hologram guide.', question:'Paano kita matutulungan ngayon?', estimate:'Tinataya kong humigit-kumulang {age} taong gulang ka.', feeling:'Ang iyong unang emosyon ay {emotion}.', speakWarning:'Hindi available ang boses sa device na ito. Pindutin ang screen at subukang muli.', failed:'Hindi nakumpleto ni TAYLOR ang kahilingan. Pakisubukang muli.'},
+  zh: {ready:'TAYLOR 已准备就绪。', offline:'正在准备 TAYLOR 的离线功能...', connection:'此 AI 功能需要连接一次网络才能准备离线使用。', subtitle:'BulSU AI 全息导览助手', language:'语言', navigation:'室内导航', status:'TAYLOR 已就绪', age:'检测年龄', emotion:'初始情绪', voice:'状态', voiceReady:'语音已就绪', voiceUnavailable:'语音不可用', recognized:'已识别', askCenter:'向 TAYLOR 询问该中心的信息', preparing:'正在准备 AI 视觉...', placeholder:'向 TAYLOR 询问有关布拉干州立大学的问题...', send:'发送', thinking:'TAYLOR 正在思考...', greeting:'欢迎来到布拉干州立大学。我是您的 AI 全息导览助手 TAYLOR。', question:'今天有什么可以帮您？', estimate:'我估计您的年龄约为 {age} 岁。', feeling:'您最初的情绪似乎是 {emotion}。', speakWarning:'此设备无法使用语音。请点击屏幕后重试。', failed:'TAYLOR 无法完成请求，请重试。'}
 };
 const SUGGESTION_LABELS = {
   tl: ['Ano ang BulSU?', 'Ano ang ARICC?', 'Mga programang akademiko', 'Mga pasilidad ng kampus', 'Pananaliksik at inobasyon', 'Mga serbisyo sa mag-aaral', 'Mga scholarship'],
@@ -412,6 +413,16 @@ export default function TaylorDashboard() {
 
   return (
     <div className="homepage-shell taylor-shell">
+      <button
+        type="button"
+        className="taylor-navigation-fab"
+        onClick={() => navigate('/ai-navigation')}
+        aria-label={t.navigation}
+        title={t.navigation}
+      >
+        <FiMapPin aria-hidden="true" />
+        <span>{t.navigation}</span>
+      </button>
       <div className="homepage-panel taylor-panel">
         <section className="taylor-header">
           <button type="button" onClick={() => navigate("/")} aria-label="Back to homepage" style={{ alignSelf: "flex-start", padding: "0.55rem 0.9rem", borderRadius: "0.6rem", cursor: "pointer" }}>← Home</button>

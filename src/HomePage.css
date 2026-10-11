@@ -260,7 +260,64 @@
 }
 
 .taylor-shell {
+  position: relative;
   background: radial-gradient(circle at top left, #0f3d5c 0%, #08131f 45%, #02060b 100%);
+}
+
+.taylor-navigation-fab {
+  position: fixed;
+  top: 50%;
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: #0e7490;
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.taylor-navigation-fab svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 auto;
+}
+
+.taylor-navigation-fab:hover,
+.taylor-navigation-fab:focus-visible {
+  background: #155e75;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+  transform: translateY(-50%) scale(1.03);
+}
+
+.taylor-navigation-fab:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .taylor-navigation-fab {
+    top: auto;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    transform: none;
+  }
+
+  .taylor-navigation-fab:hover,
+  .taylor-navigation-fab:focus-visible {
+    transform: scale(1.03);
+  }
+
+  .taylor-navigation-fab span {
+    display: none;
+  }
 }
 
 .taylor-panel {
