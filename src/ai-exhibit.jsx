@@ -1228,7 +1228,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         const cameraStartedAt = performance.now();
         console.time('camera initialization');
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: getPerformanceSettings().cameraWidth }, height: { ideal: getPerformanceSettings().cameraHeight } },
           audio: false
         });
         if (cancelled || !videoRef.current) {
