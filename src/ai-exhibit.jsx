@@ -1,3 +1,4 @@
+import { getPerformanceSettings } from './services/devicePerformance.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FiEye, FiArrowLeft, FiMapPin, FiChevronRight, FiNavigation } from 'react-icons/fi';
@@ -1354,6 +1355,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   };
 
   // Start real-time detection
+  const detectionBusyRef = useRef(false);
   const startRealTimeDetection = () => {
     if (!detectionService || !videoRef.current ||
       detectionService.runtimeState !== 'RUNTIME_READY' ||
@@ -1374,8 +1376,11 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
     // Run detection every 2 seconds for better performance and stability
     detectionIntervalRef.current = setInterval(async () => {
-      await performDetection();
-    }, 1500);
+      if (document.hidden || detectionBusyRef.current) return;
+      detectionBusyRef.current = true;
+      try { await performDetection(); }
+      finally { detectionBusyRef.current = false; }
+    }, getPerformanceSettings().inferenceInterval);
 
     // Also run an immediate detection after video is ready
     // setTimeout(() => performDetection(), 2000);
