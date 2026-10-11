@@ -347,7 +347,7 @@ export default function AINavigation({ onBack }) {
     {scanRoute && <button
       type="button"
       className="navigation-scan-fab"
-      onClick={() => navigate(scanRoute, { state: { activeCenter: selectedDestination, tourMode: true } })}
+      onClick={() => navigate(scanRoute, { state: { activeCenter: selectedDestination } })}
       aria-label={`${labels.scan} ${selectedDestination}`}
       title={`${labels.scan} ${selectedDestination}`}
     >
