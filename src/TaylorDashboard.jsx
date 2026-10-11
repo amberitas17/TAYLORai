@@ -21,15 +21,15 @@ const CHAT_TIMEOUT_MS = 15000;
 const CHAT_MAX_ATTEMPTS = 2;
 const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
 
-const suggestionItems = [
-  { key: 'bulsu', label: 'What is BulSU?', answer: 'Bulacan State University is a premier public university in the Philippines, known for academic excellence, innovation, and service to the community.' },
-  { key: 'aricc', label: 'What is ARICC?', answer: 'What is ARICC?' },
-  { key: 'programs', label: 'Academic Programs', answer: 'BulSU offers strong programs in engineering, education, business, health sciences, information technology, and the arts.' },
-  { key: 'facilities', label: 'Campus Facilities', answer: 'BulSU provides modern classrooms, libraries, laboratories, innovation spaces, student centers, and smart campus facilities.' },
-  { key: 'research', label: 'Research and Innovation', answer: 'BulSU supports impactful research through laboratories, industry partnerships, technology transfer, and community-driven innovation.' },
-  { key: 'services', label: 'Student Services', answer: 'Student services include academic advising, counseling, wellness support, scholarships, and campus engagement programs.' },
-  { key: 'scholarships', label: 'Scholarships', answer: 'BulSU offers scholarship and financial assistance opportunities to support deserving students in their academic journey.' }
-];
+// const suggestionItems = [
+//   { key: 'bulsu', label: 'What is BulSU?', answer: 'Bulacan State University is a premier public university in the Philippines, known for academic excellence, innovation, and service to the community.' },
+//   { key: 'aricc', label: 'What is ARICC?', answer: 'What is ARICC?' },
+//   { key: 'programs', label: 'Academic Programs', answer: 'BulSU offers strong programs in engineering, education, business, health sciences, information technology, and the arts.' },
+//   { key: 'facilities', label: 'Campus Facilities', answer: 'BulSU provides modern classrooms, libraries, laboratories, innovation spaces, student centers, and smart campus facilities.' },
+//   { key: 'research', label: 'Research and Innovation', answer: 'BulSU supports impactful research through laboratories, industry partnerships, technology transfer, and community-driven innovation.' },
+//   { key: 'services', label: 'Student Services', answer: 'Student services include academic advising, counseling, wellness support, scholarships, and campus engagement programs.' },
+//   { key: 'scholarships', label: 'Scholarships', answer: 'BulSU offers scholarship and financial assistance opportunities to support deserving students in their academic journey.' }
+// ];
 
 const CENTER_PROMPTS = {
   ARICC: [
@@ -68,6 +68,11 @@ const CENTER_PROMPTS = {
     'How does RECON support disaster resilience and renewable energy?'
   ]
 };
+const MAIN_CENTER_PROMPTS = Object.entries(CENTER_PROMPTS).map(([center, prompts]) => ({
+  key: center,
+  label: prompts[0],
+  answer: prompts[0],
+}));
 
 
 const UI_TEXT = {
@@ -85,10 +90,6 @@ const greetingToneKey = (emotion) => {
   return 'greeting';
 };
 
-const SUGGESTION_LABELS = {
-  tl: ['Ano ang BulSU?', 'Ano ang ARICC?', 'Mga programang akademiko', 'Mga pasilidad ng kampus', 'Pananaliksik at inobasyon', 'Mga serbisyo sa mag-aaral', 'Mga scholarship'],
-  zh: ['什么是 BulSU？', '什么是 ARICC？', '学术课程', '校园设施', '研究与创新', '学生服务', '奖学金']
-};
 const CENTER_QUESTION_LABELS = {
   tl: ['Ano ang sentrong ito?', 'Anong mga serbisyo ang inaalok?', 'Anong pagsasanay ang available?', 'Ano ang mga pangunahing gawain?', 'Paano ito makatutulong?'],
   zh: ['这个中心是什么？', '提供哪些服务？', '有哪些培训？', '主要工作是什么？', '如何提供帮助？']
@@ -543,9 +544,9 @@ export default function TaylorDashboard() {
             </Suspense>
           </div>
           {!activeEntity && <div className="suggestion-row">
-                {suggestionItems.map((item) => (
+                {MAIN_CENTER_PROMPTS.map((item) => (
                   <button key={item.key} className="suggestion-chip" onClick={() => handleSuggestion(item)}>
-                    {language === 'en' ? item.label : SUGGESTION_LABELS[language]?.[suggestionItems.findIndex((candidate) => candidate.key === item.key)] || item.label}
+                    {item.label}
                   </button>
                 ))}
               </div>}

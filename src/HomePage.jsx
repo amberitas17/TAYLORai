@@ -215,11 +215,11 @@ export default function HomePage() {
       <div className="homepage-panel">
         <section className="hero-section">
           <div className="hero-copy">
-            <div className="eyebrow">Bulacan State University • ARICC Experience</div>
+            <div className="eyebrow">Bulacan State University</div>
             <h1>TAYLOR</h1>
             <p className="hero-subtitle">Meet TAYLOR – Your AI-Powered BulSU Hologram Guide</p>
             <p>
-              Experience an intelligent and personalized campus guide designed to introduce visitors to Bulacan State University and ARICC.
+              Experience an intelligent and personalized campus guide designed to introduce visitors to Bulacan State University Research and Innovation Units.
             </p>
 
             <div className="action-row">

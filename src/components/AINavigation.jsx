@@ -149,8 +149,8 @@ const localizedLandmark = (text, language) => language === 'en' || !text ? text 
 const Hologram = lazy(() => import('../hologram.jsx'));
 
 const TOUR_CENTERS = {
-  ARICC: { fullName: 'Advanced Robotics and Intelligent Control Center', location: 'CIT - 4th Floor', route: '/machine-vision-exhibit-aricc' },
-  ARICC_STAIRS: { fullName: 'Advanced Robotics and Intelligent Control Center (stairs route)', location: 'CIT - 4th Floor', route: '/machine-vision-exhibit-aricc' },
+  ARICC: { fullName: 'Advanced Robotics and Intelligent Control Center', location: 'CIT - 4th Floor', route: '/machine-vision-aricc' },
+  ARICC_STAIRS: { fullName: 'Advanced Robotics and Intelligent Control Center (stairs route)', location: 'CIT - 4th Floor', route: '/machine-vision-aricc' },
   RIO: { fullName: 'Research and Innovation Office', location: 'CIT - 4th Floor', route: '/machine-vision-rio' },
   RIO_STAIRS: { fullName: 'Research and Innovation Office (stairs route)', location: 'CIT - 4th Floor', route: '/machine-vision-rio' },
   FABLAB: { fullName: 'Center for Fabrication and Manufacture', location: 'CIT - 4th Floor', route: '/machine-vision-fablab' },
