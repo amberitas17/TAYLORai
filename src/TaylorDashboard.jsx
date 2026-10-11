@@ -1,3 +1,4 @@
+import { getPerformanceSettings } from './services/devicePerformance.js';
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 const Hologram = lazy(() => import('./hologram.jsx'));
@@ -462,7 +463,7 @@ export default function TaylorDashboard() {
           )}
           <div className="avatar-card">
             <Suspense fallback={<div className="avatar-placeholder">{t.preparing}</div>}>
-              <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
+              {getPerformanceSettings().avatar3D ? <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" /> : <div className="avatar-placeholder" role="status">TAYLOR voice and chat are ready. 3D avatar is disabled in lightweight mode.</div>}
             </Suspense>
           </div>
           {!activeEntity && <div className="suggestion-row">
