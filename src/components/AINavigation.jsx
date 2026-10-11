@@ -144,11 +144,6 @@ const NAV_LANDMARKS = {
 };
 const localizedInstruction = (text, language) => language === 'en' || !text ? text : (NAV_INSTRUCTIONS[language]?.[text] || text);
 const localizedLandmark = (text, language) => language === 'en' || !text ? text : (NAV_LANDMARKS[language]?.[text] || text);
-const Hologram = lazy'), 'gi'), translated),
-    instruction
-  );
-}
-
 const Hologram = lazy(() => import('../hologram.jsx'));
 
 const TOUR_CENTERS = {
