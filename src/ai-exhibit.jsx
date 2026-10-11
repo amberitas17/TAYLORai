@@ -2087,6 +2087,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   return (
     <div style={{ flex: 1, position: "relative", height: "100vh", overflow: "hidden" }}>
+      {!tourMode && <button type="button" onClick={() => navigate("/taylor")} aria-label="Back to TAYLOR" style={{ position: "absolute", top: 12, left: 12, zIndex: 1100, padding: "0.6rem 0.85rem", borderRadius: 8, background: "#fff", color: "#111", border: "1px solid #ddd" }}>← TAYLOR</button>}
       <div className="exhibit-language-picker">
         <label htmlFor="exhibit-language">{exhibitText.language}</label>
         <select id="exhibit-language" value={language} onChange={(event) => changeLanguage(event.target.value)}>
