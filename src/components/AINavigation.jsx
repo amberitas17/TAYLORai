@@ -5,7 +5,7 @@ import LeafletMap from './LeafletMap';
 import { CIT_FLOOR_LABELS, getDestinationRoute, getNode } from '../navigation/citIndoorRoute.js';
 import { getCITWalkthroughEvidence } from '../navigation/citWalkthroughEvidence.js';
 import IndoorNavigationState from '../services/indoorNavigationState.js';
-import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
+import { textToSpeech } from '../services/speechAPI.js';
 
 const Hologram = lazy(() => import('../hologram.jsx'));
 
@@ -46,7 +46,6 @@ function NavigationAvatar({ event, instruction, muted, onMute, expanded, onToggl
     previousEvent.current = `${event}:${instruction}`;
     let active = true;
     setSpeaking(true);
-    handleSpeechInteraction();
     textToSpeech(instruction, false, 'taylor', 'en').finally(() => {
       if (active) setSpeaking(false);
     });
