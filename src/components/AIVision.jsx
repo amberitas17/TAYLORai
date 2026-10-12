@@ -527,6 +527,14 @@ export default function AIVision() {
             {entertainmentPhase === 'analyzing' && 'Live emotion and age detection running'}
           </p>
           {flowError && <p style={{ color: '#e53935', fontWeight: 600 }}>{flowError}</p>}
+          {analysisTakingLong && !welcomeDone && (
+            <div role="status" className="analysis-slow-fallback">
+              <p>Facial analysis is taking longer on this device. You can continue to TAYLOR without waiting.</p>
+              <button type="button" className="skip-button" onClick={() => skipFacialAnalysis(navigate)}>
+                Continue Without Analysis
+              </button>
+            </div>
+          )}
           {welcomeDone && <p style={{ color: '#2e7d32', fontWeight: 600 }}>Welcome greeting completed.</p>}
           <div className="status-section">
             <div className="status-row">
