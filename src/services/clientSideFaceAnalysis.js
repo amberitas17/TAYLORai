@@ -97,7 +97,7 @@ class ClientSideFaceAnalysisService {
     let cache;
     try {
       cache = await caches.open(this.cacheName);
-      const cached = await caches.match(url);
+      const cached = await cache.match(url) || await caches.match(url);
       if (cached) {
         this.state = 'FACE_LOADING_FROM_CACHE';
         // A cache hit is already reusable; avoid rewriting large model shards on each visit.
@@ -124,6 +124,7 @@ class ClientSideFaceAnalysisService {
         } catch (error) {
           lastError = error;
           if (attempt + 1 >= this.maxAttempts || error.retryable === false) throw error;
+          // Retry transient weak-network failures, but do not delay recovery for permanent errors.
           await new Promise((resolve) => setTimeout(resolve, 400 * (2 ** attempt)));
         } finally {
           clearTimeout(timeout);
