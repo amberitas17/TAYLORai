@@ -669,6 +669,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const canvasRef = useRef(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraRetryCount, setCameraRetryCount] = useState(0);
+  const [modelRetryCount, setModelRetryCount] = useState(0);
   const [cameraFailure, setCameraFailure] = useState("");
   const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState("");
@@ -954,7 +955,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         setLoadingMessage(`Preparing ${zoneLabel} recognition...`);
         setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOADING);
 
-        await cameraReadySignalRef.current;
+        // Prepare the selected zone model independently of camera consent.
+        // This allows a first-time download while the visitor chooses whether to scan.
         if (cancelled) return;
         const initializePromise = exhibitDetectionService.initialize({ classifier: classifierMode });
         initializePromise.then(() => {
@@ -1014,7 +1016,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       cancelled = true;
       cameraReadyResolveRef.current?.();
     };
-  }, [classifierMode]);
+  }, [classifierMode, modelRetryCount]);
 
   useEffect(() => {
     // Cleanup only on unmount. Do not update React state or depend on render-local
@@ -2480,6 +2482,16 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button type="button" onClick={() => setShowCamera(true)} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Enable Camera to Scan</button>
             <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Skip Exhibit Scan</button>
+          </div>
+        </div>
+      )}
+      {!isLoading && !detectionService && (recognitionState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED || recognitionState === EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR) && (
+        <div role="alert" style={{ position: 'absolute', zIndex: 102, bottom: 20, left: '50%', transform: 'translateX(-50%)', width: 'min(92vw, 420px)', padding: 16, borderRadius: 12, background: '#102333', color: '#fff', textAlign: 'center', boxSizing: 'border-box' }}>
+          <strong>{zoneLabel} recognition is not ready</strong>
+          <p style={{ fontSize: 13 }}>A first-time visit needs a connection to download this office's model. You can retry when the connection improves or continue without scanning.</p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setModelRetryCount(count => count + 1)} style={{ minHeight: 44, padding: '8px 12px' }}>Retry Recognition</button>
+            <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '8px 12px' }}>Back to TAYLOR</button>
           </div>
         </div>
       )}
