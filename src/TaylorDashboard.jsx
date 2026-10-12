@@ -256,7 +256,7 @@ export default function TaylorDashboard() {
   useEffect(() => {
     if (location.state?.skipFacialAnalysis) {
       setSessionContext(null);
-      setMessages((prev) => prev.length ? prev : [{ speaker: 'guide', greetingKey: 'greeting' }, { speaker: 'guide', greetingKey: 'question' }]);
+      setMessages([{ speaker: 'guide', greetingKey: 'greeting' }, { speaker: 'guide', greetingKey: 'question' }]);
       return;
     }
     const profile = location.state?.detectedProfile || getSessionContext();
@@ -547,7 +547,7 @@ export default function TaylorDashboard() {
           )}
           <div className="avatar-card">
             <Suspense fallback={<div className="avatar-placeholder">{t.preparing}</div>}>
-              {getPerformanceSettings().avatar3D ? <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" /> : <div className="avatar-placeholder" role="status">TAYLOR voice and chat are ready. 3D avatar is disabled in lightweight mode.</div>}
+              {getPerformanceSettings().avatar3D ? <Hologram emotion={sessionContext?.emotion || 'neutral'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" /> : <div className="avatar-placeholder" role="status">TAYLOR voice and chat are ready. 3D avatar is disabled in lightweight mode.</div>}
             </Suspense>
           </div>
           {!activeEntity && <div className="suggestion-row">
