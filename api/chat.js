@@ -227,7 +227,13 @@ export default async function handler(req, res) {
     const bulsuRetrieval = isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity)
       ? await retrieveBulsuCenters(lastUserMessage, effectiveActiveEntity)
       : { results: [], retrievalMode: 'no-context' };
-    const bulsuResults = bulsuRetrieval.results;
+    // Always include exact poster-sourced contact records for recognized center contact queries,
+    // even when Pinecone returns semantically similar but non-contact passages.
+    const contactQuestion = /\\b(contact|contacts|phone|telephone|mobile|email|e[ -]?mail|reach|call|hotline|facebook|messenger)\\b/i.test(lastUserMessage);
+    const exactContactRecords = contactQuestion && effectiveActiveEntity
+      ? bulsuRecords.filter((record) => record.entity === effectiveActiveEntity && record.section === 'contact')
+      : [];
+    const bulsuResults = [...exactContactRecords, ...bulsuRetrieval.results.filter((record) => !exactContactRecords.some((contact) => contact.id === record.id))];
     const bulsuContext = formatBulsuContext(bulsuResults);
     if (effectiveActiveEntity === 'RIO' && isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity) && !bulsuContext) {
       const reply = 'I recognize this as RIO, but detailed RIO information is not yet available in my verified BulSU knowledge base.';
