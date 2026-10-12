@@ -58,6 +58,7 @@ class AvatarErrorBoundary extends React.Component {
 export default function AIVision() {
   const navigate = useNavigate();
   const [cameraPermission, setCameraPermission] = useState(null);
+  const [analysisTakingLong, setAnalysisTakingLong] = useState(false);
   const [cameraStatus, setCameraStatus] = useState('CAMERA_INITIALIZING');
   const [modelStatus, setModelStatus] = useState('FACE_CACHE_CHECK');
   const [stream, setStream] = useState(null);
@@ -344,6 +345,17 @@ export default function AIVision() {
     return { result, ageValue };
   };
 
+  // Never make a first-time visitor wait indefinitely for optional face analysis.
+  useEffect(() => {
+    if (cameraPermission !== 'granted' || navigationPendingRef.current || hasWelcomedRef.current) return undefined;
+    const timeout = window.setTimeout(() => {
+      if (mountedRef.current && !navigationPendingRef.current && !hasWelcomedRef.current) {
+        setAnalysisTakingLong(true);
+      }
+    }, 8000);
+    return () => window.clearTimeout(timeout);
+  }, [cameraPermission, modelStatus]);
+
   // Live continuous emotion + age group detection
   useEffect(() => {
     inferenceCancelledRef.current = false;
@@ -397,7 +409,7 @@ export default function AIVision() {
         }
       };
 
-      detectionInterval.current = setInterval(runInference, 400);
+      detectionInterval.current = setInterval(runInference, 1000);
       runInference();
     }
 
@@ -411,7 +423,7 @@ export default function AIVision() {
         const track = streamRef.current?.getVideoTracks?.()[0];
         if (!track || track.readyState === 'ended') startCamera();
         if (runInference && !detectionInterval.current) {
-          detectionInterval.current = setInterval(runInference, 400);
+          detectionInterval.current = setInterval(runInference, 1000);
           runInference();
         }
       }
