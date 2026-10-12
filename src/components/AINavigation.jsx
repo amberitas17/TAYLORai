@@ -487,7 +487,7 @@ export default function AINavigation({ onBack }) {
         <section role="status" className="navigation-arrival-options" style={{ padding: '16px', marginTop: '12px', borderRadius: '12px', background: '#f1f7fa', color: '#102a3b' }}>
           <strong>{language === 'tl' ? 'Nakarating ka na!' : language === 'zh' ? '您已到达目的地！' : 'You have arrived!'}</strong>
           <p>{language === 'tl' ? 'Opsyonal ang pag-scan ng exhibit. Maaari mong tapusin ang pagbisita nang hindi ginagamit ang kamera.' : language === 'zh' ? '扫描展品是可选的。您可以不使用摄像头直接结束参观。' : 'Exhibit scanning is optional. You can finish your visit without using the camera.'}</p>
-          <button type="button" onClick={() => navigate('/taylor', { state: { skipFacialAnalysis: true } })} style={{ minHeight: 44, padding: '10px 16px', borderRadius: 10, cursor: 'pointer' }}>
+          <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '10px 16px', borderRadius: 10, cursor: 'pointer' }}>
             {language === 'tl' ? 'Tapusin nang walang pag-scan' : language === 'zh' ? '不扫描，结束参观' : 'Finish without scanning'}
           </button>
         </section>
