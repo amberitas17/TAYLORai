@@ -667,7 +667,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const activeCenter = location.state?.activeCenter || classifierMode.toUpperCase();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [showCamera, setShowCamera] = useState(true);
+  const [showCamera, setShowCamera] = useState(false);
   const [cameraRetryCount, setCameraRetryCount] = useState(0);
   const [cameraFailure, setCameraFailure] = useState("");
   const [isDetecting, setIsDetecting] = useState(false);
@@ -2473,6 +2473,16 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         </label> */}
       </div>}
 
+      {!showCamera && !uploadedVideoRef.current && (
+        <div role="region" aria-label="Optional exhibit camera access" style={{ position: 'absolute', zIndex: 101, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 'min(90vw, 420px)', padding: 24, borderRadius: 14, background: '#102333', color: '#fff', textAlign: 'center', boxSizing: 'border-box' }}>
+          <h2 style={{ marginTop: 0 }}>Scan an exhibit in {activeCenter}</h2>
+          <p>Exhibit scanning uses your camera only if you choose to enable it. Skipping facial recognition does not prevent exhibit scanning.</p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setShowCamera(true)} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Enable Camera to Scan</button>
+            <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Skip Exhibit Scan</button>
+          </div>
+        </div>
+      )}
       {cameraFailure && showCamera && !uploadedVideoRef.current && (
         <div role="alert" style={{ position: 'absolute', zIndex: 100, top: '35%', left: '50%', transform: 'translateX(-50%)', width: 'min(90vw, 420px)', padding: 20, borderRadius: 14, background: '#102333', color: '#fff', textAlign: 'center', boxSizing: 'border-box' }}>
           <h2 style={{ marginTop: 0 }}>Camera unavailable</h2>
