@@ -28,8 +28,9 @@ export const EXHIBIT_ZONE_STATES = Object.freeze({
 
 export const MODEL_ASSET_VERSION = '20261010-recon-13class-v1';
 const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
-const MODEL_REQUEST_TIMEOUT_MS = 8000;
-const MODEL_RETRY_DELAYS_MS = [500, 1500, 3500];
+// A first-time 3G visitor may need substantially longer to receive ONNX model bytes.
+const MODEL_REQUEST_TIMEOUT_MS = 45000;
+const MODEL_RETRY_DELAYS_MS = [1000, 3000];
 const RECOGNITION_MIN_CONFIDENCE = 0.80;
 const RECOGNITION_MIN_MARGIN = 0.15;
 const RUNTIME_ASSETS = [
