@@ -449,5 +449,86 @@
     "source": "Research-center contact details provided by project administrator on 2026-10-12",
     "source_type": "administrator_provided",
     "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-aricc-poster-contact-20261012",
+    "entity": "ARICC",
+    "aliases": [
+      "Advanced Robotics and Intelligent Control Center",
+      "ARIC Center"
+    ],
+    "full_name": "Advanced Robotics and Intelligent Control Center",
+    "institution": "Bulacan State University",
+    "category": "research_center",
+    "section": "contact",
+    "content": "ARICC contact information: Email: ariccenter.dio.rde@bulsu.edu.ph. Facebook: @DIOARICCenter.",
+    "source": "ARIC Center_Poster (2)(1).png",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-cbs-poster-contact-20261012",
+    "entity": "CBS",
+    "aliases": [
+      "Center for Bulacan Studies",
+      "Bahay Saliksikan ng Bulacan"
+    ],
+    "full_name": "Center for Bulacan Studies",
+    "institution": "Bulacan State University",
+    "category": "research_center",
+    "section": "contact",
+    "content": "CBS contact information: Email: cbs.dio.rde@bulsu.edu.ph. Facebook: BahaySaliksikanngBulacan.",
+    "source": "Center for Bulacan Studies_poster (1)(1).png",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-fablab-poster-contact-20261012",
+    "entity": "FABLAB",
+    "aliases": [
+      "Center for Fabrication and Manufacture",
+      "BulSU Fablab",
+      "Bulacan State University FabLab"
+    ],
+    "full_name": "Center for Fabrication and Manufacture",
+    "institution": "Bulacan State University",
+    "category": "fabrication_center",
+    "section": "contact",
+    "content": "FABLAB contact information: Email: fablabcenter.dio.rde@bulsu.edu.ph. Facebook: https://www.facebook.com/bulsufablab/. Location: Bulacan State University, 4th Floor Alvarado Hall Building, Brgy. Guinhawa, Malolos City, Bulacan.",
+    "source": "Center for Fabrication and Manufacture (BulSU Fablab) Poster (1)(1).png",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-fic-poster-contact-20261012",
+    "entity": "FIC",
+    "aliases": [
+      "Food Innovation Center",
+      "Regional Food Innovation Center"
+    ],
+    "full_name": "Food Innovation Center",
+    "institution": "Bulacan State University",
+    "category": "food_innovation_center",
+    "section": "contact",
+    "content": "FIC contact information: Email: fic.dio@bulsu.edu.ph. Facebook: @Bulacan State University-Food Innovation Center.",
+    "source": "FIC PROFILE (3)(1).pdf",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-recon-poster-contact-20261012",
+    "entity": "RECON",
+    "aliases": [
+      "Resiliency Energy Continuity Center",
+      "RECON Center"
+    ],
+    "full_name": "Resiliency Energy Continuity Center",
+    "institution": "Bulacan State University",
+    "category": "research_center",
+    "section": "contact",
+    "content": "RECON contact information: Email: reconcenter.dio.rde@bulsu.edu.ph. Facebook Messenger: Resiliency Energy and Continuity Center.",
+    "source": "RECON Center Poster (1)(1).jpg",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
   }
 ]
