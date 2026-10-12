@@ -668,6 +668,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [showCamera, setShowCamera] = useState(true);
+  const [cameraRetryCount, setCameraRetryCount] = useState(0);
+  const [cameraFailure, setCameraFailure] = useState("");
   const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState("");
   const [locationDetected, setLocationDetected] = useState(false);
@@ -1261,9 +1263,10 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
     let cancelled = false;
     const startCamera = async () => {
+      setCameraFailure("");
       if (!navigator.mediaDevices?.getUserMedia) {
         cameraReadyResolveRef.current?.();
-        setError('Camera access is not supported in this browser. Upload a video instead.');
+        setCameraFailure('Camera access is not supported in this browser.');
         return;
       }
       try {
@@ -1281,6 +1284,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         cameraStreamRef.current = stream;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        setCameraFailure('');
         exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'CAMERA_READY', {
           elapsedMs: Math.round(performance.now() - cameraStartedAt)
         });
@@ -1292,9 +1296,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         cameraReadyResolveRef.current?.();
         console.error('Camera error:', cameraError);
         const message = cameraError.name === 'NotAllowedError'
-          ? 'Camera permission was denied. Allow camera access or upload a video.'
-          : 'Camera could not be started. Upload a video instead.';
-        setError(message);
+          ? 'Camera access is blocked. Allow camera access in your browser site settings, then tap Retry Camera.'
+          : 'Camera could not be started. Check your camera connection and try again.';
+        setCameraFailure(message);
       }
     };
 
@@ -1305,7 +1309,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       stopRealTimeDetection();
       stopCameraStream();
     };
-  }, [showCamera]);
+  }, [showCamera, cameraRetryCount]);
 
   const captureReconLearningCandidate = (detection) => {
     if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
@@ -2469,6 +2473,17 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         </label> */}
       </div>}
 
+      {cameraFailure && showCamera && !uploadedVideoRef.current && (
+        <div role="alert" style={{ position: 'absolute', zIndex: 100, top: '35%', left: '50%', transform: 'translateX(-50%)', width: 'min(90vw, 420px)', padding: 20, borderRadius: 14, background: '#102333', color: '#fff', textAlign: 'center', boxSizing: 'border-box' }}>
+          <h2 style={{ marginTop: 0 }}>Camera unavailable</h2>
+          <p>{cameraFailure}</p>
+          <p style={{ fontSize: 13 }}>In Chrome, use the site settings icon beside the address bar to allow camera access if it was blocked.</p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setCameraRetryCount(count => count + 1)} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Retry Camera</button>
+            <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Back to TAYLOR</button>
+          </div>
+        </div>
+      )}
       {/* Video element now driven by an uploaded file instead of the live camera */}
       <video
         ref={videoRef}
