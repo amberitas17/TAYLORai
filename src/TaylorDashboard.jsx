@@ -144,7 +144,7 @@ async function requestChat(payload) {
 export default function TaylorDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [sessionContext, setSessionContext] = useState(getSessionContext);
+  const [sessionContext, setSessionContext] = useState(() => location.state?.skipFacialAnalysis ? null : getSessionContext());
   const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -254,6 +254,11 @@ export default function TaylorDashboard() {
   }, [language]);
 
   useEffect(() => {
+    if (location.state?.skipFacialAnalysis) {
+      setSessionContext(null);
+      setMessages((prev) => prev.length ? prev : [{ speaker: 'guide', greetingKey: 'greeting' }, { speaker: 'guide', greetingKey: 'question' }]);
+      return;
+    }
     const profile = location.state?.detectedProfile || getSessionContext();
     if (!profile) return;
 
@@ -512,8 +517,10 @@ export default function TaylorDashboard() {
               </p>
             )}
             <h3>{t.status}</h3>
-            <p>{t.age}: {sessionContext?.age != null && Number.isFinite(Number(sessionContext.age)) ? (Number(sessionContext.age) < 13 ? 'Child' : 'Adult') : 'Unknown'}</p>
-            <p>{t.emotion}: {sessionContext?.emotion ?? '—'}</p>
+            {sessionContext?.initialized && <>
+              <p>{t.age}: {sessionContext.age != null && Number.isFinite(Number(sessionContext.age)) ? (Number(sessionContext.age) < 13 ? 'Child' : 'Adult') : 'Unknown'}</p>
+              <p>{t.emotion}: {sessionContext.emotion ?? '—'}</p>
+            </>}
             <p>{t.voice}: {speechStatus?.available ? t.voiceReady : t.voiceUnavailable}</p>
           </div>
         </section>
