@@ -100,8 +100,7 @@ class ClientSideFaceAnalysisService {
       const cached = await caches.match(url);
       if (cached) {
         this.state = 'FACE_LOADING_FROM_CACHE';
-        await cache.put(url, cached.clone());
-        if (!await cache.match(url)) throw new Error(`${resource} could not be verified in Cache Storage`);
+        // A cache hit is already reusable; avoid rewriting large model shards on each visit.
         this.resourceDiagnostics[resource] = { status: 'CACHE', duration: performance.now() - startedAt };
         return 'CACHE';
       }
