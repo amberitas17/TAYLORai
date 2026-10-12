@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
-import { Camera, Shield, User, Smile, Upload, Eye, Zap, ArrowLeft } from 'lucide-react';
+import { Camera, Shield, User, Smile, Eye, Zap, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clientSideFaceAnalysisService from '../services/clientSideFaceAnalysis.js';
 import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
@@ -480,7 +480,7 @@ export default function AIVision() {
         <div className="permission-content">
           <Camera size={60} />
           <h2>Camera Permission Required</h2>
-          <p>We need camera access to provide live emotion and age detection.</p>
+          <p>Camera access is optional for estimating age group and initial facial expression. You can use TAYLOR without it.</p>
           <button className="permission-button" onClick={startCamera}>Grant Permission</button>
           <button className="skip-button" onClick={() => skipFacialAnalysis(navigate)}>Skip for now</button>
         </div>
@@ -495,8 +495,7 @@ export default function AIVision() {
         <div className="permission-content">
           <Shield size={60} />
           <h2>Camera Access Denied</h2>
-          <p>You can still upload a photo for emotion and age detection or continue without it.</p>
-          <button className="upload-button" onClick={handleUploadPhoto}><Upload size={20} /> Upload Photo</button>
+          <p>Camera access is optional. Continue to TAYLOR without facial analysis; no photo is needed.</p>
           <button className="skip-button" onClick={() => skipFacialAnalysis(navigate)}>Continue Without Analysis</button>
         </div>
       </div>
