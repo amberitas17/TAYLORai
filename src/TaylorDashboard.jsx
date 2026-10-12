@@ -330,7 +330,8 @@ export default function TaylorDashboard() {
     if (message.includes('model') && message.includes('not found')) {
       return 'The configured AI model is unavailable. Please contact the site administrator.';
     }
-    if (message.includes('Network') || message.includes('network')) {
+    if (error?.name === 'AbortError') return 'The request timed out on this connection. Please retry, or ask about a research center with offline information.';
+    if (message.includes('Network') || message.includes('network') || message.includes('Failed to fetch')) {
       return 'A network error prevented the chat request from completing.';
     }
     return 'The chat service is temporarily unavailable. Please try again in a moment.';
@@ -402,10 +403,8 @@ export default function TaylorDashboard() {
         return;
       }
 
-      console.info('[taylor] chat request', {
-        endpoint: CHAT_ENDPOINT,
-        payload: { messages: nextMessages.map(({ speaker, text }) => ({ role: speaker === 'user' ? 'user' : 'assistant', content: text })) }
-      });
+      // Avoid logging visitor conversation content to the browser console.
+      console.info('[taylor] chat request', { endpoint: CHAT_ENDPOINT, messageCount: nextMessages.length });
 
       const response = resolution.response;
 
@@ -422,7 +421,7 @@ export default function TaylorDashboard() {
 
       console.info('[taylor] chat response', {
         status: response.status,
-        body: responseText
+        retrievalMode: data.retrievalMode || 'unspecified'
       });
 
       if (!response.ok || data.success === false) {
