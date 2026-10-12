@@ -669,11 +669,17 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 if (!response.ok) throw new Error(`Model resource request failed: ${response.status} ${url}`);
                 if (typeof caches !== 'undefined') {
                     const cache = await caches.open(MODEL_CACHE_NAME);
-                    await cache.put(normalizedCacheKey, response.clone());
-                    if (!await cache.match(normalizedCacheKey)) {
-                        const verificationError = new Error(`Model resource cache verification failed: ${url}`);
-                        verificationError.code = 'MODEL_CACHE_VERIFICATION_FAILED';
-                        throw verificationError;
+                    // Cache Storage can reject writes on memory-constrained phones or
+                    // throttled connections. A successful network response must remain
+                    // usable for this session even when offline persistence fails.
+                    try {
+                        await cache.put(normalizedCacheKey, response.clone());
+                        if (!await cache.match(normalizedCacheKey)) {
+                            console.warn('Model resource was downloaded but cache verification failed:', url);
+                        }
+                    } catch (cacheError) {
+                        console.warn('Model resource downloaded; continuing without persistent cache:', url, cacheError);
+                        this.recordZoneDiagnostic(zoneWithCacheMiss || this.classifierMode, 'MODEL_CACHE_WRITE_FAILED', { resource: url, message: cacheError.message });
                     }
                 }
                 this.modelNetworkDownloads += 1;
