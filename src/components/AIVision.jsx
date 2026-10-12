@@ -143,8 +143,9 @@ export default function AIVision() {
     if (faceInitializationStartedRef.current) return;
     faceInitializationStartedRef.current = true;
     const start = () => initializeModels();
-    if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 1200 });
-    else window.setTimeout(start, 0);
+    // Face initialization is critical on weak-network Android phones; idle callbacks
+    // can be delayed by rendering work and should not gate model preparation.
+    window.setTimeout(start, 0);
   }).current;
 
   const handleAvatarReady = useRef(() => {
