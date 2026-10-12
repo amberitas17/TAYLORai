@@ -1,7 +1,7 @@
 import centerRecords from '../../data/bulsu-centers.records.json' with { type: 'json' };
 
 export const LOCAL_KNOWLEDGE_SCHEMA_VERSION = 1;
-export const LOCAL_KNOWLEDGE_VERSION = 'bulsu-centers-20261012-poster-contacts-v4';
+export const LOCAL_KNOWLEDGE_VERSION = 'bulsu-centers-20261012-entity-intent-v5';
 export const LOCAL_KNOWLEDGE_DB_NAME = 'taylor-local-knowledge';
 export const LOCAL_KNOWLEDGE_STORE_NAME = 'indexes';
 export const LOCAL_KNOWLEDGE_KEY = 'bulsu-centers';
@@ -39,16 +39,18 @@ function tokens(value) {
 
 function entityFromText(value = '') {
   const normalized = normalize(value);
-  return Object.entries(ENTITY_ALIASES)
+  if (!normalized) return '';
+  const aliases = Object.entries(ENTITY_ALIASES)
     .filter(([entity]) => !entity.endsWith('_PENDING'))
-    .sort(([, left], [, right]) => Math.max(...right.map((alias) => normalize(alias).length)) - Math.max(...left.map((alias) => normalize(alias).length)))
-    .find(([, aliases]) => aliases.some((alias) => normalized.includes(normalize(alias))))?.[0] || '';
+    .flatMap(([entity, names]) => names.map((name) => ({ entity, alias: normalize(name) })))
+    .filter(({ alias }) => alias.length > 0)
+    .sort((left, right) => right.alias.length - left.alias.length);
+  return aliases.find(({ alias }) => (' ' + normalized + ' ').includes(' ' + alias + ' '))?.entity || '';
 }
 
 function getIntent(query) {
   const normalized = normalize(query);
-  if (/\b(contact|contacts|contact info|contact information|phone|telephone|mobile|email|e mail|reach|call|hotline|number)\b/.test(normalized)) return 'contact';
-  if (/\b(contact|contacts|phone|telephone|mobile|email|reach|call|hotline|number)\b|contact info|contact information|e mail/.test(normalized)) return 'contact';
+  if (/\b(contact|contacts|phone|telephone|mobile|email|e mail|reach|call|hotline|number|facebook|messenger)\b/.test(normalized)) return 'contact';
   if (/\bwhere|location|located|building|floor|campus|address\b/.test(normalized)) return 'location';
   if (/\bservice|services|offer|offers|provide|support|training|workshop|equipment|facility|facilities|use\b/.test(normalized)) return 'services';
   if (/\bfocus|research|project|projects|work|mission|vision|program|programs\b/.test(normalized)) return 'focus';
