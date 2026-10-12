@@ -149,13 +149,17 @@ export function searchLocalKnowledge(query, { activeEntity = '', index = createK
   const text = String(query || '').trim();
   if (!text) return { match: null, reason: 'empty-query', latencyMs: 0 };
   const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  const requestedEntity = entityFromText(text) || entityFromText(activeEntity);
+  const explicitEntity = entityFromText(text);
+  const requestedEntity = explicitEntity || entityFromText(activeEntity);
   const queryTokens = tokens(text);
   const candidates = Object.values(index.entities)
     .map((entity) => ({ entity, score: scoreEntity(entity, queryTokens, text, activeEntity) }))
     .filter(({ entity, score }) => score > 0 && (!requestedEntity || entity.entity === requestedEntity))
     .sort((left, right) => right.score - left.score);
   if (candidates.length === 0) return { match: null, reason: requestedEntity ? 'entity-not-indexed' : 'entity-not-found', entity: requestedEntity, latencyMs: elapsed(started) };
+  // Avoid attributing a generic BulSU question to a center just because one alias token overlaps.
+  // The explicit center or confirmed conversation context is required for local facts.
+  if (!requestedEntity) return { match: null, reason: 'center-not-specified', latencyMs: elapsed(started) };
   const intent = getIntent(text);
   const candidate = candidates[0];
   const answer = answerForEntity(candidate.entity, text, intent);
