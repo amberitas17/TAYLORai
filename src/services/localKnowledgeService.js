@@ -1,7 +1,7 @@
 import centerRecords from '../../data/bulsu-centers.records.json' with { type: 'json' };
 
 export const LOCAL_KNOWLEDGE_SCHEMA_VERSION = 1;
-export const LOCAL_KNOWLEDGE_VERSION = 'bulsu-centers-20261009-v1';
+export const LOCAL_KNOWLEDGE_VERSION = 'bulsu-centers-20261012-contact-v2';
 export const LOCAL_KNOWLEDGE_DB_NAME = 'taylor-local-knowledge';
 export const LOCAL_KNOWLEDGE_STORE_NAME = 'indexes';
 export const LOCAL_KNOWLEDGE_KEY = 'bulsu-centers';
@@ -19,6 +19,7 @@ const ENTITY_ALIASES = Object.freeze({
 });
 
 const INTENT_SECTIONS = Object.freeze({
+  contact: ['contact'],
   services: ['services', 'technical_services', 'research_and_development', 'laboratory_and_technical_services', 'additive_manufacturing', 'subtractive_and_other_services', 'programs'],
   facilities: ['additive_manufacturing', 'subtractive_and_other_services', 'stakeholders', 'laboratory_and_technical_services'],
   location: ['overview', 'regional_context', 'vision_mission_goals', 'stakeholders'],
@@ -46,6 +47,7 @@ function entityFromText(value = '') {
 
 function getIntent(query) {
   const normalized = normalize(query);
+  if (/\b(contact|contacts|contact info|contact information|phone|telephone|mobile|email|e mail|reach|call|hotline|number)\b/.test(normalized)) return 'contact';
   if (/\bwhere|location|located|building|floor|campus|address\b/.test(normalized)) return 'location';
   if (/\bservice|services|offer|offers|provide|support|training|workshop|equipment|facility|facilities|use\b/.test(normalized)) return 'services';
   if (/\bfocus|research|project|projects|work|mission|vision|program|programs\b/.test(normalized)) return 'focus';
@@ -115,6 +117,9 @@ function scoreEntity(entity, queryTokens, query, activeEntity) {
 function answerForEntity(entity, query, intent) {
   const allowedSections = new Set(INTENT_SECTIONS[intent]);
   const relevant = entity.records.filter((record) => allowedSections.has(record.section));
+  if (intent === 'contact' && relevant.length === 0) {
+    return { text: `I do not have verified phone numbers or email addresses for ${entity.entity} in the current BulSU research-center directory. Please confirm the latest contact details with the university or the center directly. I will not guess.`, sourceIds: [], sources: [], intent };
+  }
   if (intent === 'location') {
     const locationRecords = entity.records.filter((record) => Object.keys(record.location).length > 0);
     if (locationRecords.length === 0 && Object.keys(entity.locations).length === 0) return null;
