@@ -105,8 +105,8 @@ export default function AIVision() {
   useEffect(() => {
     mountedRef.current = true;
     startEntertainmentSequence();
+    // Prioritize facial-model preparation over the optional 3D avatar on weak Android data.
     scheduleFaceInitialization();
-    initializeAvatar();
 
     return () => {
       mountedRef.current = false;
@@ -185,6 +185,15 @@ export default function AIVision() {
       if (video.srcObject === stream) video.srcObject = null;
     };
   }, [stream]);
+
+  // Render the optional avatar only after facial models have finished preparing.
+  // This avoids competing model downloads and GPU work during first-time face startup.
+  useEffect(() => {
+    if (['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY', 'FACE_MODEL_ERROR', 'FACE_MODEL_DOWNLOAD_REQUIRED'].includes(modelStatus)) {
+      initializeAvatar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelStatus]);
 
   const initializeModels = async () => {
     try {
