@@ -402,15 +402,10 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             this.zoneStates[requestedMode] = this.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
-            if (!options.cacheOnly && !options.retry) {
-                console.warn('⚠️ Retrying recognition initialization from local cache', error.message);
-                try {
-                    return await this.initializeMode({ ...options, retry: true, cacheOnly: true, generation });
-                } catch (cacheRetryError) {
-                    initializationError = cacheRetryError;
-                }
-            }
-            this.modelState = this.zoneResourceCacheMisses.has(requestedMode) || initializationError.code === 'MODEL_DOWNLOAD_REQUIRED'
+            // Preserve the original network failure. A cache-only retry after a failed
+            // first download cannot recover missing bytes and masks the actual cause.
+            // Visitors can retry explicitly when connectivity improves.
+            this.modelState = initializationError.code === 'MODEL_DOWNLOAD_REQUIRED' || (this.zoneResourceCacheMisses.has(requestedMode) && !this.modelNetworkDownloads)
                 ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
             this.zoneStates[requestedMode] = this.modelState;
