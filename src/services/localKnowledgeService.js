@@ -48,6 +48,7 @@ function entityFromText(value = '') {
 function getIntent(query) {
   const normalized = normalize(query);
   if (/\b(contact|contacts|contact info|contact information|phone|telephone|mobile|email|e mail|reach|call|hotline|number)\b/.test(normalized)) return 'contact';
+  if (/\b(contact|contacts|phone|telephone|mobile|email|reach|call|hotline|number)\b|contact info|contact information|e mail/.test(normalized)) return 'contact';
   if (/\bwhere|location|located|building|floor|campus|address\b/.test(normalized)) return 'location';
   if (/\bservice|services|offer|offers|provide|support|training|workshop|equipment|facility|facilities|use\b/.test(normalized)) return 'services';
   if (/\bfocus|research|project|projects|work|mission|vision|program|programs\b/.test(normalized)) return 'focus';
