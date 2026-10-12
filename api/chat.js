@@ -229,7 +229,7 @@ export default async function handler(req, res) {
       : { results: [], retrievalMode: 'no-context' };
     // Always include exact poster-sourced contact records for recognized center contact queries,
     // even when Pinecone returns semantically similar but non-contact passages.
-    const contactQuestion = /\\b(contact|contacts|phone|telephone|mobile|email|e[ -]?mail|reach|call|hotline|facebook|messenger)\\b/i.test(lastUserMessage);
+    const contactQuestion = /\b(contact|contacts|phone|telephone|mobile|email|e[ -]?mail|reach|call|hotline|facebook|messenger|number)\b/i.test(lastUserMessage);
     const exactContactRecords = contactQuestion && effectiveActiveEntity
       ? bulsuRecords.filter((record) => record.entity === effectiveActiveEntity && record.section === 'contact')
       : [];
