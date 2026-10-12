@@ -1,7 +1,7 @@
 import centerRecords from '../../data/bulsu-centers.records.json' with { type: 'json' };
 
 export const LOCAL_KNOWLEDGE_SCHEMA_VERSION = 1;
-export const LOCAL_KNOWLEDGE_VERSION = 'bulsu-centers-20261012-contact-v2';
+export const LOCAL_KNOWLEDGE_VERSION = 'bulsu-centers-20261012-caesar-contact-v3';
 export const LOCAL_KNOWLEDGE_DB_NAME = 'taylor-local-knowledge';
 export const LOCAL_KNOWLEDGE_STORE_NAME = 'indexes';
 export const LOCAL_KNOWLEDGE_KEY = 'bulsu-centers';
