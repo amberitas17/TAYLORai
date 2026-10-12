@@ -7,6 +7,18 @@ import avatarAssetService from '../services/avatarAssetService.js';
 import './AIVision.css';
 const Hologram = lazy(() => import('../../src/hologram.jsx'));
 
+function skipFacialAnalysis(navigate) {
+  // Explicitly discard any prior visitor's facial profile in this browser.
+  try {
+    window.sessionStorage.removeItem('taylorSessionContext');
+    window.sessionStorage.removeItem('aiGuideSessionContext');
+    window.sessionStorage.removeItem('taylorGreetingPlayed');
+    window.localStorage.removeItem('firstDetectedEmotionAge');
+    window.localStorage.removeItem('latestDetectedEmotionAge');
+  } catch {}
+  navigate('/taylor', { replace: true, state: { skipFacialAnalysis: true } });
+}
+
 function getFaceStatusLabel(status, avatarReady) {
   if (['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(status)) {
     if (!avatarReady) return 'Face analysis ready';
@@ -470,7 +482,7 @@ export default function AIVision() {
           <h2>Camera Permission Required</h2>
           <p>We need camera access to provide live emotion and age detection.</p>
           <button className="permission-button" onClick={startCamera}>Grant Permission</button>
-          <button className="skip-button" onClick={() => setCameraPermission('denied')}>Skip for now</button>
+          <button className="skip-button" onClick={() => skipFacialAnalysis(navigate)}>Skip for now</button>
         </div>
       </div>
     );
@@ -485,7 +497,7 @@ export default function AIVision() {
           <h2>Camera Access Denied</h2>
           <p>You can still upload a photo for emotion and age detection or continue without it.</p>
           <button className="upload-button" onClick={handleUploadPhoto}><Upload size={20} /> Upload Photo</button>
-          <button className="skip-button" onClick={() => navigate('/')}>Continue Without Analysis</button>
+          <button className="skip-button" onClick={() => skipFacialAnalysis(navigate)}>Continue Without Analysis</button>
         </div>
       </div>
     );
