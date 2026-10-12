@@ -947,7 +947,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   useEffect(() => {
     let cancelled = false;
-    const initializationTimeoutMs = 12000;
+    const initializationTimeoutMs = 12000; // Informational only: downloads continue on slow networks.
     const initService = async () => {
       const startedAt = performance.now();
       try {
@@ -2231,7 +2231,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       fontSize: 18,
       color: "#2196f3",
       boxShadow: "0 2px 12px rgba(0,0,0,0.10)" }}>
-          {loadingMessage}
+          <div role="status" aria-live="polite">{loadingMessage}<div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>First-time setup may take longer on 3G. Only this office's recognition model is being prepared.</div></div>
         </div>
     )}
     {statusMessage && (
@@ -2488,7 +2488,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       {!isLoading && !detectionService && (recognitionState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED || recognitionState === EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR) && (
         <div role="alert" style={{ position: 'absolute', zIndex: 102, bottom: 20, left: '50%', transform: 'translateX(-50%)', width: 'min(92vw, 420px)', padding: 16, borderRadius: 12, background: '#102333', color: '#fff', textAlign: 'center', boxSizing: 'border-box' }}>
           <strong>{zoneLabel} recognition is not ready</strong>
-          <p style={{ fontSize: 13 }}>A first-time visit needs a connection to download this office's model. You can retry when the connection improves or continue without scanning.</p>
+          <p style={{ fontSize: 13 }}>A first-time visit needs a connection to download this office's model. On 3G, preparation may take longer. Retry when the connection improves or continue without scanning.</p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => setModelRetryCount(count => count + 1)} style={{ minHeight: 44, padding: '8px 12px' }}>Retry Recognition</button>
             <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '8px 12px' }}>Back to TAYLOR</button>
