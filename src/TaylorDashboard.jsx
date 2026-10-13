@@ -1,6 +1,23 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Hologram from './hologram.jsx';
+// Keep Three.js and the GLB renderer out of the critical chat bundle.
+const Hologram = lazy(() => import('./hologram.jsx'));
+
+class AvatarErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error) { console.error('[taylor] Avatar rendering failed', error); }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
+
+function AvatarPlaceholder({ message, onRetry }) {
+  return <div role="status" aria-live="polite" style={{ minHeight: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20, textAlign: 'center', color: '#12324a', background: '#eaf6ff', borderRadius: 16 }}>
+    <span>{message}</span>
+    <span style={{ fontSize: 13 }}>You can continue chatting while the avatar is unavailable.</span>
+    {onRetry && <button type="button" onClick={onRetry}>Retry avatar</button>}
+  </div>;
+}
+
 import { textToSpeech } from './services/speechAPI.js';
 import './HomePage.css';
 
@@ -33,6 +50,23 @@ export default function TaylorDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sessionContext, setSessionContext] = useState(getSessionContext);
+  const [avatarEnabled, setAvatarEnabled] = useState(false);
+  const [avatarTimedOut, setAvatarTimedOut] = useState(false);
+  const [avatarAttempt, setAvatarAttempt] = useState(0);
+
+  // Give the chat interface a chance to paint before importing WebGL/Three.js.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAvatarEnabled(true), 250);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!avatarEnabled) return;
+    setAvatarTimedOut(false);
+    const timer = window.setTimeout(() => setAvatarTimedOut(true), 15000);
+    return () => window.clearTimeout(timer);
+  }, [avatarEnabled, avatarAttempt]);
+  const retryAvatar = () => { setAvatarEnabled(true); setAvatarAttempt((value) => value + 1); };
+
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -218,7 +252,15 @@ export default function TaylorDashboard() {
 
         <section className="guide-section">
           <div className="avatar-card">
-            <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
+            {!avatarEnabled || avatarTimedOut ? (
+              <AvatarPlaceholder message={avatarTimedOut ? 'TAYLOR avatar is taking longer than expected.' : 'Preparing TAYLOR avatar...'} onRetry={avatarTimedOut ? retryAvatar : undefined} />
+            ) : (
+              <AvatarErrorBoundary key={avatarAttempt} fallback={<AvatarPlaceholder message="Avatar rendering is unavailable on this device or connection." onRetry={retryAvatar} />}>
+                <Suspense fallback={<AvatarPlaceholder message="Loading TAYLOR avatar..." />}>
+                  <Hologram emotion={sessionContext?.emotion || 'happy'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
+                </Suspense>
+              </AvatarErrorBoundary>
+            )}
           </div>
           <div className="suggestion-row">
                 {suggestionItems.map((item) => (
