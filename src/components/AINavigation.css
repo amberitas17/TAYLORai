@@ -758,6 +758,7 @@
 .navigation-direction--left strong, .navigation-direction--right strong { background: #fff0cf; color: #9b6500; }
 .navigation-direction--elevator strong { background: #dff7ef; color: #19734e; }
 .navigation-step-meta { display: flex; flex-wrap: wrap; gap: 8px; color: #6c8490; font-size: .72rem; font-weight: 800; }
+.navigation-step-meta > span:nth-child(2) { display: none; }
 .navigation-step-content h2 { margin: 0; color: #102a3b; font-size: clamp(1.35rem, 5vw, 1.8rem); }
 .navigation-step-content p { margin: 0; color: #395765; font-size: 1rem; line-height: 1.5; }
 .navigation-confidence { color: #708893; line-height: 1.35; }
