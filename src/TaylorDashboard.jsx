@@ -164,20 +164,11 @@ export default function TaylorDashboard() {
   const [sessionContext, setSessionContext] = useState(() => location.state?.skipFacialAnalysis ? null : getSessionContext());
   const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
   const [avatarEnabled, setAvatarEnabled] = useState(false);
-  const [avatarTimedOut, setAvatarTimedOut] = useState(false);
   const [avatarAttempt, setAvatarAttempt] = useState(0);
   useEffect(() => {
     const timer = window.setTimeout(() => setAvatarEnabled(true), 250);
     return () => window.clearTimeout(timer);
   }, []);
-  useEffect(() => {
-    if (!avatarEnabled || !getPerformanceSettings().avatar3D) return undefined;
-    setAvatarTimedOut(false);
-    // Slow Wi-Fi or mobile data should not automatically hide an avatar that is still loading.
-    // Keep chat usable and allow retry after a longer grace period.
-    const timer = window.setTimeout(() => setAvatarTimedOut(true), 45000);
-    return () => window.clearTimeout(timer);
-  }, [avatarEnabled, avatarAttempt]);
   const retryAvatar = () => { setAvatarEnabled(true); setAvatarAttempt((attempt) => attempt + 1); };
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -579,8 +570,8 @@ export default function TaylorDashboard() {
           <div className="avatar-card">
             {!getPerformanceSettings().avatar3D ? (
               <div className="avatar-placeholder" role="status">TAYLOR voice and chat are ready. 3D avatar is disabled in lightweight mode.</div>
-            ) : !avatarEnabled || avatarTimedOut ? (
-              <AvatarPlaceholder message={avatarTimedOut ? 'TAYLOR avatar could not finish loading. Your connection may be slow; retry when ready.' : 'Preparing TAYLOR avatar... Chat remains available on slow Wi-Fi or mobile data.'} onRetry={avatarTimedOut ? retryAvatar : undefined} />
+            ) : !avatarEnabled ? (
+              <AvatarPlaceholder message="Preparing TAYLOR avatar... Chat remains available while loading." />
             ) : (
               <AvatarErrorBoundary key={avatarAttempt} fallback={<AvatarPlaceholder message="Avatar rendering is unavailable on this device or connection." onRetry={retryAvatar} />}>
                 <Suspense fallback={<AvatarPlaceholder message="Loading TAYLOR avatar..." />}>
