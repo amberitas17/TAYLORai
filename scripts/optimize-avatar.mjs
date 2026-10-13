@@ -36,7 +36,7 @@ const inventory = (doc) => {
   };
 };
 const before = inventory(document);
-await document.transform(dedup(), prune(), meshopt());
+await document.transform(dedup(), prune(), meshopt({ encoder: MeshoptEncoder }));
 await io.write(target, document);
 const verified = await io.read(target);
 const after = inventory(verified);
