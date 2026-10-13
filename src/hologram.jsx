@@ -37,9 +37,9 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
   const boneRestPoseRef = useRef(new Map());
   const gestureStateRef = useRef({ mode: 'neutral', startedAt: 0 });
 
-  const modelPaths = [assetPreset === 'avatar' ? '/sarah-avatar.glb' : '/sarah-idle.glb'];
-  const loadedModels = useGLTF(modelPaths);
-  const selectedModel = loadedModels[0];
+  // Request only the active avatar asset. drei caches this URL across remounts.
+  const modelPath = assetPreset === 'avatar' ? '/sarah-avatar.glb' : '/sarah-idle.glb';
+  const selectedModel = useGLTF(modelPath);
   const displayScene = selectedModel.scene;
   const activeAnims = selectedModel.animations;
 
