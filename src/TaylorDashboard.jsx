@@ -429,10 +429,9 @@ export default function TaylorDashboard() {
       }
 
       const reply = data.reply || 'I am sorry, I am having trouble responding right now. Please try again in a moment.';
-      if (data.activeEntity) {
-        setActiveEntity(data.activeEntity);
-        window.sessionStorage.setItem('taylorActiveEntity', data.activeEntity);
-      }
+      setActiveEntity(data.activeEntity || '');
+      if (data.activeEntity) window.sessionStorage.setItem('taylorActiveEntity', data.activeEntity);
+      else window.sessionStorage.removeItem('taylorActiveEntity');
       setMessages((prev) => [...prev, { speaker: 'guide', text: reply }]);
       speakWithPreferredVoice(reply);
     } catch (error) {

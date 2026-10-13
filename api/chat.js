@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import process from 'node:process';
 import bulsuRecords from '../data/bulsu-centers.records.json' with { type: 'json' };
+import { classifyChatQuestion, getWebSearchOptions } from '../scripts/chatRouting.mjs';
 
 dotenv.config();
 
@@ -18,10 +19,6 @@ let pineconeClient;
 function normalizeBulsuEntity(value = '') {
   const text = String(value).toLowerCase();
   return BULSU_ENTITIES.find((entity) => text.includes(entity.toLowerCase())) || '';
-}
-
-function isBulsuCenterQuestion(message = '', activeEntity = '') {
-  return Boolean(normalizeBulsuEntity(message) || normalizeBulsuEntity(activeEntity) || /bulsu|bulacan state university|university|center|research|innovation|facility|program/i.test(message));
 }
 
 function searchBulsuCenters(query, activeEntity = '') {
@@ -222,9 +219,9 @@ export default async function handler(req, res) {
 
     const openrouter = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1', timeout: 15000, maxRetries: 0 });
     const lastUserMessage = [...messages].reverse().find((message) => message?.role === 'user')?.content || '';
-    const requestedEntity = normalizeBulsuEntity(lastUserMessage);
-    const effectiveActiveEntity = requestedEntity || normalizeBulsuEntity(activeEntity);
-    const bulsuRetrieval = isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity)
+    const classification = classifyChatQuestion(lastUserMessage, activeEntity);
+    const effectiveActiveEntity = classification.entity;
+    const bulsuRetrieval = classification.useBulsuContext
       ? await retrieveBulsuCenters(lastUserMessage, effectiveActiveEntity)
       : { results: [], retrievalMode: 'no-context' };
     // Always include exact poster-sourced contact records for recognized center contact queries,
@@ -235,25 +232,28 @@ export default async function handler(req, res) {
       : [];
     const bulsuResults = [...exactContactRecords, ...bulsuRetrieval.results.filter((record) => !exactContactRecords.some((contact) => contact.id === record.id))];
     const bulsuContext = formatBulsuContext(bulsuResults);
-    if (effectiveActiveEntity === 'RIO' && isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity) && !bulsuContext) {
-      const reply = 'I recognize this as RIO, but detailed RIO information is not yet available in my verified BulSU knowledge base.';
+    if (effectiveActiveEntity === 'RIO' && classification.useBulsuContext && !bulsuContext) {
+      const reply = 'The verified BulSU knowledge base currently has no RIO records for this question, so I cannot provide or invent details about RIO.';
       res.status(200).json({ success: true, reply, activeEntity: 'RIO', usedBulsuContext: false, retrievalMode: bulsuRetrieval.retrievalMode, deploymentVersion: getDeploymentVersion(), retrievalConfig: getRetrievalConfig() });
       return;
     }
     const completion = await openrouter.chat.completions.create({
       model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
       messages: [
-        { role: 'system', content: `${SYSTEM_PROMPT}\n\nWhen a BulSU question has no supplied retrieved evidence, say that the verified knowledge base does not provide enough detail. Do not fill gaps from general knowledge.` },
+        { role: 'system', content: `${SYSTEM_PROMPT}\n\nFor general questions, answer from your general knowledge without requiring BulSU evidence. For institutional questions with no supplied retrieved evidence, say that the verified knowledge base does not provide enough detail. Do not fill institutional gaps from general knowledge. For current-information questions, use web results only when supplied.` },
+        { role: 'system', content: `The latest user question is classified as ${classification.topic}${classification.entity ? ` about ${classification.entity}` : ''}. Use earlier messages only for a genuine follow-up; do not let an earlier institutional topic override this latest topic.` },
+        ...(classification.useWebSearch ? [{ role: 'system', content: 'This is a current-information question. Prefer supplied live web results and identify uncertainty if live retrieval is unavailable.' }] : []),
         ...(bulsuContext ? [{ role: 'system', content: `Answer BulSU questions only from this official BulSU context.\n\n${bulsuContext}` }] : []),
         ...messages,
       ],
       temperature: 0.7,
       max_tokens: 300,
+      ...getWebSearchOptions(classification),
     });
 
     const reply = completion.choices?.[0]?.message?.content?.trim() || 'I am TAYLOR and I am here to assist you.';
     console.info('[chat] success', { replyLength: reply.length });
-    res.status(200).json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedBulsuContext: Boolean(bulsuContext), retrievalMode: bulsuRetrieval.retrievalMode, deploymentVersion: getDeploymentVersion(), retrievalConfig: getRetrievalConfig() });
+    res.status(200).json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedBulsuContext: Boolean(bulsuContext), retrievalMode: bulsuRetrieval.retrievalMode, topic: classification.topic, deploymentVersion: getDeploymentVersion(), retrievalConfig: getRetrievalConfig() });
   } catch (error) {
     const errorInfo = classifyOpenRouterError(error);
     console.error('[chat] openrouter error', {

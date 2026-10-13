@@ -57,6 +57,10 @@ function getIntent(query) {
   return 'overview';
 }
 
+function isFollowUpQuestion(query) {
+  return /\b(it|its|they|them|their|this|that|these|those|the center|the office|the facility|the program|the services)\b/i.test(normalize(query));
+}
+
 function buildEntityIndex(records) {
   const entities = {};
   for (const record of records) {
@@ -152,7 +156,7 @@ export function searchLocalKnowledge(query, { activeEntity = '', index = createK
   if (!text) return { match: null, reason: 'empty-query', latencyMs: 0 };
   const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const explicitEntity = entityFromText(text);
-  const requestedEntity = explicitEntity || entityFromText(activeEntity);
+  const requestedEntity = explicitEntity || (isFollowUpQuestion(text) ? entityFromText(activeEntity) : '');
   const queryTokens = tokens(text);
   const candidates = Object.values(index.entities)
     .map((entity) => ({ entity, score: scoreEntity(entity, queryTokens, text, activeEntity) }))

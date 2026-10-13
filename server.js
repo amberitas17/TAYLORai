@@ -4,11 +4,14 @@ import dotenv from 'dotenv';
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
 import OpenAI from 'openai';
+import process from 'node:process';
 import { getFacebookPageContextHint, indexFacebookKnowledgeBase, searchFacebookKnowledgeBase, shouldUseFacebookContext } from './scripts/facebookKnowledgeBase.mjs';
-import { BULSU_GROUNDED_SYSTEM_PROMPT, formatBulsuContext, isBulsuCenterQuestion, normalizeBulsuEntity, searchBulsuCenters } from './scripts/bulsuCentersKnowledgeBase.mjs';
+import { BULSU_GROUNDED_SYSTEM_PROMPT, formatBulsuContext, searchBulsuCenters } from './scripts/bulsuCentersKnowledgeBase.mjs';
 import { generateExhibitExplanation } from './scripts/exhibitExplanationService.mjs';
+import { classifyChatQuestion, getWebSearchOptions } from './scripts/chatRouting.mjs';
 
 dotenv.config();
 
@@ -273,17 +276,17 @@ app.post('/api/chat', async (req, res) => {
     const openrouter = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY, baseURL: 'https://openrouter.ai/api/v1' });
     const systemPrompt = {
       role: 'system',
-      content: `${BULSU_GROUNDED_SYSTEM_PROMPT}\n\nYou assist visitors with academic programs, student services, enrollment, scholarships, research and innovation, and campus facilities. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.`
+      content: `${BULSU_GROUNDED_SYSTEM_PROMPT}\n\nFor general questions, answer from your general knowledge without requiring BulSU evidence. For institutional questions with no supplied retrieved evidence, say that the verified knowledge base does not provide enough detail. Do not fill institutional gaps from general knowledge. For current-information questions, use web results only when supplied. Always respond as TAYLOR, be professional, welcoming, concise, and helpful.`
     };
 
     const lastUserMessage = [...messages].reverse().find((message) => message?.role === 'user')?.content || '';
-    const requestedEntity = normalizeBulsuEntity(lastUserMessage);
-    const effectiveActiveEntity = requestedEntity || normalizeBulsuEntity(activeEntity);
-    const useBulsuContext = isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity);
+    const classification = classifyChatQuestion(lastUserMessage, activeEntity);
+    const effectiveActiveEntity = classification.entity;
+    const useBulsuContext = classification.useBulsuContext;
     const bulsuResults = useBulsuContext ? await searchBulsuCenters(lastUserMessage, { activeEntity: effectiveActiveEntity, topK: 5 }) : [];
     const bulsuContext = formatBulsuContext(bulsuResults);
     if (effectiveActiveEntity === 'RIO' && useBulsuContext && !bulsuContext) {
-      const reply = 'I recognize this as RIO, but detailed RIO information is not yet available in my verified BulSU knowledge base.';
+      const reply = 'The verified BulSU knowledge base currently has no RIO records for this question, so I cannot provide or invent details about RIO.';
       return res.json({ success: true, reply, activeEntity: 'RIO', usedFacebookContext: false, usedBulsuContext: false });
     }
     const useFacebookContext = shouldUseFacebookContext(lastUserMessage);
@@ -305,6 +308,7 @@ app.post('/api/chat', async (req, res) => {
       model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
       messages: [
         systemPrompt,
+        { role: 'system', content: `The latest user question is classified as ${classification.topic}${classification.entity ? ` about ${classification.entity}` : ''}. Use earlier messages only for a genuine follow-up; do not let an earlier institutional topic override this latest topic.` },
         ...(bulsuContext
           ? [{ role: 'system', content: `Answer center questions only from this official BulSU center context.\n\n${bulsuContext}` }]
           : []),
@@ -315,11 +319,12 @@ app.post('/api/chat', async (req, res) => {
       ],
       temperature: 0.7,
       max_tokens: 300,
+      ...getWebSearchOptions(classification),
     });
 
     const reply = completion.choices?.[0]?.message?.content?.trim() || 'I am TAYLOR and I am here to assist you.';
     console.info('[server] success', { replyLength: reply.length, usedFacebookContext: Boolean(facebookContext), usedBulsuContext: Boolean(bulsuContext) });
-    res.json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedFacebookContext: Boolean(facebookContext), usedBulsuContext: Boolean(bulsuContext) });
+    res.json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedFacebookContext: Boolean(facebookContext), usedBulsuContext: Boolean(bulsuContext), topic: classification.topic });
   } catch (error) {
     const errorInfo = classifyOpenRouterError(error);
     console.error('[server] openrouter error', {
