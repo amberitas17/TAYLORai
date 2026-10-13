@@ -575,7 +575,7 @@ export default function TaylorDashboard() {
             ) : (
               <AvatarErrorBoundary key={avatarAttempt} fallback={<AvatarPlaceholder message="Avatar rendering is unavailable on this device or connection." onRetry={retryAvatar} />}>
                 <Suspense fallback={<AvatarPlaceholder message="Loading TAYLOR avatar..." />}>
-                  <Hologram emotion={sessionContext?.emotion || 'neutral'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
+                  <Hologram emotion={sessionContext?.emotion || 'neutral'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" assetUrl={new URLSearchParams(window.location.search).get("avatarTest") === "optimized" ? "/sarah-avatar-optimized.glb" : null} />
                 </Suspense>
               </AvatarErrorBoundary>
             )}
