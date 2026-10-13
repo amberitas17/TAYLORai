@@ -74,6 +74,7 @@ export default function AIVision() {
   const [diagnosticsTick, setDiagnosticsTick] = useState(0);
   const [avatarState, setAvatarState] = useState('AVATAR_CACHE_CHECK');
   const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
+  const [avatarObjectUrl, setAvatarObjectUrl] = useState(null);
   const [avatarDiagnostics, setAvatarDiagnostics] = useState(avatarAssetService.getDiagnostics());
   const faceDebugEnabled = new URLSearchParams(window.location.search).has('faceDebug');
   const aiVisionReady = ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) && avatarState === 'AVATAR_READY';
@@ -130,6 +131,9 @@ export default function AIVision() {
     setAvatarState('AVATAR_CACHE_CHECK');
     try {
       await avatarAssetService.initialize();
+      const preparedUrl = avatarAssetService.getAssetUrl('/sarah-avatar.glb');
+      if (!preparedUrl) throw new Error('Avatar bytes are unavailable for rendering');
+      setAvatarObjectUrl(preparedUrl);
       setAvatarAssetsReady(true);
       setAvatarDiagnostics(avatarAssetService.getDiagnostics());
     } catch (error) {
@@ -576,7 +580,7 @@ export default function AIVision() {
         {avatarAssetsReady && avatarState !== 'AVATAR_ERROR' ? (
           <AvatarErrorBoundary onError={handleAvatarError}>
             <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
-              <Hologram onReady={handleAvatarReady} emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" />
+              <Hologram onReady={handleAvatarReady} emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" assetUrl={avatarObjectUrl} />
             </Suspense>
           </AvatarErrorBoundary>
         ) : (
