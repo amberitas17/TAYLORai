@@ -17,8 +17,10 @@ const IS_LOCAL_BROWSER = typeof window !== 'undefined' && /localhost|127\.0\.0\.
 const CHAT_ENDPOINT = API_URL && (!/localhost|127\.0\.0\.1/i.test(API_URL) || IS_LOCAL_BROWSER)
   ? `${API_URL.replace(/\/$/, '')}/chat`
   : '/api/chat';
-const CHAT_TIMEOUT_MS = 15000;
-const CHAT_MAX_ATTEMPTS = 2;
+// Allow server-side retrieval plus OpenRouter inference to complete on mobile.
+const CHAT_TIMEOUT_MS = 35000;
+// Avoid two back-to-back 15-second cancellations and duplicate LLM requests.
+const CHAT_MAX_ATTEMPTS = 1;
 const KNOWLEDGE_ENTITIES = new Set(['ARICC', 'RIO', 'CAESAR', 'FABLAB', 'RECON', 'CBS', 'BARAS TBI', 'FIC']);
 
 // const suggestionItems = [
