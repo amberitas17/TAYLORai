@@ -34,8 +34,7 @@ class FaceApiAIService {
             console.error('❌ Error loading face-api.js models:', error);
             this.isLoaded = false;
             return false;
-        }
-    } finally { this.loadingPromise = null; }
+        } finally { this.loadingPromise = null; }
     })();
     return this.loadingPromise;
   }
