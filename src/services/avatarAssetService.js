@@ -1,6 +1,7 @@
 const AVATAR_CACHE_NAME = 'taylor-avatar-assets-v1';
 const AVATAR_ASSETS = ['/sarah-avatar.glb'];
-const AVATAR_TIMEOUT_MS = 30000;
+// Allow a slow 3G connection enough time to deliver the initial GLB.
+const AVATAR_TIMEOUT_MS = 90000;
 const AVATAR_MAX_ATTEMPTS = 3;
 
 class AvatarAssetService {
