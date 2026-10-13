@@ -12,7 +12,6 @@ class AvatarErrorBoundary extends React.Component {
 
 function AvatarPlaceholder({ message, onRetry }) {
   return <div role="status" aria-live="polite" style={{ minHeight: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20, textAlign: 'center', color: '#12324a', background: '#eaf6ff', borderRadius: 16 }}>
-    <img src="/logo.png" alt="TAYLOR" style={{ width: 72, height: 72, objectFit: 'contain' }} />
     <span>{message}</span>
     <span style={{ fontSize: 13 }}>You can continue chatting while the avatar is unavailable.</span>
     {onRetry && <button type="button" onClick={onRetry}>Retry avatar</button>}
