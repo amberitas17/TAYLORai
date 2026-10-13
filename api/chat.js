@@ -13,6 +13,9 @@ const BULSU_VECTOR_DIMENSION = 1024;
 const DEFAULT_TOP_K = 5;
 const DEFAULT_RELEVANCE_THRESHOLD = 0.35;
 const DEFAULT_EMBEDDING_MODEL = 'Xenova/bge-m3';
+// Search is opt-in at deployment level and restricted to time-sensitive questions.
+const LIVE_WEB_QUERY = /\b(latest|current|today|recent|this (week|month|year)|202[6-9]|announcement|deadline|schedule|updated|news|weather|enrollment date|application period)\b/i;
+const LIVE_WEB_MAX_TOKENS = 450;
 let pineconeClient;
 
 function normalizeBulsuEntity(value = '') {
@@ -240,7 +243,12 @@ export default async function handler(req, res) {
       res.status(200).json({ success: true, reply, activeEntity: 'RIO', usedBulsuContext: false, retrievalMode: bulsuRetrieval.retrievalMode, deploymentVersion: getDeploymentVersion(), retrievalConfig: getRetrievalConfig() });
       return;
     }
-    const completion = await openrouter.chat.completions.create({
+    // Never replace verified institutional RAG with unverified search results.
+    // General time-sensitive questions may use OpenRouter's hosted web search.
+    const shouldSearchWeb = process.env.TAYLOR_WEB_SEARCH_ENABLED === 'true'
+      && !isBulsuCenterQuestion(lastUserMessage, effectiveActiveEntity)
+      && LIVE_WEB_QUERY.test(lastUserMessage);
+    const completionInput = {
       model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct',
       messages: [
         { role: 'system', content: `${SYSTEM_PROMPT}\n\nWhen a BulSU question has no supplied retrieved evidence, say that the verified knowledge base does not provide enough detail. Do not fill gaps from general knowledge.` },
@@ -248,12 +256,30 @@ export default async function handler(req, res) {
         ...messages,
       ],
       temperature: 0.7,
-      max_tokens: 300,
-    });
+      max_tokens: shouldSearchWeb ? LIVE_WEB_MAX_TOKENS : 300,
+      ...(shouldSearchWeb ? { tools: [{ type: 'openrouter:web_search' }] } : {}),
+    };
+    let completion;
+    let webSearchUsed = false;
+    try {
+      completion = await openrouter.chat.completions.create(completionInput);
+      webSearchUsed = shouldSearchWeb;
+    } catch (webError) {
+      if (!shouldSearchWeb) throw webError;
+      console.warn('[chat] web search unavailable; retrying without search', webError?.message);
+      completion = await openrouter.chat.completions.create({
+        ...completionInput,
+        tools: undefined,
+        messages: [
+          { role: 'system', content: 'Live web search is unavailable. Do not claim to know current events, dates, deadlines, or announcements. Explain that current information could not be verified.' },
+          ...completionInput.messages,
+        ],
+      });
+    }
 
     const reply = completion.choices?.[0]?.message?.content?.trim() || 'I am TAYLOR and I am here to assist you.';
     console.info('[chat] success', { replyLength: reply.length });
-    res.status(200).json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedBulsuContext: Boolean(bulsuContext), retrievalMode: bulsuRetrieval.retrievalMode, deploymentVersion: getDeploymentVersion(), retrievalConfig: getRetrievalConfig() });
+    res.status(200).json({ success: true, reply, activeEntity: effectiveActiveEntity || '', usedBulsuContext: Boolean(bulsuContext), retrievalMode: bulsuRetrieval.retrievalMode, deploymentVersion: getDeploymentVersion(), retrievalConfig: getRetrievalConfig(), webSearchUsed, sources: completion.choices?.[0]?.message?.annotations || [] });
   } catch (error) {
     const errorInfo = classifyOpenRouterError(error);
     console.error('[chat] openrouter error', {
