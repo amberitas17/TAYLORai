@@ -4,23 +4,24 @@ import * as faceapi from 'face-api.js';
 class FaceApiAIService {
     constructor() {
         this.isLoaded = false;
+    this.loadingPromise = null;
         // Use CDN-hosted models for better compatibility
-        this.modelPath = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+        this.modelPath = '/models'; // Same-origin model weights, cacheable by the PWA
 
         // Face-api.js supports these emotions
         this.emotionLabels = ['angry', 'disgusted', 'fearful', 'happy', 'neutral', 'sad', 'surprised'];
     }
 
     async initialize() {
-        console.log('🚀 Initializing face-api.js models...');
+        if (this.isLoaded) return true;
+    if (this.loadingPromise) return this.loadingPromise;
 
-        try {
+        this.loadingPromise = (async () => { try {
             // Load all required models
             await Promise.all([
                 faceapi.nets.tinyFaceDetector.loadFromUri(this.modelPath),
                 faceapi.nets.faceLandmark68Net.loadFromUri(this.modelPath),
-                faceapi.nets.faceRecognitionNet.loadFromUri(this.modelPath),
-                faceapi.nets.faceExpressionNet.loadFromUri(this.modelPath),
+        faceapi.nets.faceExpressionNet.loadFromUri(this.modelPath),
                 faceapi.nets.ageGenderNet.loadFromUri(this.modelPath)
             ]);
 
@@ -34,7 +35,10 @@ class FaceApiAIService {
             this.isLoaded = false;
             return false;
         }
-    }
+    } finally { this.loadingPromise = null; }
+    })();
+    return this.loadingPromise;
+  }
 
     async analyzeImage(imageElement) {
         if (!this.isLoaded) {
@@ -48,7 +52,7 @@ class FaceApiAIService {
         try {
             // Use more sensitive detection options
             const detectionOptions = new faceapi.TinyFaceDetectorOptions({
-                inputSize: 416,        // Higher input size for better detection
+                inputSize: 320,        // Higher input size for better detection
                 scoreThreshold: 0.3    // Lower threshold for more sensitive detection
             });
 
@@ -67,7 +71,7 @@ class FaceApiAIService {
                 // Try with even more sensitive settings
                 console.log('🔄 Retrying with more sensitive detection...');
                 const sensitiveOptions = new faceapi.TinyFaceDetectorOptions({
-                    inputSize: 512,
+                    inputSize: 416,
                     scoreThreshold: 0.1
                 });
 
