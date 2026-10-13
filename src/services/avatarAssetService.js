@@ -16,6 +16,7 @@ class AvatarAssetService {
     this.cacheMisses = 0;
     this.error = '';
     this.resources = {};
+    this.assetObjectUrls = {};
     this.loadStartedAt = 0;
   }
 
@@ -56,6 +57,7 @@ class AvatarAssetService {
         console.warn('[avatar] Cache lookup failed; continuing with network loading:', error);
       }
       if (cached) {
+        await this.prepareObjectUrl(asset, cached);
         this.state = 'AVATAR_LOADING_FROM_CACHE';
         this.cacheHits += 1;
         this.resources[asset] = { source: 'CACHE', duration: performance.now() - assetStartedAt };
@@ -86,6 +88,7 @@ class AvatarAssetService {
               console.warn('[avatar] Cache write failed; avatar can still render:', cacheError);
             }
           }
+          await this.prepareObjectUrl(asset, response);
           this.resources[asset] = { source: 'NETWORK', attempts: attempt + 1, duration: performance.now() - assetStartedAt, cacheSaved };
           return 'NETWORK';
         } catch (error) {
@@ -104,6 +107,19 @@ class AvatarAssetService {
     this.source = sources.every((source) => source === 'CACHE') ? 'CACHE' : 'NETWORK';
     this.downloadTime = performance.now() - startedAt;
     this.initializationTime = this.downloadTime;
+  }
+
+  async prepareObjectUrl(asset, response) {
+    if (this.assetObjectUrls[asset]) return this.assetObjectUrls[asset];
+    const blob = await response.blob();
+    if (!blob.size) throw new Error(`Avatar asset ${asset} is empty`);
+    const objectUrl = URL.createObjectURL(blob);
+    this.assetObjectUrls[asset] = objectUrl;
+    return objectUrl;
+  }
+
+  getAssetUrl(asset = '/sarah-avatar.glb') {
+    return this.assetObjectUrls[asset] || null;
   }
 
   markFirstRender() {
