@@ -619,7 +619,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     async fetchModelResource(url, options = {}) {
         const cacheKey = options.cacheKey || url;
         const zoneWithCacheMiss = Object.keys(ZONE_RESOURCES).find((zone) => url.includes(`/models/${zone}/`));
-        const normalizedCacheKey = cacheKey.includes('.onnx') && !cacheKey.includes('?')
+        const normalizedCacheKey = (cacheKey.startsWith('/models/') && !cacheKey.includes('?'))
             ? `${cacheKey}?v=${MODEL_ASSET_VERSION}`
             : cacheKey;
         const requestOptions = { ...options };
