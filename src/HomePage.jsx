@@ -5,14 +5,10 @@ import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
 import './HomePage.css';
 
 const suggestionItems = [
-  { key: 'bulsu', label: 'What is BulSU?', answer: 'Bulacan State University is a premier public university in the Philippines, known for academic excellence, innovation, and service to the community.' },
   { key: 'aricc', label: 'What is ARICC?', answer: 'What is ARICC?' },
-  { key: 'programs', label: 'Academic Programs', answer: 'BulSU offers strong programs in engineering, education, business, health sciences, information technology, and the arts.' },
-  { key: 'facilities', label: 'Campus Facilities', answer: 'BulSU provides modern classrooms, libraries, laboratories, innovation spaces, student centers, and smart campus facilities.' },
-  { key: 'research', label: 'Research and Innovation', answer: 'BulSU supports impactful research through laboratories, industry partnerships, technology transfer, and community-driven innovation.' },
-  { key: 'services', label: 'Student Services', answer: 'Student services include academic advising, counseling, wellness support, scholarships, and campus engagement programs.' },
-  { key: 'scholarships', label: 'Scholarships', answer: 'BulSU offers scholarship and financial assistance opportunities to support deserving students in their academic journey.' },
-  { key: 'voice', label: 'Start Voice Conversation', answer: 'I am TAYLOR and I am ready to assist you. You may ask me about BulSU, ARICC, programs, research, facilities, or student services.' }
+  { key: 'recon', label: 'What is RECON?', answer: 'What is RECON?' },
+  { key: 'fablab', label: 'What is FABLAB?', answer: 'What is FABLAB?' },
+  { key: 'caesar', label: 'What is CAESAR?', answer: 'What is CAESAR?' }
 ];
 
 const getInitialSessionContext = () => {
