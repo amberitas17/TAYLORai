@@ -6,7 +6,8 @@ import * as faceapi from 'face-api.js';
 class ClientSideFaceAnalysisService {
   constructor() {
     this.isLoaded = false;
-    this.modelPath = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'; // Official models
+    this.loadingPromise = null;
+    this.modelPath = '/models'; // Same-origin model weights, cacheable by the PWA
     this.emotionLabels = ['angry', 'disgusted', 'fearful', 'happy', 'neutral', 'sad', 'surprised'];
   }
 
@@ -14,14 +15,14 @@ class ClientSideFaceAnalysisService {
    * Initialize face-api.js models in the browser
    */
   async initialize() {
-    console.log('🚀 Initializing face-api.js models in browser...');
+    if (this.isLoaded) return true;
+    if (this.loadingPromise) return this.loadingPromise;
 
-    try {
+    this.loadingPromise = (async () => { try {
       // Load all required models from public/models directory
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(this.modelPath),
         faceapi.nets.faceLandmark68Net.loadFromUri(this.modelPath),
-        faceapi.nets.faceRecognitionNet.loadFromUri(this.modelPath),
         faceapi.nets.faceExpressionNet.loadFromUri(this.modelPath),
         faceapi.nets.ageGenderNet.loadFromUri(this.modelPath)
       ]);
@@ -36,6 +37,9 @@ class ClientSideFaceAnalysisService {
       this.isLoaded = false;
       return false;
     }
+  } finally { this.loadingPromise = null; }
+    })();
+    return this.loadingPromise;
   }
 
   /**
@@ -54,7 +58,7 @@ class ClientSideFaceAnalysisService {
     try {
       // Use more sensitive detection options
       const detectionOptions = new faceapi.TinyFaceDetectorOptions({
-        inputSize: 512,
+        inputSize: 320,
         scoreThreshold: 0.2
       });
 
@@ -69,7 +73,7 @@ class ClientSideFaceAnalysisService {
       if (detections.length === 0) {
         console.log('⚠️  No faces detected, retrying with ultra-sensitive settings...');
         const ultraSensitiveOptions = new faceapi.TinyFaceDetectorOptions({
-          inputSize: 320,
+          inputSize: 416,
           scoreThreshold: 0.1
         });
 
