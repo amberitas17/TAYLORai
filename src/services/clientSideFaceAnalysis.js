@@ -165,13 +165,13 @@ class ClientSideFaceAnalysisService {
     const {
       includeAge = true,
       retryOnMiss = true,
-      inputSize = 224,
+      inputSize = 160,
       scoreThreshold = 0.25
     } = options;
 
     try {
       const detectionOptions = new faceapi.TinyFaceDetectorOptions({
-        inputSize,
+        inputSize: Math.max(128, Math.min(320, Math.round(inputSize / 32) * 32)),
         scoreThreshold
       });
 
