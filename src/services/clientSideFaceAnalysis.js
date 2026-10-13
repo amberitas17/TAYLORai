@@ -7,7 +7,7 @@ class ClientSideFaceAnalysisService {
   constructor() {
     this.isLoaded = false;
     this.loadingPromise = null;
-    this.modelPath = '/models'; // Same-origin model weights, cacheable by the PWA
+    this.modelPath = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'; // Remote fallback until all required weights are bundled locally
     this.emotionLabels = ['angry', 'disgusted', 'fearful', 'happy', 'neutral', 'sad', 'surprised'];
   }
 
