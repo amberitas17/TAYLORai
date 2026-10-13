@@ -15,7 +15,10 @@ import './HomePage.css';
 class AvatarErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
   static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch(error) { console.error('[taylor] Avatar rendering failed', error); }
+  componentDidCatch(error, info) {
+    console.error('[taylor] Avatar rendering failed', { message: error?.message, stack: error?.stack, componentStack: info?.componentStack, userAgent: navigator.userAgent, asset: this.props.asset });
+    this.props.onError?.(error);
+  }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
@@ -165,11 +168,20 @@ export default function TaylorDashboard() {
   const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
   const [avatarEnabled, setAvatarEnabled] = useState(false);
   const [avatarAttempt, setAvatarAttempt] = useState(0);
+  const [avatarError, setAvatarError] = useState('');
+  const [avatarUseOriginalFallback, setAvatarUseOriginalFallback] = useState(false);
+  const optimizedAvatarTest = new URLSearchParams(window.location.search).get('avatarTest') === 'optimized';
   useEffect(() => {
     const timer = window.setTimeout(() => setAvatarEnabled(true), 250);
     return () => window.clearTimeout(timer);
   }, []);
-  const retryAvatar = () => { setAvatarEnabled(true); setAvatarAttempt((attempt) => attempt + 1); };
+  const retryAvatar = () => {
+    setAvatarError('');
+    // A failed compressed asset may be unsupported on the current Safari session.
+    if (optimizedAvatarTest) setAvatarUseOriginalFallback(true);
+    setAvatarEnabled(true);
+    setAvatarAttempt((attempt) => attempt + 1);
+  };
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [language, setLanguage] = useState(() => {
@@ -573,9 +585,9 @@ export default function TaylorDashboard() {
             ) : !avatarEnabled ? (
               <AvatarPlaceholder message="Preparing TAYLOR avatar... Chat remains available while loading." />
             ) : (
-              <AvatarErrorBoundary key={avatarAttempt} fallback={<AvatarPlaceholder message="Avatar rendering is unavailable on this device or connection." onRetry={retryAvatar} />}>
+              <AvatarErrorBoundary key={avatarAttempt} asset={optimizedAvatarTest && !avatarUseOriginalFallback ? "optimized" : "original"} onError={(error) => setAvatarError(error?.message || "Unknown rendering error")} fallback={<AvatarPlaceholder message={avatarError ? `Avatar could not load: ${avatarError.slice(0, 160)}` : "Avatar rendering is unavailable on this device or connection."} onRetry={retryAvatar} />}>
                 <Suspense fallback={<AvatarPlaceholder message="Loading TAYLOR avatar..." />}>
-                  <Hologram emotion={sessionContext?.emotion || 'neutral'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" assetUrl={new URLSearchParams(window.location.search).get("avatarTest") === "optimized" ? "/sarah-avatar-optimized.glb" : null} />
+                  <Hologram emotion={sessionContext?.emotion || 'neutral'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" assetUrl={optimizedAvatarTest && !avatarUseOriginalFallback ? "/sarah-avatar-optimized.glb" : null} />
                 </Suspense>
               </AvatarErrorBoundary>
             )}
