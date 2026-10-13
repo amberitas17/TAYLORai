@@ -6,7 +6,7 @@ class FaceApiAIService {
         this.isLoaded = false;
     this.loadingPromise = null;
         // Use CDN-hosted models for better compatibility
-        this.modelPath = '/models'; // Same-origin model weights, cacheable by the PWA
+        this.modelPath = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'; // Remote fallback until all required weights are bundled locally
 
         // Face-api.js supports these emotions
         this.emotionLabels = ['angry', 'disgusted', 'fearful', 'happy', 'neutral', 'sad', 'surprised'];
