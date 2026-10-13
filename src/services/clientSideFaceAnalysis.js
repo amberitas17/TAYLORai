@@ -36,8 +36,7 @@ class ClientSideFaceAnalysisService {
       console.error('❌ Error loading face-api.js models in browser:', error);
       this.isLoaded = false;
       return false;
-    }
-  } finally { this.loadingPromise = null; }
+    } finally { this.loadingPromise = null; }
     })();
     return this.loadingPromise;
   }
