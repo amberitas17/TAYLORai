@@ -12,6 +12,21 @@ import {
 import { resolveLocalFirstChat } from './services/localKnowledgeChat.js';
 import './HomePage.css';
 
+class AvatarErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error) { console.error('[taylor] Avatar rendering failed', error); }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
+
+function AvatarPlaceholder({ message, onRetry }) {
+  return <div className="avatar-placeholder" role="status" aria-live="polite" style={{ minHeight: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20, textAlign: 'center' }}>
+    <span>{message}</span>
+    <span style={{ fontSize: 13 }}>You can continue chatting while the avatar is unavailable.</span>
+    {onRetry && <button type="button" onClick={onRetry}>Retry avatar</button>}
+  </div>;
+}
+
 const API_URL = (import.meta.env.VITE_NODEJS_API_URL || '').trim();
 const IS_LOCAL_BROWSER = typeof window !== 'undefined' && /localhost|127\.0\.0\.1/i.test(window.location.hostname);
 const CHAT_ENDPOINT = API_URL && (!/localhost|127\.0\.0\.1/i.test(API_URL) || IS_LOCAL_BROWSER)
@@ -148,6 +163,20 @@ export default function TaylorDashboard() {
   const location = useLocation();
   const [sessionContext, setSessionContext] = useState(() => location.state?.skipFacialAnalysis ? null : getSessionContext());
   const [activeEntity, setActiveEntity] = useState(() => location.state?.activeEntity || getActiveEntity());
+  const [avatarEnabled, setAvatarEnabled] = useState(false);
+  const [avatarTimedOut, setAvatarTimedOut] = useState(false);
+  const [avatarAttempt, setAvatarAttempt] = useState(0);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAvatarEnabled(true), 250);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!avatarEnabled || !getPerformanceSettings().avatar3D) return undefined;
+    setAvatarTimedOut(false);
+    const timer = window.setTimeout(() => setAvatarTimedOut(true), 15000);
+    return () => window.clearTimeout(timer);
+  }, [avatarEnabled, avatarAttempt]);
+  const retryAvatar = () => { setAvatarEnabled(true); setAvatarAttempt((attempt) => attempt + 1); };
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [language, setLanguage] = useState(() => {
@@ -546,9 +575,17 @@ export default function TaylorDashboard() {
             </section>
           )}
           <div className="avatar-card">
-            <Suspense fallback={<div className="avatar-placeholder">{t.preparing}</div>}>
-              {getPerformanceSettings().avatar3D ? <Hologram emotion={sessionContext?.emotion || 'neutral'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" /> : <div className="avatar-placeholder" role="status">TAYLOR voice and chat are ready. 3D avatar is disabled in lightweight mode.</div>}
-            </Suspense>
+            {!getPerformanceSettings().avatar3D ? (
+              <div className="avatar-placeholder" role="status">TAYLOR voice and chat are ready. 3D avatar is disabled in lightweight mode.</div>
+            ) : !avatarEnabled || avatarTimedOut ? (
+              <AvatarPlaceholder message={avatarTimedOut ? 'TAYLOR avatar is taking longer than expected.' : 'Preparing TAYLOR avatar...'} onRetry={avatarTimedOut ? retryAvatar : undefined} />
+            ) : (
+              <AvatarErrorBoundary key={avatarAttempt} fallback={<AvatarPlaceholder message="Avatar rendering is unavailable on this device or connection." onRetry={retryAvatar} />}>
+                <Suspense fallback={<AvatarPlaceholder message="Loading TAYLOR avatar..." />}>
+                  <Hologram emotion={sessionContext?.emotion || 'neutral'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" />
+                </Suspense>
+              </AvatarErrorBoundary>
+            )}
           </div>
           {!activeEntity && <div className="suggestion-row">
                 {MAIN_CENTER_PROMPTS.map((item) => (
