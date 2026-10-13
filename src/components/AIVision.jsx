@@ -580,7 +580,14 @@ export default function AIVision() {
             </Suspense>
           </AvatarErrorBoundary>
         ) : (
-          <div className="avatar-placeholder">{getAvatarStatusLabel(avatarState)}</div>
+          <div className="avatar-placeholder" role="status">
+            <span>{getAvatarStatusLabel(avatarState)}</span>
+            {avatarState === 'AVATAR_ERROR' && (
+              <button type="button" onClick={() => { setAvatarAssetsReady(false); initializeAvatar(); }}>
+                Retry avatar
+              </button>
+            )}
+          </div>
         )}
       </div>
 
