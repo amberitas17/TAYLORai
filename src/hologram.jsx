@@ -359,7 +359,7 @@ function LoadingFallback() {
   );
 }
 
-export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', onReady }) {
+export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', assetUrl = null, onReady }) {
   const [contextGeneration, setContextGeneration] = useState(0);
   const [contextLost, setContextLost] = useState(false);
   const canvasRef = useRef(null);
