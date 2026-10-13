@@ -2,7 +2,9 @@ import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import process from 'node:process';
-import bulsuRecords from '../data/bulsu-centers.records.json' with { type: 'json' };
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const bulsuRecords = require('../data/bulsu-centers.records.json');
 import { classifyChatQuestion, getWebSearchOptions } from '../scripts/chatRouting.mjs';
 
 dotenv.config();
