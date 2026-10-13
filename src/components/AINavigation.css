@@ -772,7 +772,7 @@
 .navigation-scan-fab {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
-  bottom: max(18px, env(safe-area-inset-bottom));
+  top: 50%;
   z-index: 30;
   display: inline-flex;
   align-items: center;
@@ -787,6 +787,7 @@
   cursor: pointer;
   font-weight: 800;
   touch-action: manipulation;
+  transform: translateY(-50%);
   transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
@@ -800,7 +801,7 @@
 .navigation-scan-fab:focus-visible {
   background: #155e75;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
-  transform: translateY(-2px);
+  transform: translateY(calc(-50% - 2px));
 }
 
 .navigation-scan-fab:focus-visible {
