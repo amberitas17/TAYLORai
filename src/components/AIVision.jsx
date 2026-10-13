@@ -76,6 +76,7 @@ export default function AIVision() {
   const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
   const [avatarObjectUrl, setAvatarObjectUrl] = useState(null);
   const [avatarDiagnostics, setAvatarDiagnostics] = useState(avatarAssetService.getDiagnostics());
+  const optimizedAvatarTest = new URLSearchParams(window.location.search).get('avatarTest') === 'optimized';
   const faceDebugEnabled = new URLSearchParams(window.location.search).has('faceDebug');
   const aiVisionReady = ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) && avatarState === 'AVATAR_READY';
 
@@ -130,6 +131,14 @@ export default function AIVision() {
     console.info('[machine-vision] avatar initialization start', startupTimestampsRef.current.avatarInitializationStart);
     setAvatarState('AVATAR_CACHE_CHECK');
     try {
+      // Opt-in A/B test: load the optimized GLB directly, without replacing the
+      // production avatar or changing the existing single-download path.
+      if (optimizedAvatarTest) {
+        setAvatarObjectUrl('/sarah-avatar-optimized.glb');
+        setAvatarAssetsReady(true);
+        console.info('[machine-vision] testing optimized avatar GLB');
+        return;
+      }
       await avatarAssetService.initialize();
       const preparedUrl = avatarAssetService.getAssetUrl('/sarah-avatar.glb');
       if (!preparedUrl) throw new Error('Avatar bytes are unavailable for rendering');
