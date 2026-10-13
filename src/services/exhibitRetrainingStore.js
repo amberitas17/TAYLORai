@@ -243,6 +243,24 @@ export async function listExhibitRetrainingCandidates() {
   return listRecords();
 }
 
+/**
+ * Research-only export. Data stays on this device until the researcher explicitly
+ * downloads it. Never marks records as synced or deletes the local queue.
+ */
+export async function exportExhibitRetrainingCandidates() {
+  const records = await listRecords();
+  const serialized = await Promise.all(records.map(async ({ image, ...record }) => ({
+    ...record,
+    imageDataUrl: image ? await blobToDataUrl(image) : null,
+  })));
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    recordCount: serialized.length,
+    records: serialized,
+  };
+}
+
 export async function verifyExhibitRetrainingCandidate(candidateId, label, verificationSource = 'human_review') {
   if (!candidateId || !label || verificationSource === 'model') throw new Error('Independent human verification is required');
   const records = await listRecords();
