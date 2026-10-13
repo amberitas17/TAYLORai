@@ -2,7 +2,10 @@ import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import process from 'node:process';
-import bulsuRecords from '../data/bulsu-centers.records.json' with { type: 'json' };
+import { createRequire } from 'node:module';
+// Node 20 Vercel functions cannot parse the newer JSON import-attributes syntax.
+const require = createRequire(import.meta.url);
+const bulsuRecords = require('../data/bulsu-centers.records.json');
 import { classifyChatQuestion, getWebSearchOptions } from '../scripts/chatRouting.mjs';
 
 dotenv.config();
@@ -185,11 +188,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  console.info('[chat] request', {
-    method: req.method,
-    url: req.url,
-    body: req.body,
-  });
+  console.info('[chat] request', { method: req.method });
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
