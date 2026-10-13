@@ -511,7 +511,7 @@ export default function TaylorDashboard() {
         <section className="taylor-header">
           <button type="button" onClick={() => navigate("/")} aria-label="Back to homepage" style={{ alignSelf: "flex-start", padding: "0.55rem 0.9rem", borderRadius: "0.6rem", cursor: "pointer" }}>← Home</button>
           <div>
-            <div className="eyebrow">Bulacan State University • ARICC</div>
+            <div className="eyebrow">Bulacan State University</div>
             <h1>TAYLOR</h1>
             {bootstrap.state !== 'BOOTSTRAP_READY' && (
               <p aria-live="polite">
