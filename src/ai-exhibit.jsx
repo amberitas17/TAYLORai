@@ -25,7 +25,7 @@ import {
   getExhibitRetrainingConsent,
   setExhibitRetrainingConsent,
   captureCorrectedExhibitCandidate,
-  syncExhibitRetrainingQueue,
+  exportExhibitRetrainingCandidates,
 } from './services/exhibitRetrainingStore.js';
 
 const width = window.innerWidth;
@@ -707,6 +707,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [recognitionDebug, setRecognitionDebug] = useState(null);
   const [learningConsent, setLearningConsent] = useState(() => getLandmarkLearningConsent());
   const [exhibitRetrainingConsent, setExhibitRetrainingConsentState] = useState(() => getExhibitRetrainingConsent());
+  const [researchExportStatus, setResearchExportStatus] = useState('');
+  const [researchExportBusy, setResearchExportBusy] = useState(false);
   const [learningCaptureStatus, setLearningCaptureStatus] = useState('');
   const [correctionLabel, setCorrectionLabel] = useState('');
   const [explanationState, setExplanationState] = useState({ status: 'idle', explanation: null, error: null });
@@ -726,19 +728,36 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     try { window.localStorage.setItem('taylorLanguage', nextLanguage); } catch (error) { console.warn('Unable to save exhibit language preference:', error); }
   };
 
-  useEffect(() => {
-    const sync = () => syncExhibitRetrainingQueue().catch((error) => console.warn('Exhibit retraining sync deferred:', error.message));
-    sync();
-    const onVisibility = () => { if (document.visibilityState === 'visible' && navigator.onLine) sync(); };
-    window.addEventListener('online', sync);
-    window.addEventListener('focus', sync);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('online', sync);
-      window.removeEventListener('focus', sync);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, []);
+  // Research-only mode: examples remain in IndexedDB until explicitly exported.
+  // No automatic upload to the unavailable Vercel retraining endpoint.
+  const downloadResearchCandidates = async () => {
+    if (researchExportBusy) return;
+    setResearchExportBusy(true);
+    setResearchExportStatus('');
+    try {
+      const payload = await exportExhibitRetrainingCandidates();
+      if (!payload.recordCount) {
+        setResearchExportStatus('No saved exhibit samples on this device.');
+        return;
+      }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `taylor-exhibit-research-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // Delay URL cleanup so mobile browsers can start the download.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setResearchExportStatus(`Export prepared: ${payload.recordCount} sample(s). Keep the file private.`);
+    } catch (error) {
+      console.error('Exhibit research export failed:', error);
+      setResearchExportStatus('Export failed. Local samples were not deleted.');
+    } finally {
+      setResearchExportBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!tourMode || typeof window === 'undefined') return;
@@ -2421,8 +2440,25 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             }}
             style={{ marginRight: 7 }}
           />
-          Share uncertain exhibit frames for review
+          Save exhibit samples locally for research
         </label>
+        <button
+          type="button"
+          onClick={downloadResearchCandidates}
+          disabled={researchExportBusy}
+          style={{
+            background: 'rgba(0,0,0,0.78)',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.5)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: 12,
+            cursor: researchExportBusy ? 'wait' : 'pointer',
+          }}
+        >
+          {researchExportBusy ? 'Preparing export…' : 'Export saved research samples'}
+        </button>
+        {researchExportStatus && <div role="status" style={{ maxWidth: 260, padding: '6px 10px', background: 'rgba(0,0,0,0.78)', color: '#fff', borderRadius: 8, fontSize: 12 }}>{researchExportStatus}</div>}
         {classifierMode.toLowerCase() === 'recon' && (
           <label style={{
             background: "rgba(0,0,0,0.72)",
