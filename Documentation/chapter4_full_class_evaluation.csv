@@ -1,0 +1,190 @@
+record_type,zone,expected,predicted,raw_predicted,confidence,margin,accepted,correct,source,source_split,independence,frame_index,latency_ms,samples,precision,recall,f1,status
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9951137900352478,0.9918846765067428,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,0,6.718800403177738,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.994371771812439,0.9898790027946234,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,90,4.06969990581274,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9919664859771729,0.9874346349388361,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,181,3.46320029348135,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9854393005371094,0.9758069729432464,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,272,3.776900004595518,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9996880292892456,0.999613964886521,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,363,3.9610001258552074,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9966458678245544,0.9954406454926357,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,454,3.846399951726198,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9986238479614258,0.998148494574707,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,545,3.8105002604424953,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9897757768630981,0.9827368250116706,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,636,4.062999971210957,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9999967813491821,0.9999945873080378,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,727,4.75350022315979,,,,,
+sample,ARICC,3D Printer,3D Printer,3D Printer,0.9996576309204102,0.99940355704166,True,True,Documentation/datasets/ARICC/ARICC/3D Printer.MOV,validation,source-disjoint,818,3.298199735581875,,,,,
+sample,ARICC,Collaborative Robot,Collaborative Robot,Collaborative Robot,0.9858943223953247,0.9769134018570185,True,True,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,0,3.4849997609853745,,,,,
+sample,ARICC,Collaborative Robot,Collaborative Robot,Collaborative Robot,0.9953610301017761,0.9930778169073164,True,True,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,34,3.5124998539686203,,,,,
+sample,ARICC,Collaborative Robot,Collaborative Robot,Collaborative Robot,0.8696281313896179,0.7670922055840492,True,True,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,68,3.240499645471573,,,,,
+sample,ARICC,Collaborative Robot,3D Printer,3D Printer,0.8460273146629333,0.8014916703104973,True,False,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,102,3.451900091022253,,,,,
+sample,ARICC,Collaborative Robot,UNKNOWN,3D Printer,0.7254224419593811,0.5727983862161636,False,False,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,136,3.047199919819832,,,,,
+sample,ARICC,Collaborative Robot,UNKNOWN,3D Printer,0.5157639980316162,0.33921779692173004,False,False,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,170,3.9889002218842506,,,,,
+sample,ARICC,Collaborative Robot,UNKNOWN,Collaborative Robot,0.4306979775428772,0.017893970012664795,False,False,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,204,3.981000278145075,,,,,
+sample,ARICC,Collaborative Robot,UNKNOWN,Collaborative Robot,0.43375086784362793,0.08342304825782776,False,False,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,238,4.141900222748518,,,,,
+sample,ARICC,Collaborative Robot,Collaborative Robot,Collaborative Robot,0.9362848997116089,0.8964578844606876,True,True,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,272,4.057900048792362,,,,,
+sample,ARICC,Collaborative Robot,UNKNOWN,3D Printer,0.7120950818061829,0.5308430343866348,False,False,Documentation/datasets/ARICC/ARICC/Collaborative Robot 3.MOV,validation,source-disjoint,307,3.7186001427471638,,,,,
+sample,ARICC,Industrial Robot,UNKNOWN,3D Printer,0.5583654046058655,0.27384549379348755,False,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,0,3.4457999281585217,,,,,
+sample,ARICC,Industrial Robot,3D Printer,3D Printer,0.9586493968963623,0.9264481514692307,True,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,32,3.079600166529417,,,,,
+sample,ARICC,Industrial Robot,3D Printer,3D Printer,0.8234861493110657,0.7472151443362236,True,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,64,3.8128001615405083,,,,,
+sample,ARICC,Industrial Robot,3D Printer,3D Printer,0.9731918573379517,0.9559387005865574,True,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,97,3.7724999710917473,,,,,
+sample,ARICC,Industrial Robot,3D Printer,3D Printer,0.9427559971809387,0.905755128711462,True,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,129,4.00019995868206,,,,,
+sample,ARICC,Industrial Robot,3D Printer,3D Printer,0.9688780307769775,0.9554675575345755,True,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,162,3.851999994367361,,,,,
+sample,ARICC,Industrial Robot,3D Printer,3D Printer,0.9911878108978271,0.9873411210719496,True,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,194,3.223299980163574,,,,,
+sample,ARICC,Industrial Robot,UNKNOWN,3D Printer,0.6006090641021729,0.27042874693870544,False,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,227,3.0769002623856068,,,,,
+sample,ARICC,Industrial Robot,3D Printer,3D Printer,0.801033079624176,0.6613957583904266,True,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,259,3.454099874943495,,,,,
+sample,ARICC,Industrial Robot,3D Printer,3D Printer,0.9480221271514893,0.9227220583707094,True,False,Documentation/datasets/ARICC/ARICC/Industrial Robot.MOV,validation,source-disjoint,292,3.1209001317620277,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.999903678894043,0.9998544068075716,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,0,3.989399876445532,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.9999306201934814,0.9998645334853791,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,61,3.8075000047683716,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.9997196793556213,0.9995910914294655,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,122,4.096799995750189,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.9999648332595825,0.9999543417852692,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,183,4.521399736404419,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.9999067783355713,0.999837465948076,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,244,3.9301998913288116,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.9999501705169678,0.9999005088211561,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,305,3.1763999722898006,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.9999897480010986,0.9999819709591975,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,366,4.340699873864651,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.999943733215332,0.999911167909886,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,427,3.5482998937368393,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.9999957084655762,0.9999930830233552,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,488,3.258600365370512,,,,,
+sample,ARICC,Smart Systems,Smart Systems,Smart Systems,0.9974371194839478,0.9965745173976757,True,True,Documentation/datasets/ARICC/ARICC/Smart Systems 5.MOV,validation,source-disjoint,549,3.4386999905109406,,,,,
+class_metric,ARICC,3D Printer,,,,,,,,,,,,10,0.5263,1.0000,0.6897,VALIDATED
+class_metric,ARICC,Collaborative Robot,,,,,,,,,,,,10,1.0000,0.4000,0.5714,VALIDATED
+missing_class,ARICC,FDAS,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+class_metric,ARICC,Industrial Robot,,,,,,,,,,,,10,N/A,0.0000,N/A,VALIDATED
+missing_class,ARICC,Pick & Place Machine,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,ARICC,Robotic Arm,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+class_metric,ARICC,Smart Systems,,,,,,,,,,,,10,1.0000,1.0000,1.0000,VALIDATED
+missing_class,ARICC,Speech Home Automation,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+sample,RECON,fluke_930_non_contact_tachometer,fluke_930_non_contact_tachometer,fluke_930_non_contact_tachometer,0.9925869472028467,0.9895398775173309,True,True,Documentation/datasets/RECON/IMG_4565.JPG,unspecified,unverified,,3.8431002758443356,,,,,
+sample,RECON,fluke_971_temperature_humidity_meter,UNKNOWN,fluke_971_temperature_humidity_meter,0.5793470855497548,0.2039433354017281,False,False,Documentation/datasets/RECON/IMG_4566.JPG,unspecified,unverified,,3.017100039869547,,,,,
+missing_class,RECON,charcoal_oven_machine,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,festo_solar_wind_training_system,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,fluke_2042_cable_tracer,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,fluke_355_clamp_meter,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,fluke_922_air_flow_meter,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+class_metric,RECON,fluke_930_non_contact_tachometer,,,,,,,,,,,,1,1.0000,1.0000,1.0000,INDEPENDENCE_UNVERIFIED
+class_metric,RECON,fluke_971_temperature_humidity_meter,,,,,,,,,,,,1,N/A,0.0000,N/A,INDEPENDENCE_UNVERIFIED
+missing_class,RECON,ip_display_area,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,quadruple_suction_single_discharge_cooking_oil_transfer_device,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,root_crop_slicing_machine,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,testo_420_volume_flow_hood,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,testo_440_air_velocity_iaq,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,RECON,unmanned_aerial_system,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+sample,FABLAB,Crealty Ender 3D Printer,Crealty Ender 3D Printer,Crealty Ender 3D Printer,0.9992757439613342,0.9985617705970071,True,True,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,0,4.48619993403554,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,Crealty Ender 3D Printer,Crealty Ender 3D Printer,0.9998705387115479,0.9998035525568412,True,True,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,97,3.44030000269413,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,Crealty Ender 3D Printer,Crealty Ender 3D Printer,0.9999288320541382,0.9998854602781648,True,True,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,195,3.3832998014986515,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,Crealty Ender 3D Printer,Crealty Ender 3D Printer,0.8669488430023193,0.7383674830198288,True,True,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,293,3.0825999565422535,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,UNKNOWN,Crealty Ender 3D Printer,0.7188347578048706,0.4388633072376251,False,False,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,391,3.663400188088417,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,Crealty Ender 3D Printer,Crealty Ender 3D Printer,0.9668871760368347,0.940992433577776,True,True,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,489,3.0534001998603344,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,BCN3d,BCN3d,0.927335798740387,0.8547132015228271,True,False,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,587,3.2502003014087677,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,Crealty Ender 3D Printer,Crealty Ender 3D Printer,0.9999979734420776,0.9999967786690149,True,True,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,685,3.235800191760063,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,Crealty Ender 3D Printer,Crealty Ender 3D Printer,0.9853073358535767,0.9717755140736699,True,True,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,783,3.33720026537776,,,,,
+sample,FABLAB,Crealty Ender 3D Printer,Crealty Ender 3D Printer,Crealty Ender 3D Printer,0.998023271560669,0.9967061711940914,True,True,Documentation/datasets/FABLAB/Crealty Ender 3D Printer 5.MOV,validation,source-disjoint,881,4.040499683469534,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.9999971389770508,0.9999942698430004,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,0,3.3279997296631336,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.9999957084655762,0.9999916969541118,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,94,3.302900120615959,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.9999818801879883,0.9999642853417754,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,188,3.8597998209297657,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.9970818161964417,0.9942372837103903,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,282,3.6245998926460743,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.9968685507774353,0.9946425994858146,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,376,3.651800099760294,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.999840259552002,0.9996992092055734,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,470,4.158900119364262,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.9998369216918945,0.9996829363517463,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,564,4.414800088852644,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.9999799728393555,0.9999604758813803,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,658,4.141300451010466,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.9997554421424866,0.9995241386495763,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,752,3.601000178605318,,,,,
+sample,FABLAB,Digital Embroidery Machine,Digital Embroidery Machine,Digital Embroidery Machine,0.99982750415802,0.9996706366364378,True,True,Documentation/datasets/FABLAB/Digital Embroidery Machine 3.MOV,validation,source-disjoint,847,3.841899801045656,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9999897480010986,0.999980438892635,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,0,3.6284001544117928,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9999910593032837,0.9999857286552469,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,42,3.0586998909711838,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9997460246086121,0.9994969906983897,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,84,3.6153001710772514,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9999828338623047,0.9999685325738028,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,126,4.596199840307236,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9998319149017334,0.9996864467684645,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,168,4.565100185573101,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9999790191650391,0.9999665354107492,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,211,3.8570999167859554,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9999982118606567,0.9999974697245193,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,253,3.639299888163805,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9999974966049194,0.9999960821398872,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,295,3.625100012868643,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9999958276748657,0.9999931540146463,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,337,3.657400142401457,,,,,
+sample,FABLAB,Leapfrog Bolt Pro,Leapfrog Bolt Pro,Leapfrog Bolt Pro,0.9999078512191772,0.9998743375472259,True,True,Documentation/datasets/FABLAB/Leapfrog Bolt Pro 3.MOV,validation,source-disjoint,380,3.083100076764822,,,,,
+sample,FABLAB,STRATASYS,UNKNOWN,STRATASYS,0.6042931079864502,0.47499899566173553,False,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,0,3.781300038099289,,,,,
+sample,FABLAB,STRATASYS,UNKNOWN,VAQUFORM,0.3262483775615692,0.041923701763153076,False,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,61,3.5562999546527863,,,,,
+sample,FABLAB,STRATASYS,UNKNOWN,STRATASYS,0.7692821621894836,0.5985120385885239,False,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,123,4.077400080859661,,,,,
+sample,FABLAB,STRATASYS,STRATASYS,STRATASYS,0.9096430540084839,0.8285310491919518,True,True,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,185,4.05730027705431,,,,,
+sample,FABLAB,STRATASYS,UNKNOWN,BCN3d,0.35014933347702026,0.04769048094749451,False,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,247,3.850699868053198,,,,,
+sample,FABLAB,STRATASYS,BCN3d,BCN3d,0.8911628127098083,0.8119604289531708,True,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,308,4.028500057756901,,,,,
+sample,FABLAB,STRATASYS,UNKNOWN,STRATASYS,0.418364942073822,0.2105771005153656,False,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,370,3.946899902075529,,,,,
+sample,FABLAB,STRATASYS,UNKNOWN,STRATASYS,0.5472909212112427,0.186067134141922,False,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,432,3.8875997997820377,,,,,
+sample,FABLAB,STRATASYS,UNKNOWN,BCN3d,0.5907195806503296,0.19285616278648376,False,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,494,3.8445000536739826,,,,,
+sample,FABLAB,STRATASYS,BCN3d,BCN3d,0.9123490452766418,0.8348288089036942,True,False,Documentation/datasets/FABLAB/STRATASYS.MOV,validation,source-disjoint,556,4.171499982476234,,,,,
+missing_class,FABLAB,3D Outputs,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,FABLAB,BCN3d,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+class_metric,FABLAB,Crealty Ender 3D Printer,,,,,,,,,,,,10,1.0000,0.8000,0.8889,VALIDATED
+class_metric,FABLAB,Digital Embroidery Machine,,,,,,,,,,,,10,1.0000,1.0000,1.0000,VALIDATED
+class_metric,FABLAB,Leapfrog Bolt Pro,,,,,,,,,,,,10,1.0000,1.0000,1.0000,VALIDATED
+class_metric,FABLAB,STRATASYS,,,,,,,,,,,,10,1.0000,0.1000,0.1818,VALIDATED
+missing_class,FABLAB,VAQUFORM,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.45322611927986145,0.3331637680530548,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,0,4.938600119203329,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.5220525860786438,0.42043954133987427,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,58,3.728399984538555,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.5121335983276367,0.4102290868759155,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,116,3.719900269061327,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.4474424421787262,0.252432182431221,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,175,3.670300357043743,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.48471972346305847,0.37534138560295105,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,233,3.4235999919474125,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.31298112869262695,0.12708528339862823,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,291,4.150200169533491,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,microscope,0.2408199906349182,0.004042118787765503,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,350,4.497000016272068,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.2250741720199585,0.03018924593925476,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,408,3.626200370490551,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.34710490703582764,0.1917072981595993,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,466,3.547799773514271,,,,,
+sample,CAESAR,analytical_balance,UNKNOWN,analytical_balance,0.3657321333885193,0.18102815747261047,False,False,Documentation/datasets/CAESAR/Analytical Balance.MOV,validation,source-disjoint,525,3.4169000573456287,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,benchtop_multi_parameter_meter,0.4148958921432495,0.24280840158462524,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,0,4.204399883747101,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,benchtop_multi_parameter_meter,0.3386992812156677,0.09171752631664276,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,54,3.5973000340163708,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,benchtop_multi_parameter_meter,0.4580751359462738,0.3252256363630295,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,109,4.042800050228834,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,benchtop_multi_parameter_meter,0.375415563583374,0.2231040745973587,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,164,3.7520001642405987,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,benchtop_multi_parameter_meter,0.321104496717453,0.16142679750919342,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,218,4.2757997289299965,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,benchtop_multi_parameter_meter,0.2719237804412842,0.11740823090076447,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,273,4.251500125974417,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,benchtop_multi_parameter_meter,0.6218655705451965,0.5332927033305168,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,328,4.67800023034215,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,chemical_testing_area,0.3454788625240326,0.09098157286643982,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,382,4.476900212466717,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,chemical_testing_area,0.30174559354782104,0.08594562113285065,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,437,4.414999857544899,,,,,
+sample,CAESAR,benchtop_multi_parameter_meter,UNKNOWN,benchtop_multi_parameter_meter,0.2900005877017975,0.09403485059738159,False,False,Documentation/datasets/CAESAR/Benchtop Multi-Parameter Meter.MOV,validation,source-disjoint,492,4.147899802774191,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.8575807809829712,0.7754089683294296,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,0,4.42909961566329,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.9234800338745117,0.8586083799600601,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,51,3.969500306993723,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.9277092814445496,0.8773284368216991,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,103,3.7831999361515045,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.8962023258209229,0.8073363453149796,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,155,4.256899934262037,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.9561389088630676,0.9396913405507803,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,206,4.827999975532293,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.9616605043411255,0.940207602456212,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,258,4.226199816912413,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.8143545389175415,0.7656154334545135,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,310,4.149099811911583,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.9642088413238525,0.9460090659558773,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,361,4.0825000032782555,,,,,
+sample,CAESAR,digital_dry_bath_incubator,UNKNOWN,digital_dry_bath_incubator,0.7022830247879028,0.5903630033135414,False,False,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,413,4.223099909722805,,,,,
+sample,CAESAR,digital_dry_bath_incubator,digital_dry_bath_incubator,digital_dry_bath_incubator,0.8216142058372498,0.7579531446099281,True,True,Documentation/datasets/CAESAR/Digital Dry Bath Incubator 2.MOV,validation,source-disjoint,465,4.284200258553028,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9966621398925781,0.9956446985015646,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,0,4.014800302684307,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9988344311714172,0.9984002913988661,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,53,4.2896997183561325,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9974441528320312,0.9963304536649957,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,106,4.797299858182669,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9968186616897583,0.9958832780248486,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,160,4.6860999427735806,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9919529557228088,0.9900073248427361,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,213,3.657700028270483,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9986116886138916,0.9980702851898968,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,266,4.549999721348286,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9942165613174438,0.9919638915453106,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,320,6.841600406914949,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.998180627822876,0.9971992609789595,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,373,14.650299679487944,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9992115497589111,0.9988998282933608,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,426,9.396499954164028,,,,,
+sample,CAESAR,ducted_fumehood,ducted_fumehood,ducted_fumehood,0.9967671632766724,0.9956941311247647,True,True,Documentation/datasets/CAESAR/Ducted Fumehood.MOV,validation,source-disjoint,480,10.174100287258625,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.9996887445449829,0.999587283396977,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,0,6.050200201570988,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.9998910427093506,0.9998607330016966,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,44,10.38549980148673,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.9998695850372314,0.9998384097489179,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,89,8.11769999563694,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.9997486472129822,0.9996782845119014,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,134,6.138899829238653,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.999792754650116,0.9997381290813792,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,178,4.812099970877171,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.999890923500061,0.9998690248867206,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,223,5.2016000263392925,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.9999719858169556,0.9999659145437363,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,268,5.554600153118372,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.9999065399169922,0.9998612997733289,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,312,10.47520013526082,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.9985085129737854,0.9978853560169227,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,357,5.801999941468239,,,,,
+sample,CAESAR,incubator,incubator,incubator,0.9998568296432495,0.9998184846008371,True,True,Documentation/datasets/CAESAR/Incubator.MOV,validation,source-disjoint,402,6.813399959355593,,,,,
+sample,CAESAR,laboratory_glassware,laboratory_glassware,laboratory_glassware,0.9510406255722046,0.9405832337215543,True,True,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,0,5.200199782848358,,,,,
+sample,CAESAR,laboratory_glassware,laboratory_glassware,laboratory_glassware,0.8275758028030396,0.7380776032805443,True,True,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,49,4.269700031727552,,,,,
+sample,CAESAR,laboratory_glassware,UNKNOWN,preparation_area,0.29720020294189453,0.10620847344398499,False,False,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,99,5.347900092601776,,,,,
+sample,CAESAR,laboratory_glassware,UNKNOWN,preparation_area,0.4453545808792114,0.06853580474853516,False,False,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,148,4.619899671524763,,,,,
+sample,CAESAR,laboratory_glassware,UNKNOWN,preparation_area,0.5565388798713684,0.2967214584350586,False,False,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,198,5.153900012373924,,,,,
+sample,CAESAR,laboratory_glassware,UNKNOWN,preparation_area,0.36569592356681824,0.17207978665828705,False,False,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,247,4.876399878412485,,,,,
+sample,CAESAR,laboratory_glassware,UNKNOWN,laboratory_glassware,0.22396402060985565,0.05276589095592499,False,False,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,297,3.6594998091459274,,,,,
+sample,CAESAR,laboratory_glassware,UNKNOWN,laboratory_glassware,0.30638694763183594,0.06390279531478882,False,False,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,346,4.656499717384577,,,,,
+sample,CAESAR,laboratory_glassware,UNKNOWN,laboratory_glassware,0.32721367478370667,0.1477820873260498,False,False,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,396,4.132499918341637,,,,,
+sample,CAESAR,laboratory_glassware,UNKNOWN,preparation_area,0.3208347260951996,0.11325603723526001,False,False,Documentation/datasets/CAESAR/Laboratory Glassware 2.MOV,validation,source-disjoint,446,3.7855999544262886,,,,,
+class_metric,CAESAR,analytical_balance,,,,,,,,,,,,10,N/A,0.0000,N/A,VALIDATED
+class_metric,CAESAR,benchtop_multi_parameter_meter,,,,,,,,,,,,10,N/A,0.0000,N/A,VALIDATED
+missing_class,CAESAR,biobase_vortex_mixer,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,chemical_testing_area,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+class_metric,CAESAR,digital_dry_bath_incubator,,,,,,,,,,,,10,1.0000,0.9000,0.9474,VALIDATED
+class_metric,CAESAR,ducted_fumehood,,,,,,,,,,,,10,1.0000,1.0000,1.0000,VALIDATED
+missing_class,CAESAR,gravimetrics,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,hot_plate_with_stirrer,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,img,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+class_metric,CAESAR,incubator,,,,,,,,,,,,10,1.0000,1.0000,1.0000,VALIDATED
+class_metric,CAESAR,laboratory_glassware,,,,,,,,,,,,10,1.0000,0.2000,0.3333,VALIDATED
+missing_class,CAESAR,microprocessor_centrifuge,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,microscope,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,nichipet_ex_ii,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,nichipet_ex_ii_and_biobase_vortex_mixer,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,preparation_area,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,shaker_incubator,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,spectrophotometer,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
+missing_class,CAESAR,velocity_18r_pro_centrifuge,,,,,,,,,,,,,,,,NO_INDEPENDENT_TEST_SAMPLES
