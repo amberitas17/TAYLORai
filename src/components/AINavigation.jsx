@@ -310,7 +310,7 @@ function NavigationAvatar({ event, instruction, language, labels, muted, onMute,
       <div className="navigation-avatar-stage">
         {show3D ? <NavigationAvatarBoundary>
           <Suspense fallback={<div className="navigation-avatar-loading">{language === 'tl' ? 'Inihahanda ang avatar…' : language === 'zh' ? '正在准备虚拟助手…' : 'Preparing avatar…'}</div>}>
-            <Hologram emotion={event === 'ARRIVED' ? 'happy' : 'neutral'} isAnimating={speaking || event !== 'IDLE'} spokenText={instruction || ''} disableAnimations={false} poseMode={eventPose[event] || 'neutral'} assetPreset="idle" />
+            <Hologram emotion={event === 'ARRIVED' ? 'happy' : 'neutral'} isAnimating={speaking || event !== 'IDLE'} spokenText={instruction || ''} disableAnimations={false} poseMode={eventPose[event] || 'relaxed'} assetPreset="optimized" />
           </Suspense>
         </NavigationAvatarBoundary> : <div className="navigation-avatar-fallback" role="status">TAYLOR voice guidance is active. 3D avatar paused to save memory.</div>}
       </div>
