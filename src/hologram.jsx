@@ -226,12 +226,18 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
       const arm = getBone(scene, side, 'Arm');
       const forearm = getBone(scene, side, 'ForeArm');
       const hand = getBone(scene, side, 'Hand');
+      // Use the shoulder's actual world-space side: mirrored rigs may name
+      // their left/right bones opposite to the camera-facing screen direction.
+      // The camera faces the model from positive Z, so a small positive Z
+      // component keeps the hands visible beside (not behind) the hips.
+      const shoulderX = arm?.getWorldPosition(new THREE.Vector3()).x ?? (side === 'left' ? -1 : 1);
+      const outward = shoulderX < 0 ? -1 : 1;
       if (arm) {
-        pointBoneToward(arm, new THREE.Vector3(side === 'left' ? -0.16 : 0.16, -1, 0), 0.4);
+        pointBoneToward(arm, new THREE.Vector3(outward * 0.34, -1, 0.14), 0.3);
         scene.updateMatrixWorld(true);
       }
       if (forearm) {
-        pointBoneToward(forearm, new THREE.Vector3(side === 'left' ? -0.1 : 0.1, -1, 0.04), 0.36);
+        pointBoneToward(forearm, new THREE.Vector3(outward * 0.27, -1, 0.28), 0.28);
         scene.updateMatrixWorld(true);
       }
       const restWrist = boneRestPoseRef.current.get(hand?.name);
