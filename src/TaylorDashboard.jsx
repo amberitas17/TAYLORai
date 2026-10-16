@@ -170,7 +170,9 @@ export default function TaylorDashboard() {
   const [avatarAttempt, setAvatarAttempt] = useState(0);
   const [avatarError, setAvatarError] = useState('');
   const [avatarUseOriginalFallback, setAvatarUseOriginalFallback] = useState(false);
-  const optimizedAvatarTest = new URLSearchParams(window.location.search).get('avatarTest') === 'optimized';
+  const avatarTestMode = new URLSearchParams(window.location.search).get('avatarTest');
+  // Prefer the optimized, relaxed avatar on /taylor; ?avatarTest=original remains a safe comparison path.
+  const optimizedAvatarTest = avatarTestMode !== 'original';
   useEffect(() => {
     const timer = window.setTimeout(() => setAvatarEnabled(true), 250);
     return () => window.clearTimeout(timer);
