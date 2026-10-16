@@ -29,7 +29,8 @@ export const EXHIBIT_ZONE_STATES = Object.freeze({
 export const MODEL_ASSET_VERSION = '20261010-recon-13class-v1';
 const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
 // A first-time 3G visitor may need substantially longer to receive ONNX model bytes.
-const MODEL_REQUEST_TIMEOUT_MS = 45000;
+// Slow mobile connections need enough time to finish the first download.
+const MODEL_REQUEST_TIMEOUT_MS = 180000;
 const MODEL_RETRY_DELAYS_MS = [1000, 3000];
 const RECOGNITION_MIN_CONFIDENCE = 0.80;
 const RECOGNITION_MIN_MARGIN = 0.15;
@@ -667,20 +668,25 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     signal: controller.signal
                 });
                 if (!response.ok) throw new Error(`Model resource request failed: ${response.status} ${url}`);
+                // Fully consume the response while the download timer is active.
+                // Cache writes must not block ONNX session creation or hold up the
+                // request timeout; a failed Cache.put is never a model failure.
+                const bytes = await response.arrayBuffer();
+                const headers = new Headers(response.headers);
+                const usableResponse = () => new Response(bytes, { status: response.status, statusText: response.statusText, headers });
+                window.clearTimeout(timeout);
                 if (typeof caches !== 'undefined') {
-                    const cache = await caches.open(MODEL_CACHE_NAME);
-                    // Cache Storage can reject writes on memory-constrained phones or
-                    // throttled connections. A successful network response must remain
-                    // usable for this session even when offline persistence fails.
-                    try {
-                        await cache.put(normalizedCacheKey, response.clone());
-                        if (!await cache.match(normalizedCacheKey)) {
-                            console.warn('Model resource was downloaded but cache verification failed:', url);
+                    // Fire-and-forget persistence: preserve the successfully received
+                    // bytes for this initialization even if browser storage fails.
+                    Promise.resolve().then(async () => {
+                        try {
+                            const cache = await caches.open(MODEL_CACHE_NAME);
+                            await cache.put(normalizedCacheKey, usableResponse());
+                        } catch (cacheError) {
+                            console.warn('Model downloaded; persistent cache write unavailable:', url, cacheError);
+                            this.recordZoneDiagnostic(zoneWithCacheMiss || this.classifierMode, 'MODEL_CACHE_WRITE_FAILED', { resource: url, message: cacheError.message });
                         }
-                    } catch (cacheError) {
-                        console.warn('Model resource downloaded; continuing without persistent cache:', url, cacheError);
-                        this.recordZoneDiagnostic(zoneWithCacheMiss || this.classifierMode, 'MODEL_CACHE_WRITE_FAILED', { resource: url, message: cacheError.message });
-                    }
+                    });
                 }
                 this.modelNetworkDownloads += 1;
                 this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'DOWNLOADED' };
@@ -688,7 +694,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.log(`📥 Model download end in ${(performance.now() - startedAt).toFixed(0)}ms: ${url}`, {
                     modelVersion: MODEL_ASSET_VERSION
                 });
-                return response;
+                return usableResponse();
             } catch (error) {
                 lastError = error;
                 if (attempt === MODEL_RETRY_DELAYS_MS.length) break;
