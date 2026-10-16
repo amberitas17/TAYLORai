@@ -179,9 +179,13 @@ export default function TaylorDashboard() {
   }, []);
   const retryAvatar = () => {
     setAvatarError('');
-    // A failed compressed asset may be unsupported on the current Safari session.
-    if (optimizedAvatarTest) setAvatarUseOriginalFallback(true);
+    // Retrying should not silently switch the default optimized avatar to the original.
     setAvatarEnabled(true);
+    setAvatarAttempt((attempt) => attempt + 1);
+  };
+  const useOriginalAvatar = () => {
+    setAvatarError('');
+    setAvatarUseOriginalFallback(true);
     setAvatarAttempt((attempt) => attempt + 1);
   };
   const [messages, setMessages] = useState([]);
@@ -587,7 +591,7 @@ export default function TaylorDashboard() {
             ) : !avatarEnabled ? (
               <AvatarPlaceholder message="Preparing TAYLOR avatar... Chat remains available while loading." />
             ) : (
-              <AvatarErrorBoundary key={avatarAttempt} asset={optimizedAvatarTest && !avatarUseOriginalFallback ? "optimized" : "original"} onError={(error) => setAvatarError(error?.message || "Unknown rendering error")} fallback={<AvatarPlaceholder message={avatarError ? `Avatar could not load: ${avatarError.slice(0, 160)}` : "Avatar rendering is unavailable on this device or connection."} onRetry={retryAvatar} />}>
+              <AvatarErrorBoundary key={avatarAttempt} asset={optimizedAvatarTest && !avatarUseOriginalFallback ? "optimized" : "original"} onError={(error) => setAvatarError(error?.message || "Unknown rendering error")} fallback={<div><AvatarPlaceholder message={avatarError ? `Avatar could not load: ${avatarError.slice(0, 160)}` : "Avatar rendering is unavailable on this device or connection."} onRetry={retryAvatar} />{optimizedAvatarTest && !avatarUseOriginalFallback && <button type="button" onClick={useOriginalAvatar}>Use original avatar</button>}</div>}>
                 <Suspense fallback={<AvatarPlaceholder message="Loading TAYLOR avatar..." />}>
                   <Hologram emotion={sessionContext?.emotion || 'neutral'} isAnimating={isSpeaking} spokenText={speechText} disableAnimations={true} poseMode="relaxed" assetPreset="idle" assetUrl={optimizedAvatarTest && !avatarUseOriginalFallback ? "/sarah-avatar-optimized.glb" : null} />
                 </Suspense>
