@@ -3,8 +3,8 @@ const STORE_NAME = 'explanations';
 const DB_VERSION = 1;
 export const EXPLANATION_KNOWLEDGE_VERSION = 'exhibit-explanations-v1';
 
-function cacheKey(center, exhibit, version = EXPLANATION_KNOWLEDGE_VERSION) {
-  return `${String(center).toUpperCase()}:${String(exhibit).trim()}:${version}`;
+function cacheKey(center, exhibit, version = EXPLANATION_KNOWLEDGE_VERSION, language = 'en') {
+  return `${String(center).toUpperCase()}:${String(exhibit).trim()}:${language}:${version}`;
 }
 
 function openDatabase() {
@@ -17,11 +17,11 @@ function openDatabase() {
   });
 }
 
-export async function getCachedExhibitExplanation(center, exhibit, version = EXPLANATION_KNOWLEDGE_VERSION) {
+export async function getCachedExhibitExplanation(center, exhibit, version = EXPLANATION_KNOWLEDGE_VERSION, language = 'en') {
   try {
     const db = await openDatabase();
     return await new Promise((resolve, reject) => {
-      const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(cacheKey(center, exhibit, version));
+      const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(cacheKey(center, exhibit, version, language));
       request.onsuccess = () => resolve(request.result?.explanation || null);
       request.onerror = () => reject(request.error);
     });
@@ -30,13 +30,13 @@ export async function getCachedExhibitExplanation(center, exhibit, version = EXP
   }
 }
 
-export async function cacheExhibitExplanation(center, exhibit, explanation, version = EXPLANATION_KNOWLEDGE_VERSION) {
+export async function cacheExhibitExplanation(center, exhibit, explanation, version = EXPLANATION_KNOWLEDGE_VERSION, language = 'en') {
   if (!explanation?.verified || !explanation?.whatIsIt || !explanation?.purpose || !explanation?.sources?.length) return false;
   try {
     const db = await openDatabase();
     await new Promise((resolve, reject) => {
       const request = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put({
-        key: cacheKey(center, exhibit, version),
+        key: cacheKey(center, exhibit, version, language),
         explanation: { ...explanation, knowledgeVersion: version, cachedAt: new Date().toISOString() },
       });
       request.onsuccess = resolve;
@@ -48,11 +48,11 @@ export async function cacheExhibitExplanation(center, exhibit, explanation, vers
   }
 }
 
-export async function requestExhibitExplanation({ center, recognitionLabel, displayName, signal }) {
+export async function requestExhibitExplanation({ center, recognitionLabel, displayName, language = 'en', signal }) {
   const response = await fetch('/api/exhibit-explanation', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ center, recognitionLabel, displayName }),
+    body: JSON.stringify({ center, recognitionLabel, displayName, language }),
     signal,
   });
   if (!response.ok) throw new Error(`Explanation request failed (${response.status})`);

@@ -13,9 +13,9 @@ export function getPerformanceMode() {
   return 'full';
 }
 export const PERFORMANCE_SETTINGS = Object.freeze({
-  lite: { avatar3D: false, pixelRatio: 1, inferenceInterval: 2500 },
-  balanced: { avatar3D: true, pixelRatio: 1, inferenceInterval: 1500 },
-  full: { avatar3D: true, pixelRatio: 1.25, inferenceInterval: 1500 },
+  lite: { avatar3D: false, pixelRatio: 1, inferenceInterval: 2500, cameraWidth: 640, cameraHeight: 480 },
+  balanced: { avatar3D: true, pixelRatio: 1, inferenceInterval: 1500, cameraWidth: 1280, cameraHeight: 720 },
+  full: { avatar3D: true, pixelRatio: 1.25, inferenceInterval: 1500, cameraWidth: 1920, cameraHeight: 1080 },
 });
 export function getPerformanceSettings() {
   return PERFORMANCE_SETTINGS[getPerformanceMode()];

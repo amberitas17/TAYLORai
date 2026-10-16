@@ -1,7 +1,7 @@
 import centerRecords from '../../data/bulsu-centers.records.json' with { type: 'json' };
 
 export const LOCAL_KNOWLEDGE_SCHEMA_VERSION = 1;
-export const LOCAL_KNOWLEDGE_VERSION = 'bulsu-centers-20261009-v1';
+export const LOCAL_KNOWLEDGE_VERSION = 'bulsu-centers-20261012-entity-intent-v5';
 export const LOCAL_KNOWLEDGE_DB_NAME = 'taylor-local-knowledge';
 export const LOCAL_KNOWLEDGE_STORE_NAME = 'indexes';
 export const LOCAL_KNOWLEDGE_KEY = 'bulsu-centers';
@@ -19,6 +19,7 @@ const ENTITY_ALIASES = Object.freeze({
 });
 
 const INTENT_SECTIONS = Object.freeze({
+  contact: ['contact'],
   services: ['services', 'technical_services', 'research_and_development', 'laboratory_and_technical_services', 'additive_manufacturing', 'subtractive_and_other_services', 'programs'],
   facilities: ['additive_manufacturing', 'subtractive_and_other_services', 'stakeholders', 'laboratory_and_technical_services'],
   location: ['overview', 'regional_context', 'vision_mission_goals', 'stakeholders'],
@@ -38,18 +39,26 @@ function tokens(value) {
 
 function entityFromText(value = '') {
   const normalized = normalize(value);
-  return Object.entries(ENTITY_ALIASES)
+  if (!normalized) return '';
+  const aliases = Object.entries(ENTITY_ALIASES)
     .filter(([entity]) => !entity.endsWith('_PENDING'))
-    .sort(([, left], [, right]) => Math.max(...right.map((alias) => normalize(alias).length)) - Math.max(...left.map((alias) => normalize(alias).length)))
-    .find(([, aliases]) => aliases.some((alias) => normalized.includes(normalize(alias))))?.[0] || '';
+    .flatMap(([entity, names]) => names.map((name) => ({ entity, alias: normalize(name) })))
+    .filter(({ alias }) => alias.length > 0)
+    .sort((left, right) => right.alias.length - left.alias.length);
+  return aliases.find(({ alias }) => (' ' + normalized + ' ').includes(' ' + alias + ' '))?.entity || '';
 }
 
 function getIntent(query) {
   const normalized = normalize(query);
+  if (/\b(contact|contacts|phone|telephone|mobile|email|e mail|reach|call|hotline|number|facebook|messenger)\b/.test(normalized)) return 'contact';
   if (/\bwhere|location|located|building|floor|campus|address\b/.test(normalized)) return 'location';
   if (/\bservice|services|offer|offers|provide|support|training|workshop|equipment|facility|facilities|use\b/.test(normalized)) return 'services';
   if (/\bfocus|research|project|projects|work|mission|vision|program|programs\b/.test(normalized)) return 'focus';
   return 'overview';
+}
+
+function isFollowUpQuestion(query) {
+  return /\b(it|its|they|them|their|this|that|these|those|the center|the office|the facility|the program|the services)\b/i.test(normalize(query));
 }
 
 function buildEntityIndex(records) {
@@ -115,6 +124,9 @@ function scoreEntity(entity, queryTokens, query, activeEntity) {
 function answerForEntity(entity, query, intent) {
   const allowedSections = new Set(INTENT_SECTIONS[intent]);
   const relevant = entity.records.filter((record) => allowedSections.has(record.section));
+  if (intent === 'contact' && relevant.length === 0) {
+    return { text: `I do not have verified phone numbers or email addresses for ${entity.entity} in the current BulSU research-center directory. Please confirm the latest contact details with the university or the center directly. I will not guess.`, sourceIds: [], sources: [], intent };
+  }
   if (intent === 'location') {
     const locationRecords = entity.records.filter((record) => Object.keys(record.location).length > 0);
     if (locationRecords.length === 0 && Object.keys(entity.locations).length === 0) return null;
@@ -143,13 +155,17 @@ export function searchLocalKnowledge(query, { activeEntity = '', index = createK
   const text = String(query || '').trim();
   if (!text) return { match: null, reason: 'empty-query', latencyMs: 0 };
   const started = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  const requestedEntity = entityFromText(text) || entityFromText(activeEntity);
+  const explicitEntity = entityFromText(text);
+  const requestedEntity = explicitEntity || (isFollowUpQuestion(text) ? entityFromText(activeEntity) : '');
   const queryTokens = tokens(text);
   const candidates = Object.values(index.entities)
     .map((entity) => ({ entity, score: scoreEntity(entity, queryTokens, text, activeEntity) }))
     .filter(({ entity, score }) => score > 0 && (!requestedEntity || entity.entity === requestedEntity))
     .sort((left, right) => right.score - left.score);
   if (candidates.length === 0) return { match: null, reason: requestedEntity ? 'entity-not-indexed' : 'entity-not-found', entity: requestedEntity, latencyMs: elapsed(started) };
+  // Avoid attributing a generic BulSU question to a center just because one alias token overlaps.
+  // The explicit center or confirmed conversation context is required for local facts.
+  if (!requestedEntity) return { match: null, reason: 'center-not-specified', latencyMs: elapsed(started) };
   const intent = getIntent(text);
   const candidate = candidates[0];
   const answer = answerForEntity(candidate.entity, text, intent);

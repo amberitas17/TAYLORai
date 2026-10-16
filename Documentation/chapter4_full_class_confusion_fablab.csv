@@ -1,0 +1,9 @@
+expected\predicted,3D Outputs,BCN3d,Crealty Ender 3D Printer,Digital Embroidery Machine,Leapfrog Bolt Pro,STRATASYS,VAQUFORM,UNKNOWN
+3D Outputs,0,0,0,0,0,0,0,0
+BCN3d,0,0,0,0,0,0,0,0
+Crealty Ender 3D Printer,0,1,8,0,0,0,0,1
+Digital Embroidery Machine,0,0,0,10,0,0,0,0
+Leapfrog Bolt Pro,0,0,0,0,10,0,0,0
+STRATASYS,0,2,0,0,0,1,0,7
+VAQUFORM,0,0,0,0,0,0,0,0
+UNKNOWN,0,0,0,0,0,0,0,0

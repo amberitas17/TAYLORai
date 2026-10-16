@@ -28,15 +28,17 @@ export const EXHIBIT_ZONE_STATES = Object.freeze({
 
 export const MODEL_ASSET_VERSION = '20261010-recon-13class-v1';
 const MODEL_CACHE_NAME = `taylor-model-resources-${MODEL_ASSET_VERSION}`;
-const MODEL_REQUEST_TIMEOUT_MS = 8000;
-const MODEL_RETRY_DELAYS_MS = [500, 1500, 3500];
+// A first-time 3G visitor may need substantially longer to receive ONNX model bytes.
+// Slow mobile connections need enough time to finish the first download.
+const MODEL_REQUEST_TIMEOUT_MS = 180000;
+const MODEL_RETRY_DELAYS_MS = [1000, 3000];
 const RECOGNITION_MIN_CONFIDENCE = 0.80;
 const RECOGNITION_MIN_MARGIN = 0.15;
+// ORT-Web uses the single-threaded SIMD runtime on supported mobile browsers.
+// Do not eagerly download every 10–21 MB WASM variant on first visit.
+// ORT itself can request the non-SIMD fallback if the browser needs it.
 const RUNTIME_ASSETS = [
-    '/ort/ort-wasm.wasm',
-    '/ort/ort-wasm-simd.wasm',
-    '/ort/ort-wasm-simd-threaded.wasm',
-    '/ort/ort-wasm-simd-threaded.jsep.wasm'
+    '/ort/ort-wasm-simd.wasm'
 ];
 const ZONE_RESOURCES = Object.freeze({
     fablab: [
@@ -195,6 +197,8 @@ class ExhibitDetectionService {
         this.zoneLoadPromises = new Map();
         this.initializationPromises = new Map();
         this.initializationGeneration = 0;
+        this.activeInferences = 0;
+        this.releaseGeneration = 0;
         this.initializationDiagnostics = {
             route: '',
             modelUrl: '',
@@ -272,6 +276,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 }
 
     initialize(options = {}) {
+        ++this.releaseGeneration; // Cancel cleanup if a visitor immediately returns.
         const requestedMode = options.classifier || 'aricc';
         if (this.isInitialized && this.initializedMode === requestedMode) {
             return Promise.resolve();
@@ -321,9 +326,37 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 wasmPath: ort.env.wasm.wasmPaths
             });
 
-            console.log('🔄 Loading shared runtime, exhibit gate, and current zone model');
+            console.log('🔄 Loading selected WASM runtime, required exhibit/background gate, and current zone classifier');
 
-            await this.ensureRuntimeReady();
+            // Start only the active zone's ONNX downloads alongside the WASM
+            // runtime. Session creation remains sequential to protect mobile RAM.
+            const selectedModel = {
+                aricc: '/models/aricc/aricc_classifier.onnx',
+                recon: '/models/recon/recon_classifier.onnx',
+                fablab: '/models/fablab/fablab_classifier.onnx',
+                caesar: '/models/caesar/caesar_classifier.onnx'
+            }[requestedMode];
+            const pendingDownloads = [
+                '/models/exhibit_gate/exhibit_gate.onnx',
+                ...(selectedModel ? [selectedModel] : [])
+            ];
+            this.pendingModelDownloads = new Map();
+            for (const modelPath of pendingDownloads) {
+                const versionedPath = `${modelPath}?v=${MODEL_ASSET_VERSION}`;
+                // Attach rejection handling immediately: slow 4G downloads can
+                // finish or fail long before their ONNX session is created.
+                const task = this.fetchModelResource(versionedPath)
+                    .then(response => ({ response }), error => ({ error }));
+                this.pendingModelDownloads.set(versionedPath, task);
+            }
+            console.log('Parallel model downloads started', { models: pendingDownloads, runtime: RUNTIME_ASSETS });
+            try {
+                await this.ensureRuntimeReady();
+            } catch (runtimeError) {
+                // Avoid an unobserved rejection; model downloads remain cacheable.
+                this.pendingModelDownloads = null;
+                throw runtimeError;
+            }
             const runtimeStatuses = RUNTIME_ASSETS.map((resource) => this.resourceDiagnostics[resource]?.status);
             this.recordZoneDiagnostic(requestedMode,
                 runtimeStatuses.every((status) => status === 'HIT') ? 'RUNTIME_CACHE_HIT' : 'RUNTIME_CACHE_MISS',
@@ -364,6 +397,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 }
             }
 
+            this.pendingModelDownloads = null;
             this.zoneResourceCacheMisses.delete(requestedMode);
 
             if (generation !== this.initializationGeneration) {
@@ -395,19 +429,15 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.info('Ignoring stale recognition initialization error', { requestedMode, generation });
                 throw error;
             }
+            this.pendingModelDownloads = null;
             let initializationError = error;
             this.zoneStates[requestedMode] = this.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
-            if (!options.cacheOnly && !options.retry) {
-                console.warn('⚠️ Retrying recognition initialization from local cache', error.message);
-                try {
-                    return await this.initializeMode({ ...options, retry: true, cacheOnly: true, generation });
-                } catch (cacheRetryError) {
-                    initializationError = cacheRetryError;
-                }
-            }
-            this.modelState = this.zoneResourceCacheMisses.has(requestedMode) || initializationError.code === 'MODEL_DOWNLOAD_REQUIRED'
+            // Preserve the original network failure. A cache-only retry after a failed
+            // first download cannot recover missing bytes and masks the actual cause.
+            // Visitors can retry explicitly when connectivity improves.
+            this.modelState = initializationError.code === 'MODEL_DOWNLOAD_REQUIRED' || (this.zoneResourceCacheMisses.has(requestedMode) && !this.modelNetworkDownloads)
                 ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 : EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR;
             this.zoneStates[requestedMode] = this.modelState;
@@ -578,7 +608,11 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             return buffer;
         };
         try {
-            const response = await this.fetchModelResource(versionedPath);
+            const pending = this.pendingModelDownloads?.get(versionedPath);
+            const prefetched = pending ? await pending : null;
+            if (prefetched?.error) throw prefetched.error;
+            const response = prefetched?.response || await this.fetchModelResource(versionedPath);
+            if (pending) this.pendingModelDownloads.delete(versionedPath);
             const source = this.resourceDiagnostics[versionedPath]?.source
                 || (response.headers.get('x-taylor-cache-hit') === '1' ? 'CACHE' : 'NETWORK');
             this.initializationDiagnostics = {
@@ -620,7 +654,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
     async fetchModelResource(url, options = {}) {
         const cacheKey = options.cacheKey || url;
         const zoneWithCacheMiss = Object.keys(ZONE_RESOURCES).find((zone) => url.includes(`/models/${zone}/`));
-        const normalizedCacheKey = cacheKey.includes('.onnx') && !cacheKey.includes('?')
+        const normalizedCacheKey = (cacheKey.startsWith('/models/') && !cacheKey.includes('?'))
             ? `${cacheKey}?v=${MODEL_ASSET_VERSION}`
             : cacheKey;
         const requestOptions = { ...options };
@@ -668,14 +702,25 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                     signal: controller.signal
                 });
                 if (!response.ok) throw new Error(`Model resource request failed: ${response.status} ${url}`);
+                // Fully consume the response while the download timer is active.
+                // Cache writes must not block ONNX session creation or hold up the
+                // request timeout; a failed Cache.put is never a model failure.
+                const bytes = await response.arrayBuffer();
+                const headers = new Headers(response.headers);
+                const usableResponse = () => new Response(bytes, { status: response.status, statusText: response.statusText, headers });
+                window.clearTimeout(timeout);
                 if (typeof caches !== 'undefined') {
-                    const cache = await caches.open(MODEL_CACHE_NAME);
-                    await cache.put(normalizedCacheKey, response.clone());
-                    if (!await cache.match(normalizedCacheKey)) {
-                        const verificationError = new Error(`Model resource cache verification failed: ${url}`);
-                        verificationError.code = 'MODEL_CACHE_VERIFICATION_FAILED';
-                        throw verificationError;
-                    }
+                    // Fire-and-forget persistence: preserve the successfully received
+                    // bytes for this initialization even if browser storage fails.
+                    Promise.resolve().then(async () => {
+                        try {
+                            const cache = await caches.open(MODEL_CACHE_NAME);
+                            await cache.put(normalizedCacheKey, usableResponse());
+                        } catch (cacheError) {
+                            console.warn('Model downloaded; persistent cache write unavailable:', url, cacheError);
+                            this.recordZoneDiagnostic(zoneWithCacheMiss || this.classifierMode, 'MODEL_CACHE_WRITE_FAILED', { resource: url, message: cacheError.message });
+                        }
+                    });
                 }
                 this.modelNetworkDownloads += 1;
                 this.resourceDiagnostics[url] = { source: 'NETWORK', status: 'DOWNLOADED' };
@@ -683,7 +728,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.log(`📥 Model download end in ${(performance.now() - startedAt).toFixed(0)}ms: ${url}`, {
                     modelVersion: MODEL_ASSET_VERSION
                 });
-                return response;
+                return usableResponse();
             } catch (error) {
                 lastError = error;
                 if (attempt === MODEL_RETRY_DELAYS_MS.length) break;
@@ -1369,9 +1414,43 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
 
     async detectHierarchical(imageElement) {
-        const detection = await this.detectHierarchicalCore(imageElement);
-        this.observeImprovementCandidate(detection, imageElement);
-        return detection;
+        this.activeInferences += 1;
+        try {
+            const detection = await this.detectHierarchicalCore(imageElement);
+            this.observeImprovementCandidate(detection, imageElement);
+            return detection;
+        } finally {
+            this.activeInferences -= 1;
+        }
+    }
+
+    async releaseInactiveSessions() {
+        const releaseId = ++this.releaseGeneration;
+        // Initialization and inference must finish before native WASM sessions are released.
+        await Promise.allSettled([...this.initializationPromises.values()]);
+        while (this.activeInferences > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            if (releaseId !== this.releaseGeneration) return;
+        }
+        if (releaseId !== this.releaseGeneration) return;
+        for (const name of ['ariccModel', 'reconModel', 'fablabModel', 'caesarModel', 'gateModel']) {
+            if (releaseId !== this.releaseGeneration) return;
+            const session = this[name];
+            this[name] = null;
+            if (session && typeof session.release === 'function') {
+                try { await session.release(); }
+                catch (error) { console.warn('ONNX session release failed:', name, error); }
+            }
+        }
+        this.ariccMetadata = null;
+        this.reconMetadata = null;
+        this.fablabMetadata = null;
+        this.caesarMetadata = null;
+        this.isInitialized = false;
+        this.initializedMode = null;
+        this.modelState = EXHIBIT_MODEL_STATES.CAMERA_READY;
+        for (const zone of ['aricc', 'recon', 'fablab', 'caesar']) this.zoneStates[zone] = 'MODEL_LOADING';
+        // Cache Storage is intentionally retained; next visit reloads locally.
     }
 
     setCandidateSourceContext(source = {}) {

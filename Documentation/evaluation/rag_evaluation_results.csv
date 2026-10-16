@@ -1,0 +1,155 @@
+questionId,center,question,answerAvailability,reply,automatedScore,researcherScore,researcherVerified,retrievalMode,retrievedDocumentIds,relevanceScores,retrievalEvidenceAvailable,retrievalContainsRequiredFacts,responseTimeMs,httpStatus,errorType
+q01-aricc-overview,ARICC,What is ARICC?,available,"ARICC stands for Advanced Robotics and Intelligent Control Center. It is one of the key Regional Development Centers established at Bulacan State University, serving as a strategic hub for innovation and cutting-edge research in intelligent systems and robotics.",Partially Correct,,FALSE,unreported,,,FALSE,,10584.54,200,
+q02-aricc-technologies,ARICC,What technologies does ARICC work with?,available,"According to the official BulSU center context, ARICC works with various emerging technologies, including:
+
+1. Internet of Things (IoT)
+2. Cyber-physical systems
+3. Cloud computing
+4. Cybersecurity
+5. Big data analytics
+6. Additive manufacturing
+7. Augmented and mixed reality
+8. Horizontal and vertical software integration
+9. Digital twin simulation
+10. Autonomous systems
+11. Robotics
+
+These technologies are integrated by the center to design, develop, and innovate robotic machines, smart systems, and automation technologies tailored for industrial and societal needs.",Correct,,FALSE,unreported,,,FALSE,,3467.39,200,
+q03-aricc-training,ARICC,What training programs does ARICC offer?,available,"According to the official BulSU center context, ARICC offers hands-on training programs, including:
+
+1. Robotics training: hands-on experience with collaborative and industrial robots
+2. Electronics and automation: Arduino-based systems, sensors, and control technologies
+3. PCB fabrication: circuit design and prototyping using PCB printers and engravers
+4. STEM bootcamps: age-appropriate modules for elementary to college students
+
+These training programs are designed to support education, innovation, and industry needs.",Correct,,FALSE,unreported,,,FALSE,,5601.72,200,
+q04-aricc-services,ARICC,What technical services does ARICC provide?,available,"According to the official BulSU center context, ARICC provides the following technical services: 
+
+1. PCB printing and prototyping services
+2. 3D printing and model fabrication
+3. Capstone or thesis project support
+4. Automation and IoT system development
+5. Mobile tech exhibits for schools and events
+6. Equipment repair and calibration for electronics and training kits
+7. Educational kit assembly and sales.
+
+These services are listed on the ARICC poster under technical services.",Correct,,FALSE,unreported,,,FALSE,,10794.15,200,
+q05-aricc-contact,ARICC,How can I contact ARICC?,available,The available center information does not provide the requested contact detail for ARICC.,Partially Correct,,FALSE,unreported,,,FALSE,,2922.73,200,
+q06-aricc-followup,ARICC,What about its vision?,available,"The Advanced Robotics and Intelligent Control Center (ARICC) envisions itself as a leading hub for innovations, research, and development of robotics and intelligent systems, with the goal of ""Transforming people's lives through Industry 4.0"".",Correct,,FALSE,unreported,,,FALSE,,2246.7,200,
+q07-caesar-overview,CAESAR,What is CAESAR?,available,"CAESAR stands for Center for Advanced Environmental Science and Agriculture Research. It is a multidisciplinary research hub committed to advancing sustainable agriculture and environmental conservation by integrating science, innovation, and community action to address key issues such as habitat loss, biodiversity decline, climate change, and food security.",Correct,,FALSE,unreported,,,FALSE,,745.8,200,
+q08-caesar-research,CAESAR,What research and development services does CAESAR provide?,available,"CAESAR, the Center for Advanced Environmental Science and Agriculture Research, provides the following research and development services: 
+
+1. Biodiversity assessment and monitoring across terrestrial, freshwater, and agro-ecosystems;
+2. Ecological restoration and conservation planning; and 
+3. Native species propagation and resource conservation.",Correct,,FALSE,unreported,,,FALSE,,2625.28,200,
+q09-caesar-lab,CAESAR,What laboratory services are available from CAESAR?,available,"CAESAR, the Center for Advanced Environmental Science and Agriculture Research, offers the following laboratory and technical services: 
+
+1. Biochemical and microbiological testing for agriculture and environment
+2. DNA barcoding and molecular ecology
+3. Laboratory equipment rental
+
+These services are listed in the official CAESAR material.",Correct,,FALSE,unreported,,,FALSE,,2326.82,200,
+q10-caesar-community,CAESAR,How does CAESAR engage communities?,available,"CAESAR, the Center for Advanced Environmental Science and Agriculture Research, engages communities through several initiatives. These include:
+
+1. Collaborative projects with local government units, non-government organizations, and farmer groups.
+2. Participatory conservation planning and citizen science initiatives.
+3. Support for sustainable livelihoods linked to biodiversity.
+
+These community and stakeholder engagement activities aim to promote sustainable agriculture and environmental conservation.",Partially Correct,,FALSE,unreported,,,FALSE,,1386.4,200,
+q11-caesar-contact,CAESAR,What are CAESAR's contact details?,available,The available center information does not provide CAESAR's contact details.,Partially Correct,,FALSE,unreported,,,FALSE,,1902.15,200,
+q12-fablab-location,FABLAB,Where is the BulSU FABLAB located?,available,The available center information does not provide the location of the BulSU FABLAB.,Partially Correct,,FALSE,unreported,,,FALSE,,2130.68,200,
+q13-fablab-vision,FABLAB,What are FABLAB's vision and goals?,available,"The Center for Fabrication and Manufacture (FABLAB) at Bulacan State University has a vision to initiate the development or enhancement of existing and new products to collectively empower people of all ages to experiment and invent anything to solve real-world problems at different community levels and create diversity within the region.
+
+Its goals include:
+1. Rapid prototyping for all
+2. Building regional partnerships
+3. Developing notable projects
+4. Establishing an innovation laboratory",Correct,,FALSE,unreported,,,FALSE,,3919.96,200,
+q14-fablab-additive,FABLAB,What additive-manufacturing services does FABLAB provide?,available,"According to the official poster, FABLAB provides the following additive manufacturing services: 
+
+1. 3D printing
+2. Large format printing
+3. Digital embroidery
+4. 3D scanning
+5. Vacuum forming
+6. UV printing",Correct,,FALSE,unreported,,,FALSE,,16454.2,200,
+q15-fablab-other,FABLAB,What subtractive and other services does FABLAB offer?,available,"According to the official BulSU center context, FABLAB offers the following subtractive manufacturing services: 
+
+1. Laser cutting
+2. Desktop CNC
+
+Additionally, FABLAB provides other services including:
+
+1. Consultancy services
+2. Product prototyping
+3. 3D printing workshop and training
+4. Additive manufacturing workshop
+5. Subtractive manufacturing workshop
+6. Collaborations and partnerships",Correct,,FALSE,unreported,,,FALSE,,4680.1,200,
+q16-fablab-followup,FABLAB,Who can use it?,available,"According to the official FABLAB poster, the following stakeholders can use FABLAB: 
+
+1. Faculty researchers - they have access to advanced fabrication tools and expert design support.
+2. Students - they have hands-on prototyping access.
+3. Research centers - they can use specialized equipment for rapid prototyping and testing.
+4. Extension services and partner local government units or NGOs - they receive community training and technology deployment support.
+5. The innovation and technology support office - they help with patent filings and future licensing revenue.",Correct,,FALSE,unreported,,,FALSE,,4228.03,200,
+q17-baras-overview,BARAS TBI,What does BARAS TBI stand for and what is it?,available,BARAS TBI stands for Business Assistance for Research Acceleration and Sustainability. It is Bulacan State University's homegrown Technology Business Incubator and a launchpad for early-stage startups solving real-world problems through technology and innovation.,Correct,,FALSE,unreported,,,FALSE,,2124.53,200,
+q18-baras-track,BARAS TBI,What support does BARAS TBI provide?,available,"According to the provided context, BARAS TBI offers support through the following:
+
+1. Expert mentorship
+2. Tailored business development support
+3. Access to a strong network
+4. Access to facilities
+
+Additionally, BARAS TBI has various programs that provide support to startups, including:
+
+1. Lakbay-IN(novation) - a university caravan for technology business awareness
+2. Tuklas-IN(novation) - a startup bootcamp for education and training
+3. Likha-IN(novation) - a hackathon or startup weekend for aspiring entrepreneurs
+4. Linang-IN(novation) - a six-month intensive incubation program with mentoring on various aspects of business
+5. Ugnay-IN(novation) - a demoday or investors' pitch connecting startups to possible investors and funding opportunities.",Partially Correct,,FALSE,unreported,,,FALSE,,12897.68,200,
+q19-baras-programs,BARAS TBI,What programs does BARAS TBI offer?,available,"The DOST-BulSU BARAS Technology Business Incubator (BARAS TBI) offers the following programs:
+
+1. Lakbay-IN(novation) - a university caravan for technology business awareness and technology-driven research with commercialization potential.
+2. Tuklas-IN(novation) - a startup bootcamp for education and training intended to activate desire for technology businesses.
+3. Likha-IN(novation) - a hackathon or startup weekend for aspiring entrepreneurs to meet, engage, and collaborate.
+4. Linang-IN(novation) - a six-month intensive incubation program with mentoring on technology, finance, management, intellectual property, and market research.
+5. Ugnay-IN(novation) - a demoday or investors' pitch connecting startups to possible investors and funding opportunities.
+
+These programs aim to support and empower startups and entrepreneurs in their journey to create innovative solutions and contribute to community economic growth.",Correct,,FALSE,unreported,,,FALSE,,12630.08,200,
+q20-baras-contact-unknown,BARAS TBI,What is BARAS TBI's email address?,unavailable,The available center information does not provide the requested detail about BARAS TBI's email address.,Appropriate Abstention,,FALSE,unreported,,,FALSE,,2132.26,200,
+q21-cbs-overview,CBS,What is the Center for Bulacan Studies?,available,The Center for Bulacan Studies (CBS) is a research center of Bulacan State University that is devoted to exploring the archaeological and environmental history of Bulacan. Its primary goal is to preserve and promote the province's cultural heritage through research collaborations with various institutions and organizations.,Correct,,FALSE,unreported,,,FALSE,,3706.56,200,
+q22-cbs-services,CBS,What services does CBS offer?,available,"The Center for Bulacan Studies (CBS) offers the following services: 
+
+1. Subsurface scanning using ground penetrating radar with a 450 MHz antenna
+2. Public exhibit
+3. Archaeological, historical, and heritage site assessment
+4. Material analysis for ceramic and metal.",Correct,,FALSE,unreported,,,FALSE,,1968.32,200,
+q23-cbs-contact,CBS,How can I contact the Center for Bulacan Studies?,available,The available center information does not provide the requested detail about the contact information of the Center for Bulacan Studies.,Partially Correct,,FALSE,unreported,,,FALSE,,1398.45,200,
+q24-fic-role,FIC,What is the role of the Regional Food Innovation Center?,available,"The Regional Food Innovation Center (FIC) serves as a hub for innovations, research and development, and support services for value-adding fresh produce and the development of processed foods.",Correct,,FALSE,unreported,,,FALSE,,1553.73,200,
+q25-fic-launch,FIC,Where is the Regional FIC housed and when was Region 3 FIC launched?,available,"The Regional Food Innovation Center (FIC) is housed in Malolos, Bulacan, at the Carpio Hall Grounds of Bulacan State University. The Region 3 FIC was formally launched on December 15, 2017, together with the Department of Science and Technology (DOST).",Correct,,FALSE,unreported,,,FALSE,,4456.31,200,
+q26-recon-overview,RECON,What is the role of the RECON Center?,available,"The RECON Center, or Resiliency Energy Continuity Center, plays a role in bridging science, policy, and community development to build a more resilient and energy-efficient future. Its mission is to advance knowledge, foster collaboration, and develop practical strategies to enhance resilience, optimize energy utilization, and ensure continuity in the face of evolving environmental, social, and technological dynamics.",Incorrect,,FALSE,unreported,,,FALSE,,3656.96,200,
+q27-recon-services,RECON,What services and focus areas does RECON provide?,available,"The RECON Center, or Resiliency Energy Continuity Center, provides various services, including:
+
+1. Development of renewable energy systems and smart technologies
+2. Research on energy management and disaster risk reduction
+3. Design of resilient communication and weather monitoring systems
+4. Innovation in automation machinery and low-cost mechanical energy systems
+5. Partnership with local and national stakeholders for community impact
+6. Technical consultation
+7. Drone services
+8. Equipment rental services
+9. Trainings
+
+As for its focus areas, RECON concentrates on:
+
+1. People and community engagement
+2. Planet and environmental conservation
+3. Prosperity and economic development
+4. Peace and conflict resolution support
+5. Partnerships for multi-sector collaboration
+
+These services and focus areas align with RECON's mission to advance knowledge, foster collaboration, and develop practical strategies to enhance resilience, optimize energy utilization, and ensure continuity.",Correct,,FALSE,unreported,,,FALSE,,6572.81,200,
+q28-recon-projects,RECON,What recent projects are listed for RECON?,available,The available center information does not provide the requested detail about recent RECON projects.,Partially Correct,,FALSE,unreported,,,FALSE,,1376.3,200,
+q29-recon-followup,RECON,Does it have a contact email?,available,The available center information does not provide the requested detail about a contact email for RECON.,Partially Correct,,FALSE,unreported,,,FALSE,,2545.67,200,
+q30-rio-abstention,RIO,What services and contact details does the Research and Innovation Office (RIO) provide?,unavailable,"The verified BulSU knowledge base currently has no RIO records for this question, so I cannot provide or invent details about RIO.",Appropriate Abstention,,FALSE,unreported,,,FALSE,,283.1,200,

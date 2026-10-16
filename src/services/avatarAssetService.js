@@ -1,6 +1,7 @@
 const AVATAR_CACHE_NAME = 'taylor-avatar-assets-v1';
 const AVATAR_ASSETS = ['/sarah-avatar.glb'];
-const AVATAR_TIMEOUT_MS = 30000;
+// Allow a slow 3G connection enough time to deliver the initial GLB.
+const AVATAR_TIMEOUT_MS = 90000;
 const AVATAR_MAX_ATTEMPTS = 3;
 
 class AvatarAssetService {
@@ -15,6 +16,7 @@ class AvatarAssetService {
     this.cacheMisses = 0;
     this.error = '';
     this.resources = {};
+    this.assetObjectUrls = {};
     this.loadStartedAt = 0;
   }
 
@@ -39,12 +41,23 @@ class AvatarAssetService {
 
   async loadAssets() {
     const startedAt = performance.now();
-    const cache = await caches.open(AVATAR_CACHE_NAME);
+    let cache = null;
+    try {
+      if (typeof caches !== 'undefined') cache = await caches.open(AVATAR_CACHE_NAME);
+    } catch (error) {
+      console.warn('[avatar] Cache Storage unavailable; continuing with network loading:', error);
+    }
     const sources = await Promise.all(AVATAR_ASSETS.map(async (asset) => {
       const assetStartedAt = performance.now();
       const url = new URL(asset, window.location.origin).href;
-      const cached = await cache.match(url);
+      let cached = null;
+      try {
+        cached = cache ? await cache.match(url) : null;
+      } catch (error) {
+        console.warn('[avatar] Cache lookup failed; continuing with network loading:', error);
+      }
       if (cached) {
+        await this.prepareObjectUrl(asset, cached);
         this.state = 'AVATAR_LOADING_FROM_CACHE';
         this.cacheHits += 1;
         this.resources[asset] = { source: 'CACHE', duration: performance.now() - assetStartedAt };
@@ -64,9 +77,19 @@ class AvatarAssetService {
             error.retryable = response.status === 408 || response.status === 429 || response.status >= 500;
             throw error;
           }
-          await cache.put(url, response.clone());
-          if (!await cache.match(url)) throw new Error(`${asset} could not be verified in Cache Storage`);
-          this.resources[asset] = { source: 'NETWORK', attempts: attempt + 1, duration: performance.now() - assetStartedAt };
+          // Cache persistence is best-effort: a browser storage failure must not
+          // turn a successfully downloaded avatar into a fatal initialization error.
+          let cacheSaved = false;
+          if (cache) {
+            try {
+              await cache.put(url, response.clone());
+              cacheSaved = Boolean(await cache.match(url));
+            } catch (cacheError) {
+              console.warn('[avatar] Cache write failed; avatar can still render:', cacheError);
+            }
+          }
+          await this.prepareObjectUrl(asset, response);
+          this.resources[asset] = { source: 'NETWORK', attempts: attempt + 1, duration: performance.now() - assetStartedAt, cacheSaved };
           return 'NETWORK';
         } catch (error) {
           lastError = error;
@@ -84,6 +107,19 @@ class AvatarAssetService {
     this.source = sources.every((source) => source === 'CACHE') ? 'CACHE' : 'NETWORK';
     this.downloadTime = performance.now() - startedAt;
     this.initializationTime = this.downloadTime;
+  }
+
+  async prepareObjectUrl(asset, response) {
+    if (this.assetObjectUrls[asset]) return this.assetObjectUrls[asset];
+    const blob = await response.blob();
+    if (!blob.size) throw new Error(`Avatar asset ${asset} is empty`);
+    const objectUrl = URL.createObjectURL(blob);
+    this.assetObjectUrls[asset] = objectUrl;
+    return objectUrl;
+  }
+
+  getAssetUrl(asset = '/sarah-avatar.glb') {
+    return this.assetObjectUrls[asset] || null;
   }
 
   markFirstRender() {
