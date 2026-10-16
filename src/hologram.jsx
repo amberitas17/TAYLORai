@@ -216,22 +216,26 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
     return rise * (1 - THREE.MathUtils.smoothstep(elapsed, 1.7, 2.35));
   };
 
-  // Use the avatar's actual bone direction rather than fixed Euler angles, which vary by rig.
-  // This is only applied in relaxed mode; navigation gestures retain their existing controls.
+  // Keep both avatar assets in a comfortable hands-down stance on /taylor.
+  // Orient each rig segment in world space rather than relying on asset-specific Euler angles.
+  // Navigation pointing poses are not affected.
   const relaxArms = (scene) => {
     if (poseMode !== 'relaxed') return;
     scene.updateMatrixWorld(true);
     ['left', 'right'].forEach((side) => {
       const arm = getBone(scene, side, 'Arm');
       const forearm = getBone(scene, side, 'ForeArm');
+      const hand = getBone(scene, side, 'Hand');
       if (arm) {
-        pointBoneToward(arm, new THREE.Vector3(side === 'left' ? -0.12 : 0.12, -1, 0), 0.16);
+        pointBoneToward(arm, new THREE.Vector3(side === 'left' ? -0.16 : 0.16, -1, 0), 0.4);
         scene.updateMatrixWorld(true);
       }
       if (forearm) {
-        pointBoneToward(forearm, new THREE.Vector3(side === 'left' ? -0.08 : 0.08, -1, 0.06), 0.13);
+        pointBoneToward(forearm, new THREE.Vector3(side === 'left' ? -0.1 : 0.1, -1, 0.04), 0.36);
         scene.updateMatrixWorld(true);
       }
+      const restWrist = boneRestPoseRef.current.get(hand?.name);
+      if (hand && restWrist) hand.quaternion.slerp(restWrist, 0.3);
     });
   };
 
