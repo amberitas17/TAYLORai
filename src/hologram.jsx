@@ -233,11 +233,11 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
       const shoulderX = arm?.getWorldPosition(new THREE.Vector3()).x ?? (side === 'left' ? -1 : 1);
       const outward = shoulderX < 0 ? -1 : 1;
       if (arm) {
-        pointBoneToward(arm, new THREE.Vector3(outward * 0.34, -1, 0.14), 0.3);
+        pointBoneToward(arm, new THREE.Vector3(outward * 0.16, -1, 0.14), 0.3);
         scene.updateMatrixWorld(true);
       }
       if (forearm) {
-        pointBoneToward(forearm, new THREE.Vector3(outward * 0.27, -1, 0.28), 0.28);
+        pointBoneToward(forearm, new THREE.Vector3(outward * 0.10, -1, 0.24), 0.28);
         scene.updateMatrixWorld(true);
       }
       const restWrist = boneRestPoseRef.current.get(hand?.name);
