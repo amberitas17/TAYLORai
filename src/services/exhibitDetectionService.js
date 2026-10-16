@@ -328,7 +328,35 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
 
             console.log('🔄 Loading selected WASM runtime, required exhibit/background gate, and current zone classifier');
 
-            await this.ensureRuntimeReady();
+            // Start only the active zone's ONNX downloads alongside the WASM
+            // runtime. Session creation remains sequential to protect mobile RAM.
+            const selectedModel = {
+                aricc: '/models/aricc/aricc_classifier.onnx',
+                recon: '/models/recon/recon_classifier.onnx',
+                fablab: '/models/fablab/fablab_classifier.onnx',
+                caesar: '/models/caesar/caesar_classifier.onnx'
+            }[requestedMode];
+            const pendingDownloads = [
+                '/models/exhibit_gate/exhibit_gate.onnx',
+                ...(selectedModel ? [selectedModel] : [])
+            ];
+            this.pendingModelDownloads = new Map();
+            for (const modelPath of pendingDownloads) {
+                const versionedPath = `${modelPath}?v=${MODEL_ASSET_VERSION}`;
+                // Attach rejection handling immediately: slow 4G downloads can
+                // finish or fail long before their ONNX session is created.
+                const task = this.fetchModelResource(versionedPath)
+                    .then(response => ({ response }), error => ({ error }));
+                this.pendingModelDownloads.set(versionedPath, task);
+            }
+            console.log('Parallel model downloads started', { models: pendingDownloads, runtime: RUNTIME_ASSETS });
+            try {
+                await this.ensureRuntimeReady();
+            } catch (runtimeError) {
+                // Avoid an unobserved rejection; model downloads remain cacheable.
+                this.pendingModelDownloads = null;
+                throw runtimeError;
+            }
             const runtimeStatuses = RUNTIME_ASSETS.map((resource) => this.resourceDiagnostics[resource]?.status);
             this.recordZoneDiagnostic(requestedMode,
                 runtimeStatuses.every((status) => status === 'HIT') ? 'RUNTIME_CACHE_HIT' : 'RUNTIME_CACHE_MISS',
@@ -369,6 +397,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 }
             }
 
+            this.pendingModelDownloads = null;
             this.zoneResourceCacheMisses.delete(requestedMode);
 
             if (generation !== this.initializationGeneration) {
@@ -400,6 +429,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 console.info('Ignoring stale recognition initialization error', { requestedMode, generation });
                 throw error;
             }
+            this.pendingModelDownloads = null;
             let initializationError = error;
             this.zoneStates[requestedMode] = this.modelState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
                 ? EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED
@@ -578,7 +608,11 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
             return buffer;
         };
         try {
-            const response = await this.fetchModelResource(versionedPath);
+            const pending = this.pendingModelDownloads?.get(versionedPath);
+            const prefetched = pending ? await pending : null;
+            if (prefetched?.error) throw prefetched.error;
+            const response = prefetched?.response || await this.fetchModelResource(versionedPath);
+            if (pending) this.pendingModelDownloads.delete(versionedPath);
             const source = this.resourceDiagnostics[versionedPath]?.source
                 || (response.headers.get('x-taylor-cache-hit') === '1' ? 'CACHE' : 'NETWORK');
             this.initializationDiagnostics = {
