@@ -100,7 +100,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
     console.info('[hologram] all bones', boneNames);
     console.info('[hologram] armature bones', armBones);
 
-    if ((assetPreset === 'idle' || !disableAnimations) && activeAnims && activeAnims.length > 0) {
+    if (!disableAnimations && activeAnims && activeAnims.length > 0) {
       const idleClip = findIdleClip(activeAnims);
       const animatedBones = idleClip?.tracks
         ? [...new Set(idleClip.tracks.map((track) => track.name.split('.').slice(0, -1).join('.')))]
@@ -216,6 +216,25 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
     return rise * (1 - THREE.MathUtils.smoothstep(elapsed, 1.7, 2.35));
   };
 
+  // Use the avatar's actual bone direction rather than fixed Euler angles, which vary by rig.
+  // This is only applied in relaxed mode; navigation gestures retain their existing controls.
+  const relaxArms = (scene) => {
+    if (poseMode !== 'relaxed') return;
+    scene.updateMatrixWorld(true);
+    ['left', 'right'].forEach((side) => {
+      const arm = getBone(scene, side, 'Arm');
+      const forearm = getBone(scene, side, 'ForeArm');
+      if (arm) {
+        pointBoneToward(arm, new THREE.Vector3(side === 'left' ? -0.12 : 0.12, -1, 0), 0.16);
+        scene.updateMatrixWorld(true);
+      }
+      if (forearm) {
+        pointBoneToward(forearm, new THREE.Vector3(side === 'left' ? -0.08 : 0.08, -1, 0.06), 0.13);
+        scene.updateMatrixWorld(true);
+      }
+    });
+  };
+
   const applyPoseMode = (scene, time) => {
     if (!scene) return;
 
@@ -270,6 +289,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
 
     if (displayScene) {
       displayScene.visible = true;
+      relaxArms(displayScene);
       applyPoseMode(displayScene, clockRef.current.getElapsedTime());
     }
 
