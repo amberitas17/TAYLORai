@@ -34,11 +34,11 @@ const MODEL_REQUEST_TIMEOUT_MS = 180000;
 const MODEL_RETRY_DELAYS_MS = [1000, 3000];
 const RECOGNITION_MIN_CONFIDENCE = 0.80;
 const RECOGNITION_MIN_MARGIN = 0.15;
+// ORT-Web uses the single-threaded SIMD runtime on supported mobile browsers.
+// Do not eagerly download every 10–21 MB WASM variant on first visit.
+// ORT itself can request the non-SIMD fallback if the browser needs it.
 const RUNTIME_ASSETS = [
-    '/ort/ort-wasm.wasm',
-    '/ort/ort-wasm-simd.wasm',
-    '/ort/ort-wasm-simd-threaded.wasm',
-    '/ort/ort-wasm-simd-threaded.jsep.wasm'
+    '/ort/ort-wasm-simd.wasm'
 ];
 const ZONE_RESOURCES = Object.freeze({
     fablab: [
@@ -326,7 +326,7 @@ drawFocusBoundingBox(canvasOrCtx, box, options = {}) {
                 wasmPath: ort.env.wasm.wasmPaths
             });
 
-            console.log('🔄 Loading shared runtime, exhibit gate, and current zone model');
+            console.log('🔄 Loading selected WASM runtime, required exhibit/background gate, and current zone classifier');
 
             await this.ensureRuntimeReady();
             const runtimeStatuses = RUNTIME_ASSETS.map((resource) => this.resourceDiagnostics[resource]?.status);
