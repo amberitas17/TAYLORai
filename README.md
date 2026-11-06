@@ -1,4 +1,4 @@
-# Singapore Science Centre - Client-Side AI Emotion Detection
+# TAYLOR AI
 
 ## Overview
 This is a **completely client-side** React.js application that provides real-time emotion detection, age estimation, and gender prediction using face-api.js. No backend server required!
