@@ -1,0 +1,15 @@
+expected\predicted,charcoal_oven_machine,festo_solar_wind_training_system,fluke_2042_cable_tracer,fluke_355_clamp_meter,fluke_922_air_flow_meter,fluke_930_non_contact_tachometer,fluke_971_temperature_humidity_meter,ip_display_area,quadruple_suction_single_discharge_cooking_oil_transfer_device,root_crop_slicing_machine,testo_420_volume_flow_hood,testo_440_air_velocity_iaq,unmanned_aerial_system,UNKNOWN
+charcoal_oven_machine,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+festo_solar_wind_training_system,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+fluke_2042_cable_tracer,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+fluke_355_clamp_meter,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+fluke_922_air_flow_meter,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+fluke_930_non_contact_tachometer,0,0,0,0,0,1,0,0,0,0,0,0,0,0
+fluke_971_temperature_humidity_meter,0,0,0,0,0,0,0,0,0,0,0,0,0,1
+ip_display_area,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+quadruple_suction_single_discharge_cooking_oil_transfer_device,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+root_crop_slicing_machine,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+testo_420_volume_flow_hood,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+testo_440_air_velocity_iaq,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+unmanned_aerial_system,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+UNKNOWN,0,0,0,0,0,0,0,0,0,0,0,0,0,0

@@ -14,7 +14,7 @@
       "confidence": 1.0,
       "margin": 0.9999999523556085,
       "accepted": true,
-      "latency_ms": 3.7428000941872597,
+      "latency_ms": 7.059300318360329,
       "correct": true
     },
     {
@@ -30,7 +30,7 @@
       "confidence": 1.0,
       "margin": 0.9999999456296855,
       "accepted": true,
-      "latency_ms": 2.6507000438869,
+      "latency_ms": 4.61219996213913,
       "correct": true
     },
     {
@@ -46,7 +46,7 @@
       "confidence": 0.9999997615814209,
       "margin": 0.9999996247674687,
       "accepted": true,
-      "latency_ms": 2.524100011214614,
+      "latency_ms": 4.51119989156723,
       "correct": true
     },
     {
@@ -62,7 +62,7 @@
       "confidence": 0.9994933662668691,
       "margin": 0.9990721914172093,
       "accepted": true,
-      "latency_ms": 2.3274000268429518,
+      "latency_ms": 3.3193002454936504,
       "correct": true
     },
     {
@@ -78,7 +78,7 @@
       "confidence": 0.9999484941847203,
       "margin": 0.9999146695985572,
       "accepted": true,
-      "latency_ms": 2.3837999906390905,
+      "latency_ms": 1.8116999417543411,
       "correct": true
     },
     {
@@ -94,7 +94,7 @@
       "confidence": 0.9999742950280577,
       "margin": 0.9999628329169975,
       "accepted": true,
-      "latency_ms": 1.7242999747395515,
+      "latency_ms": 1.9644997082650661,
       "correct": true
     },
     {
@@ -110,7 +110,7 @@
       "confidence": 0.9999954185179785,
       "margin": 0.9999931595107728,
       "accepted": true,
-      "latency_ms": 1.727700000628829,
+      "latency_ms": 2.997700124979019,
       "correct": true
     },
     {
@@ -126,7 +126,7 @@
       "confidence": 0.9987052434744385,
       "margin": 0.9983487450157067,
       "accepted": true,
-      "latency_ms": 1.9682999700307846,
+      "latency_ms": 1.606999896466732,
       "correct": true
     },
     {
@@ -142,7 +142,7 @@
       "confidence": 0.9999308478368013,
       "margin": 0.9998973128948578,
       "accepted": true,
-      "latency_ms": 1.762300031259656,
+      "latency_ms": 1.986000221222639,
       "correct": true
     },
     {
@@ -158,7 +158,7 @@
       "confidence": 1.0,
       "margin": 0.9999999999842496,
       "accepted": true,
-      "latency_ms": 2.8554999735206366,
+      "latency_ms": 3.412699792534113,
       "correct": true
     },
     {
@@ -174,7 +174,7 @@
       "confidence": 0.9999173879623413,
       "margin": 0.9998823475689278,
       "accepted": true,
-      "latency_ms": 2.933399984613061,
+      "latency_ms": 4.735999740660191,
       "correct": true
     },
     {
@@ -190,7 +190,7 @@
       "confidence": 1.0,
       "margin": 0.9999999578194263,
       "accepted": true,
-      "latency_ms": 2.732599852606654,
+      "latency_ms": 3.9729997515678406,
       "correct": true
     },
     {
@@ -206,7 +206,7 @@
       "confidence": 0.535331666469574,
       "margin": 0.4360325261950493,
       "accepted": false,
-      "latency_ms": 2.651599934324622,
+      "latency_ms": 3.5645999014377594,
       "correct": false
     },
     {
@@ -222,7 +222,7 @@
       "confidence": 0.35203588008880615,
       "margin": 0.16000035405158997,
       "accepted": false,
-      "latency_ms": 6.419399986043572,
+      "latency_ms": 2.208199817687273,
       "correct": false
     },
     {
@@ -238,7 +238,7 @@
       "confidence": 0.2328110784292221,
       "margin": 0.01774720847606659,
       "accepted": false,
-      "latency_ms": 4.319799831137061,
+      "latency_ms": 2.1450999192893505,
       "correct": false
     },
     {
@@ -261,7 +261,7 @@
       "confidence": 0.9996243064150829,
       "margin": 0.9993987412398576,
       "accepted": true,
-      "latency_ms": 1.7978001851588488,
+      "latency_ms": 2.1760999225080013,
       "correct": true
     },
     {
@@ -284,7 +284,7 @@
       "confidence": 0.9990407805196801,
       "margin": 0.9980969420079202,
       "accepted": true,
-      "latency_ms": 1.6614000778645277,
+      "latency_ms": 2.40800017490983,
       "correct": true
     },
     {
@@ -307,7 +307,7 @@
       "confidence": 0.9936093455469459,
       "margin": 0.9876167291255613,
       "accepted": true,
-      "latency_ms": 2.2666999138891697,
+      "latency_ms": 5.173499695956707,
       "correct": true
     }
   ]

@@ -46,6 +46,12 @@ const RECON_CORRECTION_LABELS = [
   'unmanned_aerial_system',
 ];
 
+const EXHIBIT_UI_TEXT = {
+  en: { language: 'Language', recognized: 'EXHIBIT RECOGNIZED', whatIsIt: 'What is it?', purpose: 'What is it used for?', listen: 'Listen', ask: 'Ask TAYLOR', retry: 'Retry Explanation', preparing: 'TAYLOR is preparing your explanation. The exhibit has been identified successfully.' },
+  tl: { language: 'Wika', recognized: 'NAKILALA ANG EXHIBIT', whatIsIt: 'Ano ito?', purpose: 'Para saan ito?', listen: 'Makinig', ask: 'Magtanong kay TAYLOR', retry: 'Subukan muli ang paliwanag', preparing: 'Inihahanda ni TAYLOR ang paliwanag. Matagumpay na nakilala ang exhibit.' },
+  zh: { language: '语言', recognized: '已识别展品', whatIsIt: '这是什么？', purpose: '它有什么用途？', listen: '收听', ask: '询问 TAYLOR', retry: '重试说明', preparing: 'TAYLOR 正在准备说明。展品已成功识别。' },
+};
+
 const getKnowledgeEntity = (zone = '') => {
   const normalizedZone = String(zone).trim().toUpperCase().replace(/[_-]+/g, ' ');
   if (normalizedZone === 'BARAS' || normalizedZone === 'BARAS TBI') return 'BARAS TBI';
@@ -661,7 +667,10 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const activeCenter = location.state?.activeCenter || classifierMode.toUpperCase();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [showCamera, setShowCamera] = useState(true);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraRetryCount, setCameraRetryCount] = useState(0);
+  const [modelRetryCount, setModelRetryCount] = useState(0);
+  const [cameraFailure, setCameraFailure] = useState("");
   const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState("");
   const [locationDetected, setLocationDetected] = useState(false);
@@ -702,6 +711,20 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
   const [correctionLabel, setCorrectionLabel] = useState('');
   const [explanationState, setExplanationState] = useState({ status: 'idle', explanation: null, error: null });
   const explanationRequestRef = useRef(null);
+  const [language, setLanguage] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem('taylorLanguage');
+      return ['en', 'tl', 'zh'].includes(saved) ? saved : 'en';
+    } catch {
+      return 'en';
+    }
+  });
+  const exhibitText = EXHIBIT_UI_TEXT[language] || EXHIBIT_UI_TEXT.en;
+
+  const changeLanguage = (nextLanguage) => {
+    setLanguage(nextLanguage);
+    try { window.localStorage.setItem('taylorLanguage', nextLanguage); } catch (error) { console.warn('Unable to save exhibit language preference:', error); }
+  };
 
   useEffect(() => {
     const sync = () => syncExhibitRetrainingQueue().catch((error) => console.warn('Exhibit retraining sync deferred:', error.message));
@@ -924,7 +947,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   useEffect(() => {
     let cancelled = false;
-    const initializationTimeoutMs = 12000;
+    const initializationTimeoutMs = 12000; // Informational only: downloads continue on slow networks.
     const initService = async () => {
       const startedAt = performance.now();
       try {
@@ -932,7 +955,8 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         setLoadingMessage(`Preparing ${zoneLabel} recognition...`);
         setRecognitionState(EXHIBIT_MODEL_STATES.MODEL_LOADING);
 
-        await cameraReadySignalRef.current;
+        // Prepare the selected zone model independently of camera consent.
+        // This allows a first-time download while the visitor chooses whether to scan.
         if (cancelled) return;
         const initializePromise = exhibitDetectionService.initialize({ classifier: classifierMode });
         initializePromise.then(() => {
@@ -992,15 +1016,26 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       cancelled = true;
       cameraReadyResolveRef.current?.();
     };
-  }, [classifierMode]);
+  }, [classifierMode, modelRetryCount]);
 
-  useEffect(() => () => {
-    stopRealTimeDetection();
-    stopCameraStream();
-    if (uploadedObjectUrlRef.current) {
-      URL.revokeObjectURL(uploadedObjectUrlRef.current);
-      uploadedObjectUrlRef.current = null;
-    }
+  useEffect(() => {
+    // Cleanup only on unmount. Do not update React state or depend on render-local
+    // callbacks while the component is being torn down.
+    return () => {
+      if (detectionIntervalRef.current !== null) {
+        clearInterval(detectionIntervalRef.current);
+        detectionIntervalRef.current = null;
+      }
+      const stream = cameraStreamRef.current;
+      cameraStreamRef.current = null;
+      stream?.getTracks().forEach((track) => track.stop());
+      if (videoRef.current?.srcObject) videoRef.current.srcObject = null;
+      void exhibitDetectionService.releaseInactiveSessions().catch((error) => console.warn('Recognition cleanup deferred:', error));
+      if (uploadedObjectUrlRef.current) {
+        URL.revokeObjectURL(uploadedObjectUrlRef.current);
+        uploadedObjectUrlRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -1030,19 +1065,20 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     let current = true;
 
     const loadExplanation = async () => {
-      const cached = await getCachedExhibitExplanation(activeCenter, activeExhibit);
+      const cached = await getCachedExhibitExplanation(activeCenter, activeExhibit, undefined, language);
       if (!current || controller.signal.aborted) return;
-      const localExplanation = getOfflineExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, activeExhibit);
+      const localExplanation = getOfflineExhibitInformation(activeCenter, currentExhibit?.exhibitInfo?.code, activeExhibit, language);
       setExplanationState({ status: cached || localExplanation ? 'ready' : 'loading', explanation: cached || localExplanation, error: null });
       try {
         const explanation = await requestExhibitExplanation({
           center: activeCenter,
           recognitionLabel: currentExhibit?.exhibitInfo?.code || activeExhibit,
           displayName: activeExhibit,
+          language,
           signal: controller.signal,
         });
         if (!current || controller.signal.aborted) return;
-        await cacheExhibitExplanation(activeCenter, activeExhibit, explanation);
+        await cacheExhibitExplanation(activeCenter, activeExhibit, explanation, undefined, language);
         if (current) setExplanationState({ status: 'ready', explanation, error: null });
       } catch (error) {
         if (!current || controller.signal.aborted) return;
@@ -1062,7 +1098,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       controller.abort();
       window.removeEventListener('online', retryWhenOnline);
     };
-  }, [activeCenter, activeExhibit, currentExhibit?.exhibitInfo?.code]);
+  }, [activeCenter, activeExhibit, currentExhibit?.exhibitInfo?.code, language]);
 
   // Point-based navigation state (removed drawing system)
   const [currentPathway, setCurrentPathway] = useState('DWT_to_EAP');
@@ -1092,15 +1128,17 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   // Live tracking initialization
   useEffect(() => {
+    let unmounted = false;
+    let trackingCleanup = null;
     const startLiveTracking = async () => {
       try {
         // Request device motion permission for iOS
         if (typeof DeviceMotionEvent !== 'undefined' && DeviceMotionEvent.requestPermission) {
           const permission = await DeviceMotionEvent.requestPermission();
+          if (unmounted) return;
           if (permission !== 'granted') {
             console.log('Device motion permission denied');
-            startSimulatedTracking();
-            return;
+            return startSimulatedTracking();
           }
         }
 
@@ -1164,6 +1202,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           }
         };
 
+        if (unmounted) return;
         // Add event listeners
         window.addEventListener('devicemotion', handleDeviceMotion);
         window.addEventListener('deviceorientation', handleDeviceOrientation);
@@ -1175,12 +1214,11 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         return () => {
           window.removeEventListener('devicemotion', handleDeviceMotion);
           window.removeEventListener('deviceorientation', handleDeviceOrientation);
-          setIsTracking(false);
         };
 
       } catch (error) {
         console.log('Live tracking not available:', error);
-        startSimulatedTracking();
+        if (!unmounted) return startSimulatedTracking();
       }
     };
 
@@ -1205,10 +1243,19 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       return () => clearInterval(interval);
     };
 
-    const cleanup = startLiveTracking();
+    // Async initialization returns a Promise, not a cleanup function.
+    // Store its resolved cleanup and handle unmount-before-permission safely.
+    void startLiveTracking().then((cleanup) => {
+      if (unmounted) {
+        if (typeof cleanup === 'function') cleanup();
+      } else {
+        trackingCleanup = typeof cleanup === 'function' ? cleanup : null;
+      }
+    }).catch((error) => console.warn('Motion tracking initialization failed:', error));
 
     return () => {
-      if (cleanup) cleanup();
+      unmounted = true;
+      if (trackingCleanup) trackingCleanup();
     };
   }, []);
 
@@ -1218,9 +1265,10 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
     let cancelled = false;
     const startCamera = async () => {
+      setCameraFailure("");
       if (!navigator.mediaDevices?.getUserMedia) {
         cameraReadyResolveRef.current?.();
-        setError('Camera access is not supported in this browser. Upload a video instead.');
+        setCameraFailure('Camera access is not supported in this browser.');
         return;
       }
       try {
@@ -1228,7 +1276,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         const cameraStartedAt = performance.now();
         console.time('camera initialization');
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: getPerformanceSettings().cameraWidth }, height: { ideal: getPerformanceSettings().cameraHeight } },
           audio: false
         });
         if (cancelled || !videoRef.current) {
@@ -1238,6 +1286,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         cameraStreamRef.current = stream;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        setCameraFailure('');
         exhibitDetectionService.recordZoneDiagnostic(classifierMode, 'CAMERA_READY', {
           elapsedMs: Math.round(performance.now() - cameraStartedAt)
         });
@@ -1249,9 +1298,9 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
         cameraReadyResolveRef.current?.();
         console.error('Camera error:', cameraError);
         const message = cameraError.name === 'NotAllowedError'
-          ? 'Camera permission was denied. Allow camera access or upload a video.'
-          : 'Camera could not be started. Upload a video instead.';
-        setError(message);
+          ? 'Camera access is blocked. Allow camera access in your browser site settings, then tap Retry Camera.'
+          : 'Camera could not be started. Check your camera connection and try again.';
+        setCameraFailure(message);
       }
     };
 
@@ -1262,7 +1311,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       stopRealTimeDetection();
       stopCameraStream();
     };
-  }, [showCamera]);
+  }, [showCamera, cameraRetryCount]);
 
   const captureReconLearningCandidate = (detection) => {
     if (classifierMode.toLowerCase() !== 'recon' || !learningConsent || uploadedVideoRef.current || !videoRef.current) return;
@@ -1974,7 +2023,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
     : '';
 
   const listenToExplanation = () => {
-    if (explanationText) textToSpeech(explanationText, false, 'taylor', 'en');
+    if (explanationText) textToSpeech(explanationText, false, 'taylor', language);
   };
 
   const renderFeedbackCard = () => (
@@ -2066,10 +2115,19 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
 
   return (
     <div style={{ flex: 1, position: "relative", height: "100vh", overflow: "hidden" }}>
+      {!tourMode && <button type="button" onClick={() => navigate("/taylor")} aria-label="Back to TAYLOR" style={{ position: "absolute", top: 12, left: 12, zIndex: 1100, padding: "0.6rem 0.85rem", borderRadius: 8, background: "#fff", color: "#111", border: "1px solid #ddd" }}>← TAYLOR</button>}
+      <div className="exhibit-language-picker">
+        <label htmlFor="exhibit-language">{exhibitText.language}</label>
+        <select id="exhibit-language" value={language} onChange={(event) => changeLanguage(event.target.value)}>
+          <option value="en">English</option>
+          <option value="tl">Filipino</option>
+          <option value="zh">中文</option>
+        </select>
+      </div>
       {tourMode && (
         <>
           <header className="exhibit-tour-header" data-testid="exhibit-tour-panel">
-            <button className="exhibit-tour-header__exit" onClick={() => navigate(-1)} aria-label="Exit tour">
+            <button className="exhibit-tour-header__exit" onClick={() => navigate('/taylor')} aria-label="Exit tour">
               <FiArrowLeft aria-hidden="true" />
               <span>Exit Tour</span>
             </button>
@@ -2087,18 +2145,18 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
           ) : (
             <section className="exhibit-tour-sheet" aria-live="polite">
               <div className="exhibit-tour-sheet__handle" aria-hidden="true" />
-              <div className="exhibit-tour-panel__recognized">✓ EXHIBIT RECOGNIZED</div>
+              <div className="exhibit-tour-panel__recognized">✓ {exhibitText.recognized}</div>
               <h2>{formatRecognitionLabel(displayedActiveExhibit)}</h2>
               {activeExhibitInformation ? (
                 <div className="exhibit-explanation" aria-live="polite">
-                  <strong>What is it?</strong>
+                  <strong>{exhibitText.whatIsIt}</strong>
                   <p>{activeExhibitInformation.whatIsIt}</p>
-                  <strong>What is it used for?</strong>
+                  <strong>{exhibitText.purpose}</strong>
                   <p>{activeExhibitInformation.purpose}</p>
                 </div>
               ) : explanationState.status === 'loading' ? (
                 <p className="exhibit-explanation__unavailable">
-                  TAYLOR is preparing your explanation. The exhibit has been identified successfully.
+                  {exhibitText.preparing}
                 </p>
               ) : (
                 <p className="exhibit-explanation__unavailable">
@@ -2106,12 +2164,12 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
                 </p>
               )}
               <div className="exhibit-tour-panel__actions">
-                {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
+                {activeExhibitInformation && <button onClick={listenToExplanation}>{exhibitText.listen}</button>}
                 <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
-                  Ask TAYLOR
+                  {exhibitText.ask}
                 </button>
-                {!activeExhibitInformation && <button onClick={() => window.dispatchEvent(new Event('online'))}>Retry Explanation</button>}
-                <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
+                {!activeExhibitInformation && <button onClick={() => window.dispatchEvent(new Event('online'))}>{exhibitText.retry}</button>}
+                <button onClick={scanAnotherExhibit}>{exhibitText.scan}</button>
               </div>
               {renderFeedbackCard()}
             </section>
@@ -2121,24 +2179,24 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       )}
       {!tourMode && specialistRoute && displayedActiveExhibit && (
         <section className="exhibit-tour-sheet exhibit-direct-information" aria-live="polite">
-          <div className="exhibit-tour-panel__recognized">EXHIBIT RECOGNIZED</div>
+          <div className="exhibit-tour-panel__recognized">{exhibitText.recognized}</div>
           <h2>{formatRecognitionLabel(displayedActiveExhibit)}</h2>
           {activeExhibitInformation ? (
             <div className="exhibit-explanation" aria-live="polite">
-              <strong>What is it?</strong>
+              <strong>{exhibitText.whatIsIt}</strong>
               <p>{activeExhibitInformation.whatIsIt}</p>
-              <strong>What is it used for?</strong>
+              <strong>{exhibitText.purpose}</strong>
               <p>{activeExhibitInformation.purpose}</p>
             </div>
           ) : (
             <p className="exhibit-explanation__unavailable">
-              TAYLOR is preparing your explanation. The exhibit has been identified successfully.
+              {exhibitText.preparing}
             </p>
           )}
           <div className="exhibit-tour-panel__actions">
-            {activeExhibitInformation && <button onClick={listenToExplanation}>Listen</button>}
+            {activeExhibitInformation && <button onClick={listenToExplanation}>{exhibitText.listen}</button>}
             <button onClick={() => navigate('/taylor', { state: { activeEntity: activeCenter, activeExhibit, initialPrompt: `What is ${formatRecognitionLabel(activeExhibit)}?` } })}>
-              Ask TAYLOR
+              {exhibitText.ask}
             </button>
             {classifierMode.toLowerCase() === 'recon' && learningConsent && !uploadedVideoRef.current && (
               <>
@@ -2155,7 +2213,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
                 <button onClick={saveReconCorrection} disabled={!correctionLabel}>Save correction</button>
               </>
             )}
-            <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button>
+            {/* <button onClick={scanAnotherExhibit}>Scan Another Exhibit</button> */}
           </div>
           {renderFeedbackCard()}
         </section>
@@ -2173,7 +2231,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
       fontSize: 18,
       color: "#2196f3",
       boxShadow: "0 2px 12px rgba(0,0,0,0.10)" }}>
-          {loadingMessage}
+          <div role="status" aria-live="polite">{loadingMessage}<div style={{ fontSize: 12, fontWeight: 400, marginTop: 5 }}>First-time setup may take longer on 3G. Only this office's recognition model is being prepared.</div></div>
         </div>
     )}
     {statusMessage && (
@@ -2398,7 +2456,7 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             {learningCaptureStatus}
           </div>
         )}
-        <label style={{
+        {/* <label style={{
           background: "rgba(0,0,0,0.72)",
           color: "#fff",
           borderRadius: 8,
@@ -2414,9 +2472,40 @@ export default function CameraToNavigationScreenPWA({ classifierMode = 'aricc' }
             onChange={handleVideoUpload}
             style={{ display: "none" }}
           />
-        </label>
+        </label> */}
       </div>}
 
+      {!showCamera && !uploadedVideoRef.current && (
+        <div role="region" aria-label="Optional exhibit camera access" style={{ position: 'absolute', zIndex: 101, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 'min(90vw, 420px)', padding: 24, borderRadius: 14, background: '#102333', color: '#fff', textAlign: 'center', boxSizing: 'border-box' }}>
+          <h2 style={{ marginTop: 0 }}>Scan an exhibit in {activeCenter}</h2>
+          <p>Exhibit scanning uses your camera only if you choose to enable it. Skipping facial recognition does not prevent exhibit scanning.</p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setShowCamera(true)} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Enable Camera to Scan</button>
+            <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Skip Exhibit Scan</button>
+          </div>
+        </div>
+      )}
+      {!isLoading && !detectionService && (recognitionState === EXHIBIT_MODEL_STATES.MODEL_NOT_PREPARED || recognitionState === EXHIBIT_MODEL_STATES.MODEL_LOAD_ERROR) && (
+        <div role="alert" style={{ position: 'absolute', zIndex: 102, bottom: 20, left: '50%', transform: 'translateX(-50%)', width: 'min(92vw, 420px)', padding: 16, borderRadius: 12, background: '#102333', color: '#fff', textAlign: 'center', boxSizing: 'border-box' }}>
+          <strong>{zoneLabel} recognition is not ready</strong>
+          <p style={{ fontSize: 13 }}>A first-time visit needs a connection to download this office's model. On 3G, preparation may take longer. Retry when the connection improves or continue without scanning.</p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setModelRetryCount(count => count + 1)} style={{ minHeight: 44, padding: '8px 12px' }}>Retry Recognition</button>
+            <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '8px 12px' }}>Back to TAYLOR</button>
+          </div>
+        </div>
+      )}
+      {cameraFailure && showCamera && !uploadedVideoRef.current && (
+        <div role="alert" style={{ position: 'absolute', zIndex: 100, top: '35%', left: '50%', transform: 'translateX(-50%)', width: 'min(90vw, 420px)', padding: 20, borderRadius: 14, background: '#102333', color: '#fff', textAlign: 'center', boxSizing: 'border-box' }}>
+          <h2 style={{ marginTop: 0 }}>Camera unavailable</h2>
+          <p>{cameraFailure}</p>
+          <p style={{ fontSize: 13 }}>In Chrome, use the site settings icon beside the address bar to allow camera access if it was blocked.</p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setCameraRetryCount(count => count + 1)} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Retry Camera</button>
+            <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '10px 14px', cursor: 'pointer' }}>Back to TAYLOR</button>
+          </div>
+        </div>
+      )}
       {/* Video element now driven by an uploaded file instead of the live camera */}
       <video
         ref={videoRef}

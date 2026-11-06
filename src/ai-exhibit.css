@@ -1,3 +1,27 @@
+.exhibit-language-picker {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.4rem;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.exhibit-language-picker select {
+  min-height: 1.8rem;
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.3rem;
+  background: #fff;
+  color: #14202b;
+}
+
 .cameraOverlay {
   position: absolute;
   top: 0; right: 0; bottom: 0; left: 0;

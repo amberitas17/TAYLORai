@@ -2,7 +2,10 @@
   {
     "id": "bulsu-aricc-overview",
     "entity": "ARICC",
-    "aliases": ["Advanced Robotics and Intelligent Control Center", "ARIC Center"],
+    "aliases": [
+      "Advanced Robotics and Intelligent Control Center",
+      "ARIC Center"
+    ],
     "full_name": "Advanced Robotics and Intelligent Control Center",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -15,7 +18,10 @@
   {
     "id": "bulsu-aricc-technology-focus",
     "entity": "ARICC",
-    "aliases": ["Advanced Robotics and Intelligent Control Center", "ARIC Center"],
+    "aliases": [
+      "Advanced Robotics and Intelligent Control Center",
+      "ARIC Center"
+    ],
     "full_name": "Advanced Robotics and Intelligent Control Center",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -28,7 +34,10 @@
   {
     "id": "bulsu-aricc-training-services",
     "entity": "ARICC",
-    "aliases": ["Advanced Robotics and Intelligent Control Center", "ARIC Center"],
+    "aliases": [
+      "Advanced Robotics and Intelligent Control Center",
+      "ARIC Center"
+    ],
     "full_name": "Advanced Robotics and Intelligent Control Center",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -41,7 +50,10 @@
   {
     "id": "bulsu-aricc-technical-services",
     "entity": "ARICC",
-    "aliases": ["Advanced Robotics and Intelligent Control Center", "ARIC Center"],
+    "aliases": [
+      "Advanced Robotics and Intelligent Control Center",
+      "ARIC Center"
+    ],
     "full_name": "Advanced Robotics and Intelligent Control Center",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -54,7 +66,10 @@
   {
     "id": "bulsu-aricc-vision-mission-objectives",
     "entity": "ARICC",
-    "aliases": ["Advanced Robotics and Intelligent Control Center", "ARIC Center"],
+    "aliases": [
+      "Advanced Robotics and Intelligent Control Center",
+      "ARIC Center"
+    ],
     "full_name": "Advanced Robotics and Intelligent Control Center",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -67,7 +82,10 @@
   {
     "id": "bulsu-caesar-about",
     "entity": "CAESAR",
-    "aliases": ["Center for Advanced Environmental Science and Agriculture Research", "Center for Advanced Environmental Science and Agriculture Research"],
+    "aliases": [
+      "Center for Advanced Environmental Science and Agriculture Research",
+      "Center for Advanced Environmental Science and Agriculture Research"
+    ],
     "full_name": "Center for Advanced Environmental Science and Agriculture Research",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -80,7 +98,9 @@
   {
     "id": "bulsu-caesar-research-services",
     "entity": "CAESAR",
-    "aliases": ["Center for Advanced Environmental Science and Agriculture Research"],
+    "aliases": [
+      "Center for Advanced Environmental Science and Agriculture Research"
+    ],
     "full_name": "Center for Advanced Environmental Science and Agriculture Research",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -93,7 +113,9 @@
   {
     "id": "bulsu-caesar-laboratory-services",
     "entity": "CAESAR",
-    "aliases": ["Center for Advanced Environmental Science and Agriculture Research"],
+    "aliases": [
+      "Center for Advanced Environmental Science and Agriculture Research"
+    ],
     "full_name": "Center for Advanced Environmental Science and Agriculture Research",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -106,7 +128,9 @@
   {
     "id": "bulsu-caesar-capacity-community",
     "entity": "CAESAR",
-    "aliases": ["Center for Advanced Environmental Science and Agriculture Research"],
+    "aliases": [
+      "Center for Advanced Environmental Science and Agriculture Research"
+    ],
     "full_name": "Center for Advanced Environmental Science and Agriculture Research",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -119,7 +143,10 @@
   {
     "id": "bulsu-cbs-overview",
     "entity": "CBS",
-    "aliases": ["Center for Bulacan Studies", "Bahay Saliksikan ng Bulacan"],
+    "aliases": [
+      "Center for Bulacan Studies",
+      "Bahay Saliksikan ng Bulacan"
+    ],
     "full_name": "Center for Bulacan Studies",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -132,7 +159,10 @@
   {
     "id": "bulsu-cbs-objectives",
     "entity": "CBS",
-    "aliases": ["Center for Bulacan Studies", "Bahay Saliksikan ng Bulacan"],
+    "aliases": [
+      "Center for Bulacan Studies",
+      "Bahay Saliksikan ng Bulacan"
+    ],
     "full_name": "Center for Bulacan Studies",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -145,7 +175,10 @@
   {
     "id": "bulsu-cbs-services",
     "entity": "CBS",
-    "aliases": ["Center for Bulacan Studies", "Bahay Saliksikan ng Bulacan"],
+    "aliases": [
+      "Center for Bulacan Studies",
+      "Bahay Saliksikan ng Bulacan"
+    ],
     "full_name": "Center for Bulacan Studies",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -158,7 +191,11 @@
   {
     "id": "bulsu-fablab-vision-mission",
     "entity": "FABLAB",
-    "aliases": ["Center for Fabrication and Manufacture", "BulSU Fablab", "Bulacan State University FabLab"],
+    "aliases": [
+      "Center for Fabrication and Manufacture",
+      "BulSU Fablab",
+      "Bulacan State University FabLab"
+    ],
     "full_name": "Center for Fabrication and Manufacture",
     "institution": "Bulacan State University",
     "category": "fabrication_center",
@@ -175,7 +212,10 @@
   {
     "id": "bulsu-fablab-additive-manufacturing",
     "entity": "FABLAB",
-    "aliases": ["Center for Fabrication and Manufacture", "BulSU Fablab"],
+    "aliases": [
+      "Center for Fabrication and Manufacture",
+      "BulSU Fablab"
+    ],
     "full_name": "Center for Fabrication and Manufacture",
     "institution": "Bulacan State University",
     "category": "fabrication_center",
@@ -192,7 +232,10 @@
   {
     "id": "bulsu-fablab-subtractive-services",
     "entity": "FABLAB",
-    "aliases": ["Center for Fabrication and Manufacture", "BulSU Fablab"],
+    "aliases": [
+      "Center for Fabrication and Manufacture",
+      "BulSU Fablab"
+    ],
     "full_name": "Center for Fabrication and Manufacture",
     "institution": "Bulacan State University",
     "category": "fabrication_center",
@@ -209,7 +252,10 @@
   {
     "id": "bulsu-fablab-stakeholders",
     "entity": "FABLAB",
-    "aliases": ["Center for Fabrication and Manufacture", "BulSU Fablab"],
+    "aliases": [
+      "Center for Fabrication and Manufacture",
+      "BulSU Fablab"
+    ],
     "full_name": "Center for Fabrication and Manufacture",
     "institution": "Bulacan State University",
     "category": "fabrication_center",
@@ -226,7 +272,11 @@
   {
     "id": "bulsu-baras-overview",
     "entity": "BARAS TBI",
-    "aliases": ["DOST-BulSU BARAS Technology Business Incubator", "BARAS TBI", "Business Assistance for Research Acceleration and Sustainability"],
+    "aliases": [
+      "DOST-BulSU BARAS Technology Business Incubator",
+      "BARAS TBI",
+      "Business Assistance for Research Acceleration and Sustainability"
+    ],
     "full_name": "DOST-BulSU BARAS Technology Business Incubator",
     "institution": "Bulacan State University",
     "category": "technology_business_incubator",
@@ -239,7 +289,10 @@
   {
     "id": "bulsu-baras-track-record",
     "entity": "BARAS TBI",
-    "aliases": ["DOST-BulSU BARAS Technology Business Incubator", "BARAS TBI"],
+    "aliases": [
+      "DOST-BulSU BARAS Technology Business Incubator",
+      "BARAS TBI"
+    ],
     "full_name": "DOST-BulSU BARAS Technology Business Incubator",
     "institution": "Bulacan State University",
     "category": "technology_business_incubator",
@@ -252,7 +305,10 @@
   {
     "id": "bulsu-baras-vision-mission",
     "entity": "BARAS TBI",
-    "aliases": ["DOST-BulSU BARAS Technology Business Incubator", "BARAS TBI"],
+    "aliases": [
+      "DOST-BulSU BARAS Technology Business Incubator",
+      "BARAS TBI"
+    ],
     "full_name": "DOST-BulSU BARAS Technology Business Incubator",
     "institution": "Bulacan State University",
     "category": "technology_business_incubator",
@@ -265,7 +321,10 @@
   {
     "id": "bulsu-baras-programs",
     "entity": "BARAS TBI",
-    "aliases": ["DOST-BulSU BARAS Technology Business Incubator", "BARAS TBI"],
+    "aliases": [
+      "DOST-BulSU BARAS Technology Business Incubator",
+      "BARAS TBI"
+    ],
     "full_name": "DOST-BulSU BARAS Technology Business Incubator",
     "institution": "Bulacan State University",
     "category": "technology_business_incubator",
@@ -278,7 +337,10 @@
   {
     "id": "bulsu-fic-overview",
     "entity": "FIC",
-    "aliases": ["Food Innovation Center", "Regional Food Innovation Center"],
+    "aliases": [
+      "Food Innovation Center",
+      "Regional Food Innovation Center"
+    ],
     "full_name": "Food Innovation Center",
     "institution": "Bulacan State University",
     "category": "food_innovation_center",
@@ -294,7 +356,10 @@
   {
     "id": "bulsu-fic-regional-launch",
     "entity": "FIC",
-    "aliases": ["Food Innovation Center", "Regional Food Innovation Center"],
+    "aliases": [
+      "Food Innovation Center",
+      "Regional Food Innovation Center"
+    ],
     "full_name": "Food Innovation Center",
     "institution": "Bulacan State University",
     "category": "food_innovation_center",
@@ -309,7 +374,10 @@
   {
     "id": "bulsu-recon-overview",
     "entity": "RECON",
-    "aliases": ["Resiliency Energy Continuity Center", "RECON Center"],
+    "aliases": [
+      "Resiliency Energy Continuity Center",
+      "RECON Center"
+    ],
     "full_name": "Resiliency Energy Continuity Center",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -322,7 +390,10 @@
   {
     "id": "bulsu-recon-mission-vision-focus",
     "entity": "RECON",
-    "aliases": ["Resiliency Energy Continuity Center", "RECON Center"],
+    "aliases": [
+      "Resiliency Energy Continuity Center",
+      "RECON Center"
+    ],
     "full_name": "Resiliency Energy Continuity Center",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -335,7 +406,10 @@
   {
     "id": "bulsu-recon-services",
     "entity": "RECON",
-    "aliases": ["Resiliency Energy Continuity Center", "RECON Center"],
+    "aliases": [
+      "Resiliency Energy Continuity Center",
+      "RECON Center"
+    ],
     "full_name": "Resiliency Energy Continuity Center",
     "institution": "Bulacan State University",
     "category": "research_center",
@@ -348,13 +422,112 @@
   {
     "id": "bulsu-recon-projects",
     "entity": "RECON",
-    "aliases": ["Resiliency Energy Continuity Center", "RECON Center"],
+    "aliases": [
+      "Resiliency Energy Continuity Center",
+      "RECON Center"
+    ],
     "full_name": "Resiliency Energy Continuity Center",
     "institution": "Bulacan State University",
     "category": "research_center",
     "section": "recent_projects",
     "content": "Recent projects listed on the official RECON poster are aerial, land, and water drone designs; renewable energy consulting for farms; collaboration with DOST and PRB for a pyrotechnics lab; and solar-powered irrigation initiatives.",
     "source": "RECON Center Poster (1).jpg",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-caesar-contact-20261012",
+    "entity": "CAESAR",
+    "aliases": [
+      "Center for Advanced Environmental Science and Agriculture Research"
+    ],
+    "full_name": "Center for Advanced Environmental Science and Agriculture Research",
+    "institution": "Bulacan State University",
+    "category": "research_center",
+    "section": "contact",
+    "content": "CAESAR contact information: Telephone: 044 919-7800. Email: caesar.rei@bulsu.edu.ph. Facebook: BuLSU - CINSBC.",
+    "source": "Research-center contact details provided by project administrator on 2026-10-12",
+    "source_type": "administrator_provided",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-aricc-poster-contact-20261012",
+    "entity": "ARICC",
+    "aliases": [
+      "Advanced Robotics and Intelligent Control Center",
+      "ARIC Center"
+    ],
+    "full_name": "Advanced Robotics and Intelligent Control Center",
+    "institution": "Bulacan State University",
+    "category": "research_center",
+    "section": "contact",
+    "content": "ARICC contact information: Email: ariccenter.dio.rde@bulsu.edu.ph. Facebook: @DIOARICCenter.",
+    "source": "ARIC Center_Poster (2)(1).png",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-cbs-poster-contact-20261012",
+    "entity": "CBS",
+    "aliases": [
+      "Center for Bulacan Studies",
+      "Bahay Saliksikan ng Bulacan"
+    ],
+    "full_name": "Center for Bulacan Studies",
+    "institution": "Bulacan State University",
+    "category": "research_center",
+    "section": "contact",
+    "content": "CBS contact information: Email: cbs.dio.rde@bulsu.edu.ph. Facebook: BahaySaliksikanngBulacan.",
+    "source": "Center for Bulacan Studies_poster (1)(1).png",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-fablab-poster-contact-20261012",
+    "entity": "FABLAB",
+    "aliases": [
+      "Center for Fabrication and Manufacture",
+      "BulSU Fablab",
+      "Bulacan State University FabLab"
+    ],
+    "full_name": "Center for Fabrication and Manufacture",
+    "institution": "Bulacan State University",
+    "category": "fabrication_center",
+    "section": "contact",
+    "content": "FABLAB contact information: Email: fablabcenter.dio.rde@bulsu.edu.ph. Facebook: https://www.facebook.com/bulsufablab/. Location: Bulacan State University, 4th Floor Alvarado Hall Building, Brgy. Guinhawa, Malolos City, Bulacan.",
+    "source": "Center for Fabrication and Manufacture (BulSU Fablab) Poster (1)(1).png",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-fic-poster-contact-20261012",
+    "entity": "FIC",
+    "aliases": [
+      "Food Innovation Center",
+      "Regional Food Innovation Center"
+    ],
+    "full_name": "Food Innovation Center",
+    "institution": "Bulacan State University",
+    "category": "food_innovation_center",
+    "section": "contact",
+    "content": "FIC contact information: Email: fic.dio@bulsu.edu.ph. Facebook: @Bulacan State University-Food Innovation Center.",
+    "source": "FIC PROFILE (3)(1).pdf",
+    "source_type": "official_center_material",
+    "campus": "BulSU"
+  },
+  {
+    "id": "bulsu-recon-poster-contact-20261012",
+    "entity": "RECON",
+    "aliases": [
+      "Resiliency Energy Continuity Center",
+      "RECON Center"
+    ],
+    "full_name": "Resiliency Energy Continuity Center",
+    "institution": "Bulacan State University",
+    "category": "research_center",
+    "section": "contact",
+    "content": "RECON contact information: Email: reconcenter.dio.rde@bulsu.edu.ph. Facebook Messenger: Resiliency Energy and Continuity Center.",
+    "source": "RECON Center Poster (1)(1).jpg",
     "source_type": "official_center_material",
     "campus": "BulSU"
   }

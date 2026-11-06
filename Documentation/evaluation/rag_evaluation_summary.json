@@ -1,0 +1,116 @@
+{
+  "status": "completed_preliminary",
+  "generatedAt": "2026-10-14T06:20:26.646Z",
+  "dataset": "Documentation\\evaluation\\rag_test_questions.json",
+  "endpoint": "http://localhost:3033/api/chat",
+  "model": "meta-llama/llama-3.3-70b-instruct",
+  "deploymentVersion": "unreported",
+  "retrievalConfiguration": null,
+  "totalQuestions": 30,
+  "automatedPreliminaryCounts": {
+    "Correct": 18,
+    "Partially Correct": 9,
+    "Incorrect": 1,
+    "Appropriate Abstention": 2,
+    "Unsuccessful": 0
+  },
+  "researcherVerifiedCounts": null,
+  "answerAccuracy": null,
+  "retrievalSuccessRate": null,
+  "retrievalEvaluatedQuestions": 0,
+  "responseTimeMs": {
+    "count": 30,
+    "mean": 4443.980333333335,
+    "median": 2774.005,
+    "p95": 12777.26
+  },
+  "apiErrors": [],
+  "centerResults": {
+    "ARICC": {
+      "total": 6,
+      "automatedPreliminaryCounts": {
+        "Correct": 4,
+        "Partially Correct": 2,
+        "Incorrect": 0,
+        "Appropriate Abstention": 0,
+        "Unsuccessful": 0
+      }
+    },
+    "CAESAR": {
+      "total": 5,
+      "automatedPreliminaryCounts": {
+        "Correct": 3,
+        "Partially Correct": 2,
+        "Incorrect": 0,
+        "Appropriate Abstention": 0,
+        "Unsuccessful": 0
+      }
+    },
+    "FABLAB": {
+      "total": 5,
+      "automatedPreliminaryCounts": {
+        "Correct": 4,
+        "Partially Correct": 1,
+        "Incorrect": 0,
+        "Appropriate Abstention": 0,
+        "Unsuccessful": 0
+      }
+    },
+    "BARAS TBI": {
+      "total": 4,
+      "automatedPreliminaryCounts": {
+        "Correct": 2,
+        "Partially Correct": 1,
+        "Incorrect": 0,
+        "Appropriate Abstention": 1,
+        "Unsuccessful": 0
+      }
+    },
+    "CBS": {
+      "total": 3,
+      "automatedPreliminaryCounts": {
+        "Correct": 2,
+        "Partially Correct": 1,
+        "Incorrect": 0,
+        "Appropriate Abstention": 0,
+        "Unsuccessful": 0
+      }
+    },
+    "FIC": {
+      "total": 2,
+      "automatedPreliminaryCounts": {
+        "Correct": 2,
+        "Partially Correct": 0,
+        "Incorrect": 0,
+        "Appropriate Abstention": 0,
+        "Unsuccessful": 0
+      }
+    },
+    "RECON": {
+      "total": 4,
+      "automatedPreliminaryCounts": {
+        "Correct": 1,
+        "Partially Correct": 2,
+        "Incorrect": 1,
+        "Appropriate Abstention": 0,
+        "Unsuccessful": 0
+      }
+    },
+    "RIO": {
+      "total": 1,
+      "automatedPreliminaryCounts": {
+        "Correct": 0,
+        "Partially Correct": 0,
+        "Incorrect": 0,
+        "Appropriate Abstention": 1,
+        "Unsuccessful": 0
+      }
+    }
+  },
+  "researchIntegrity": {
+    "researcherApprovalRequired": true,
+    "automatedScoresArePreliminary": true,
+    "llamaSelfJudgingUsed": false,
+    "fabricatedResults": false
+  }
+}

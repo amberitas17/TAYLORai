@@ -12,6 +12,11 @@ const FaceApiInterface = () => {
 
     useEffect(() => {
         initializeModels();
+        return () => {
+            const stream = videoRef.current?.srcObject;
+            stream?.getTracks().forEach((track) => track.stop());
+            if (videoRef.current) videoRef.current.srcObject = null;
+        };
     }, []);
 
     const initializeModels = async () => {
@@ -75,9 +80,10 @@ const FaceApiInterface = () => {
             const video = videoRef.current;
             const ctx = canvas.getContext('2d');
 
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
+            const scale = Math.min(1, 320 / Math.max(video.videoWidth, video.videoHeight));
+            canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+            canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             // Use the canvas directly for client-side face-api.js analysis
             const result = await clientSideFaceAnalysisService.analyzeFaceFromImage(canvas);

@@ -26,7 +26,7 @@ function findIdleClip(animations = []) {
     || animations[0];
 }
 
-function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', onReady }) {
+function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', assetUrl = null, onReady }) {
   const groupRef = useRef();
   const idleMixerRef = useRef(null);
   const meshesRef = useRef([]);
@@ -37,9 +37,9 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
   const boneRestPoseRef = useRef(new Map());
   const gestureStateRef = useRef({ mode: 'neutral', startedAt: 0 });
 
-  const modelPaths = [assetPreset === 'avatar' ? '/sarah-avatar.glb' : '/sarah-idle.glb'];
-  const loadedModels = useGLTF(modelPaths);
-  const selectedModel = loadedModels[0];
+  // Request only the active avatar asset. drei caches this URL across remounts.
+  const modelPath = assetUrl || (assetPreset === 'avatar' ? '/sarah-avatar.glb' : '/sarah-idle.glb');
+  const selectedModel = useGLTF(modelPath);
   const displayScene = selectedModel.scene;
   const activeAnims = selectedModel.animations;
 
@@ -100,7 +100,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
     console.info('[hologram] all bones', boneNames);
     console.info('[hologram] armature bones', armBones);
 
-    if ((assetPreset === 'idle' || !disableAnimations) && activeAnims && activeAnims.length > 0) {
+    if (!disableAnimations && activeAnims && activeAnims.length > 0) {
       const idleClip = findIdleClip(activeAnims);
       const animatedBones = idleClip?.tracks
         ? [...new Set(idleClip.tracks.map((track) => track.name.split('.').slice(0, -1).join('.')))]
@@ -216,12 +216,41 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
     return rise * (1 - THREE.MathUtils.smoothstep(elapsed, 1.7, 2.35));
   };
 
+  // Keep both avatar assets in a comfortable hands-down stance on /taylor.
+  // Orient each rig segment in world space rather than relying on asset-specific Euler angles.
+  // Navigation pointing poses are not affected.
+  const relaxArms = (scene) => {
+    if (poseMode !== 'relaxed') return;
+    scene.updateMatrixWorld(true);
+    ['left', 'right'].forEach((side) => {
+      const arm = getBone(scene, side, 'Arm');
+      const forearm = getBone(scene, side, 'ForeArm');
+      const hand = getBone(scene, side, 'Hand');
+      // Use the shoulder's actual world-space side: mirrored rigs may name
+      // their left/right bones opposite to the camera-facing screen direction.
+      // The camera faces the model from positive Z, so a small positive Z
+      // component keeps the hands visible beside (not behind) the hips.
+      const shoulderX = arm?.getWorldPosition(new THREE.Vector3()).x ?? (side === 'left' ? -1 : 1);
+      const outward = shoulderX < 0 ? -1 : 1;
+      if (arm) {
+        pointBoneToward(arm, new THREE.Vector3(outward * 0.16, -1, 0.14), 0.3);
+        scene.updateMatrixWorld(true);
+      }
+      if (forearm) {
+        pointBoneToward(forearm, new THREE.Vector3(outward * 0.10, -1, 0.24), 0.28);
+        scene.updateMatrixWorld(true);
+      }
+      const restWrist = boneRestPoseRef.current.get(hand?.name);
+      if (hand && restWrist) hand.quaternion.slerp(restWrist, 0.3);
+    });
+  };
+
   const applyPoseMode = (scene, time) => {
     if (!scene) return;
 
-    // The avatar faces the visitor, so its right arm extends toward the visitor's left.
-    const pointingSide = poseMode === 'navigation-right' || poseMode === 'navigation-left' ? 'right' : null;
-    const screenDirection = -1;
+    // Mirror the gesture so the avatar points to the visitor's requested side.
+    const pointingSide = poseMode === 'navigation-left' ? 'right' : poseMode === 'navigation-right' ? 'left' : null;
+    const screenDirection = poseMode === 'navigation-left' ? -1 : 1;
     const gestureWeight = getGestureWeight(time);
     if (pointingSide && gestureWeight > 0.01) {
       applyPointingPose(scene, pointingSide, screenDirection, gestureWeight);
@@ -270,6 +299,7 @@ function AvatarModel({ emotion = 'neutral', isAnimating = false, spokenText = ''
 
     if (displayScene) {
       displayScene.visible = true;
+      relaxArms(displayScene);
       applyPoseMode(displayScene, clockRef.current.getElapsedTime());
     }
 
@@ -359,7 +389,7 @@ function LoadingFallback() {
   );
 }
 
-export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', onReady }) {
+export default function Hologram({ emotion, isAnimating = false, spokenText = '', disableAnimations = false, poseMode = 'neutral', assetPreset = 'auto', assetUrl = null, onReady }) {
   const [contextGeneration, setContextGeneration] = useState(0);
   const [contextLost, setContextLost] = useState(false);
   const canvasRef = useRef(null);
@@ -395,7 +425,7 @@ export default function Hologram({ emotion, isAnimating = false, spokenText = ''
         <directionalLight position={[-5, 5, -5]} intensity={0.6} />
         <pointLight position={[0, 3, 3]} intensity={0.4} color="#ffffff" />
         <Suspense fallback={<LoadingFallback />}>
-          <AvatarModel onReady={onReady} emotion={emotion} isAnimating={isAnimating} spokenText={spokenText} disableAnimations={disableAnimations} poseMode={poseMode} assetPreset={assetPreset} />
+          <AvatarModel onReady={onReady} emotion={emotion} isAnimating={isAnimating} spokenText={spokenText} disableAnimations={disableAnimations} poseMode={poseMode} assetPreset={assetPreset} assetUrl={assetUrl} />
         </Suspense>
         <OrbitControls enableZoom={false} enablePan={false} target={[0, 1.18, 0]} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
       </Canvas>

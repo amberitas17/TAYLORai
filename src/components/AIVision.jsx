@@ -1,11 +1,23 @@
 import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
-import { Camera, Shield, User, Smile, Upload, Eye, Zap, ArrowLeft } from 'lucide-react';
+import { Camera, Shield, User, Smile, Eye, Zap, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clientSideFaceAnalysisService from '../services/clientSideFaceAnalysis.js';
 import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
 import avatarAssetService from '../services/avatarAssetService.js';
 import './AIVision.css';
 const Hologram = lazy(() => import('../../src/hologram.jsx'));
+
+function skipFacialAnalysis(navigate) {
+  // Explicitly discard any prior visitor's facial profile in this browser.
+  try {
+    window.sessionStorage.removeItem('taylorSessionContext');
+    window.sessionStorage.removeItem('aiGuideSessionContext');
+    window.sessionStorage.removeItem('taylorGreetingPlayed');
+    window.localStorage.removeItem('firstDetectedEmotionAge');
+    window.localStorage.removeItem('latestDetectedEmotionAge');
+  } catch {}
+  navigate('/taylor', { replace: true, state: { skipFacialAnalysis: true } });
+}
 
 function getFaceStatusLabel(status, avatarReady) {
   if (['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(status)) {
@@ -46,6 +58,7 @@ class AvatarErrorBoundary extends React.Component {
 export default function AIVision() {
   const navigate = useNavigate();
   const [cameraPermission, setCameraPermission] = useState(null);
+  const [analysisTakingLong, setAnalysisTakingLong] = useState(false);
   const [cameraStatus, setCameraStatus] = useState('CAMERA_INITIALIZING');
   const [modelStatus, setModelStatus] = useState('FACE_CACHE_CHECK');
   const [stream, setStream] = useState(null);
@@ -61,7 +74,9 @@ export default function AIVision() {
   const [diagnosticsTick, setDiagnosticsTick] = useState(0);
   const [avatarState, setAvatarState] = useState('AVATAR_CACHE_CHECK');
   const [avatarAssetsReady, setAvatarAssetsReady] = useState(false);
+  const [avatarObjectUrl, setAvatarObjectUrl] = useState(null);
   const [avatarDiagnostics, setAvatarDiagnostics] = useState(avatarAssetService.getDiagnostics());
+  const optimizedAvatarTest = new URLSearchParams(window.location.search).get('avatarTest') === 'optimized';
   const faceDebugEnabled = new URLSearchParams(window.location.search).has('faceDebug');
   const aiVisionReady = ['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY'].includes(modelStatus) && avatarState === 'AVATAR_READY';
 
@@ -92,8 +107,8 @@ export default function AIVision() {
   useEffect(() => {
     mountedRef.current = true;
     startEntertainmentSequence();
+    // Prioritize facial-model preparation over the optional 3D avatar on weak Android data.
     scheduleFaceInitialization();
-    initializeAvatar();
 
     return () => {
       mountedRef.current = false;
@@ -116,7 +131,18 @@ export default function AIVision() {
     console.info('[machine-vision] avatar initialization start', startupTimestampsRef.current.avatarInitializationStart);
     setAvatarState('AVATAR_CACHE_CHECK');
     try {
+      // Opt-in A/B test: load the optimized GLB directly, without replacing the
+      // production avatar or changing the existing single-download path.
+      if (optimizedAvatarTest) {
+        setAvatarObjectUrl('/sarah-avatar-optimized.glb');
+        setAvatarAssetsReady(true);
+        console.info('[machine-vision] testing optimized avatar GLB');
+        return;
+      }
       await avatarAssetService.initialize();
+      const preparedUrl = avatarAssetService.getAssetUrl('/sarah-avatar.glb');
+      if (!preparedUrl) throw new Error('Avatar bytes are unavailable for rendering');
+      setAvatarObjectUrl(preparedUrl);
       setAvatarAssetsReady(true);
       setAvatarDiagnostics(avatarAssetService.getDiagnostics());
     } catch (error) {
@@ -130,8 +156,9 @@ export default function AIVision() {
     if (faceInitializationStartedRef.current) return;
     faceInitializationStartedRef.current = true;
     const start = () => initializeModels();
-    if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 1200 });
-    else window.setTimeout(start, 0);
+    // Face initialization is critical on weak-network Android phones; idle callbacks
+    // can be delayed by rendering work and should not gate model preparation.
+    window.setTimeout(start, 0);
   }).current;
 
   const handleAvatarReady = useRef(() => {
@@ -172,6 +199,15 @@ export default function AIVision() {
       if (video.srcObject === stream) video.srcObject = null;
     };
   }, [stream]);
+
+  // Render the optional avatar only after facial models have finished preparing.
+  // This avoids competing model downloads and GPU work during first-time face startup.
+  useEffect(() => {
+    if (['FACE_MODELS_READY', 'OFFLINE_FACE_MODELS_READY', 'FACE_MODEL_ERROR', 'FACE_MODEL_DOWNLOAD_REQUIRED'].includes(modelStatus)) {
+      initializeAvatar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelStatus]);
 
   const initializeModels = async () => {
     try {
@@ -285,7 +321,7 @@ export default function AIVision() {
       emotion: stableEmotion,
       emotionConfidence: result.emotionConfidence,
       allEmotions: result.allEmotions,
-      ageGroup: ageValue === undefined ? (latestProfileRef.current?.ageGroup || 'Unknown') : ageValue < 18 ? 'Child' : ageValue < 65 ? 'Adult' : 'Senior',
+      ageGroup: ageValue === undefined ? (latestProfileRef.current?.ageGroup || 'Unknown') : ageValue < 13 ? 'Child' : 'Adult',
       age: ageValue === undefined ? latestProfileRef.current?.age : ageValue,
       timestamp: new Date().toISOString()
     };
@@ -331,6 +367,17 @@ export default function AIVision() {
     setDiagnosticsTick((tick) => tick + 1);
     return { result, ageValue };
   };
+
+  // Never make a first-time visitor wait indefinitely for optional face analysis.
+  useEffect(() => {
+    if (cameraPermission !== 'granted' || navigationPendingRef.current || hasWelcomedRef.current) return undefined;
+    const timeout = window.setTimeout(() => {
+      if (mountedRef.current && !navigationPendingRef.current && !hasWelcomedRef.current) {
+        setAnalysisTakingLong(true);
+      }
+    }, 8000);
+    return () => window.clearTimeout(timeout);
+  }, [cameraPermission, modelStatus]);
 
   // Live continuous emotion + age group detection
   useEffect(() => {
@@ -385,7 +432,7 @@ export default function AIVision() {
         }
       };
 
-      detectionInterval.current = setInterval(runInference, 400);
+      detectionInterval.current = setInterval(runInference, 1000);
       runInference();
     }
 
@@ -399,7 +446,7 @@ export default function AIVision() {
         const track = streamRef.current?.getVideoTracks?.()[0];
         if (!track || track.readyState === 'ended') startCamera();
         if (runInference && !detectionInterval.current) {
-          detectionInterval.current = setInterval(runInference, 400);
+          detectionInterval.current = setInterval(runInference, 1000);
           runInference();
         }
       }
@@ -448,7 +495,7 @@ export default function AIVision() {
             emotion: result.predictions.emotion.label,
             emotionConfidence: (result.predictions.emotion.confidence || 0) / 100,
             allEmotions: result.predictions.all_emotions,
-            ageGroup: result.predictions.age.group,
+            ageGroup: Number.isFinite(Number(result.predictions.age.value)) ? (Number(result.predictions.age.value) < 13 ? 'Child' : 'Adult') : 'Unknown',
             timestamp: new Date().toISOString()
           });
           setPersonDetected(true);
@@ -468,9 +515,9 @@ export default function AIVision() {
         <div className="permission-content">
           <Camera size={60} />
           <h2>Camera Permission Required</h2>
-          <p>We need camera access to provide live emotion and age detection.</p>
+          <p>Camera access is optional for estimating age group and initial facial expression. You can use TAYLOR without it.</p>
           <button className="permission-button" onClick={startCamera}>Grant Permission</button>
-          <button className="skip-button" onClick={() => setCameraPermission('denied')}>Skip for now</button>
+          <button className="skip-button" onClick={() => skipFacialAnalysis(navigate)}>Skip for now</button>
         </div>
       </div>
     );
@@ -483,9 +530,8 @@ export default function AIVision() {
         <div className="permission-content">
           <Shield size={60} />
           <h2>Camera Access Denied</h2>
-          <p>You can still upload a photo for emotion and age detection or continue without it.</p>
-          <button className="upload-button" onClick={handleUploadPhoto}><Upload size={20} /> Upload Photo</button>
-          <button className="skip-button" onClick={() => navigate('/')}>Continue Without Analysis</button>
+          <p>Camera access is optional. Continue to TAYLOR without facial analysis; no photo is needed.</p>
+          <button className="skip-button" onClick={() => skipFacialAnalysis(navigate)}>Continue Without Analysis</button>
         </div>
       </div>
     );
@@ -504,6 +550,14 @@ export default function AIVision() {
             {entertainmentPhase === 'analyzing' && 'Live emotion and age detection running'}
           </p>
           {flowError && <p style={{ color: '#e53935', fontWeight: 600 }}>{flowError}</p>}
+          {analysisTakingLong && !welcomeDone && (
+            <div role="status" className="analysis-slow-fallback">
+              <p>Facial analysis is taking longer on this device. You can continue to TAYLOR without waiting.</p>
+              <button type="button" className="skip-button" onClick={() => skipFacialAnalysis(navigate)}>
+                Continue Without Analysis
+              </button>
+            </div>
+          )}
           {welcomeDone && <p style={{ color: '#2e7d32', fontWeight: 600 }}>Welcome greeting completed.</p>}
           <div className="status-section">
             <div className="status-row">
@@ -535,11 +589,18 @@ export default function AIVision() {
         {avatarAssetsReady && avatarState !== 'AVATAR_ERROR' ? (
           <AvatarErrorBoundary onError={handleAvatarError}>
             <Suspense fallback={<div className="avatar-placeholder">Preparing AI Vision...</div>}>
-              <Hologram onReady={handleAvatarReady} emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" />
+              <Hologram onReady={handleAvatarReady} emotion={detectedProfile?.emotion} isAnimating={isGreeting || avatarSpeaking} spokenText={'Welcome to Bulacan State University.'} poseMode="wave" assetPreset="avatar" assetUrl={avatarObjectUrl} />
             </Suspense>
           </AvatarErrorBoundary>
         ) : (
-          <div className="avatar-placeholder">{getAvatarStatusLabel(avatarState)}</div>
+          <div className="avatar-placeholder" role="status">
+            <span>{getAvatarStatusLabel(avatarState)}</span>
+            {avatarState === 'AVATAR_ERROR' && (
+              <button type="button" onClick={() => { setAvatarAssetsReady(false); initializeAvatar(); }}>
+                Retry avatar
+              </button>
+            )}
+          </div>
         )}
       </div>
 

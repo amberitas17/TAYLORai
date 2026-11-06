@@ -1,0 +1,10 @@
+expected\predicted,3D Printer,Collaborative Robot,FDAS,Industrial Robot,Pick & Place Machine,Robotic Arm,Smart Systems,Speech Home Automation,UNKNOWN
+3D Printer,10,0,0,0,0,0,0,0,0
+Collaborative Robot,1,4,0,0,0,0,0,0,5
+FDAS,0,0,0,0,0,0,0,0,0
+Industrial Robot,8,0,0,0,0,0,0,0,2
+Pick & Place Machine,0,0,0,0,0,0,0,0,0
+Robotic Arm,0,0,0,0,0,0,0,0,0
+Smart Systems,0,0,0,0,0,0,10,0,0
+Speech Home Automation,0,0,0,0,0,0,0,0,0
+UNKNOWN,0,0,0,0,0,0,0,0,0

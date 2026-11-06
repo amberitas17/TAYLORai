@@ -42,7 +42,7 @@ class FakeDatabase {
 }
 
 const index = createKnowledgeIndex();
-assert.equal(index.recordCount, 26);
+assert.equal(index.recordCount, 32);
 assert.deepEqual(Object.keys(index.entities).sort(), ['ARICC', 'BARAS TBI', 'CAESAR', 'CBS', 'FABLAB', 'FIC', 'RECON']);
 
 for (const query of ['What is ARICC?', 'Tell me about ARICC.', 'What services does ARICC offer?']) {
@@ -63,6 +63,13 @@ assert.match(fablabLocation.match.text, /Alvarado Hall/i);
 const rio = searchLocalKnowledge('What is RIO?', { index });
 assert.equal(rio.match, null);
 assert.equal(rio.entity, 'RIO');
+
+const topicSwitch = searchLocalKnowledge('What is machine learning?', { activeEntity: 'ARICC', index });
+assert.equal(topicSwitch.match, null);
+assert.equal(topicSwitch.reason, 'center-not-specified');
+
+const followUp = searchLocalKnowledge('What services does it offer?', { activeEntity: 'ARICC', index });
+assert.equal(followUp.match.entity, 'ARICC');
 
 const unknown = searchLocalKnowledge('What is a quantum telescope?', { index });
 assert.equal(unknown.match, null);

@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
-import { handleSpeechInteraction, textToSpeech } from './services/speechAPI.js';
+import { textToSpeech } from './services/speechAPI.js';
 const AiText = lazy(() => import('./ai-text.jsx'));
 const AIVision = lazy(() => import('./components/AIVision.jsx'));
 const AiExhibit = lazy(() => import('./ai-exhibit.jsx'));
@@ -57,8 +57,6 @@ function LandingPage() {
       if (storedProfile) {
         const parsed = JSON.parse(storedProfile);
         setGuestProfile(parsed);
-
-        handleSpeechInteraction();
         textToSpeech(`Welcome to the exhibition. I detected a ${parsed.emotion || 'friendly'} mood. Let us begin the experience.`, false, 'taylor', 'en');
       }
     } catch (error) {

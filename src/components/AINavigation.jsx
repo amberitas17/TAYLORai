@@ -1,17 +1,18 @@
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FiMaximize2 } from 'react-icons/fi';
 import './AINavigation.css';
 import { getPerformanceSettings } from '../services/devicePerformance.js';
 const LeafletMap = lazy(() => import('./LeafletMap'));
 import { CIT_FLOOR_LABELS, getDestinationRoute, getNode } from '../navigation/citIndoorRoute.js';
 import { getCITWalkthroughEvidence } from '../navigation/citWalkthroughEvidence.js';
 import IndoorNavigationState from '../services/indoorNavigationState.js';
-import { handleSpeechInteraction, textToSpeech } from '../services/speechAPI.js';
+import { textToSpeech } from '../services/speechAPI.js';
 
 const NAV_LANGUAGE = {
-  en: { language: 'Language', title: 'Indoor directions', start: 'Starting point', destination: 'Destination', previous: 'Previous', next: 'Next', confirm: 'Confirm landmark', arrived: 'Arrived', steps: 'Steps', map: 'Map', from: 'Starting from', to: 'Going to', explore: 'Explore', back: 'Go back', mute: 'Mute', unmute: 'Unmute', collapse: 'Collapse', expand: 'Expand' },
-  tl: { language: 'Wika', title: 'Gabay sa loob ng gusali', start: 'Panimulang lokasyon', destination: 'Pupuntahan', previous: 'Nakaraan', next: 'Susunod', confirm: 'Kumpirmahin ang palatandaan', arrived: 'Nakarating na', steps: 'Mga hakbang', map: 'Mapa', from: 'Mula sa', to: 'Papunta sa', explore: 'Tuklasin ang', back: 'Bumalik', mute: 'I-mute', unmute: 'I-unmute', collapse: 'Itago', expand: 'Ipakita' },
-  zh: { language: '语言', title: '室内导航', start: '起点', destination: '目的地', previous: '上一步', next: '下一步', confirm: '确认地标', arrived: '已到达', steps: '步骤', map: '地图', from: '出发地', to: '前往', explore: '探索', back: '返回', mute: '静音', unmute: '取消静音', collapse: '收起', expand: '展开' },
+  en: { language: 'Language', title: 'Indoor directions', start: 'Starting point', destination: 'Destination', previous: 'Previous', next: 'Next', confirm: 'Confirm landmark', arrived: 'Arrived', steps: 'Steps', map: 'Map', from: 'Starting from', to: 'Going to', scan: 'Scan exhibit', back: 'Go back', mute: 'Mute', unmute: 'Unmute', collapse: 'Collapse', expand: 'Expand' },
+  tl: { language: 'Wika', title: 'Gabay sa loob ng gusali', start: 'Panimulang lokasyon', destination: 'Pupuntahan', previous: 'Nakaraan', next: 'Susunod', confirm: 'Kumpirmahin ang palatandaan', arrived: 'Nakarating na', steps: 'Mga hakbang', map: 'Mapa', from: 'Mula sa', to: 'Papunta sa', scan: 'I-scan ang exhibit', back: 'Bumalik', mute: 'I-mute', unmute: 'I-unmute', collapse: 'Itago', expand: 'Ipakita' },
+  zh: { language: '语言', title: '室内导航', start: '起点', destination: '目的地', previous: '上一步', next: '下一步', confirm: '确认地标', arrived: '已到达', steps: '步骤', map: '地图', from: '出发地', to: '前往', scan: '扫描展览', back: '返回', mute: '静音', unmute: '取消静音', collapse: '收起', expand: '展开' },
 };
 const NAV_INSTRUCTIONS = {
   "tl": {
@@ -48,7 +49,32 @@ const NAV_INSTRUCTIONS = {
     "Continue straight, then turn right at the corridor corner.": "Dumiretso, pagkatapos ay kumanan sa kanto ng pasilyo.",
     "Turn right toward the RECON entrance.": "Kumanan papunta sa pasukan ng RECON.",
     "Arrive at RIO.": "Nakarating na kayo sa RIO.",
-    "Arrive at FABLAB.": "Nakarating na kayo sa FABLAB."
+    "Arrive at FABLAB.": "Nakarating na kayo sa FABLAB.",
+    "Continue up the stairs to the 2nd floor.": "Umakyat sa hagdan papunta sa ika-2 palapag.",
+    "Use the Dean's Office as your landmark, then turn left into the U-shaped stairwell.": "Gawing palatandaan ang Tanggapan ng Dean, pagkatapos ay kumaliwa papunta sa hagdanang hugis U.",
+    "At the Dean's Office, turn left through the U-shaped stairwell.": "Sa Tanggapan ng Dean, kumaliwa sa hagdanang hugis U.",
+    "Climb the next flight to the 3rd floor.": "Umakyat sa susunod na hagdan papunta sa ika-3 palapag.",
+    "On the 3rd floor, turn right.": "Sa ika-3 palapag, kumanan.",
+    "Go straight through the EEC Department corridor.": "Dumiretso sa pasilyo ng Departamento ng EEC.",
+    "Continue straight to the TEECS Bulletin Board.": "Dumiretso papunta sa bulletin board ng TEECS.",
+    "Near the TEECS Bulletin Board, turn right.": "Malapit sa bulletin board ng TEECS, kumanan.",
+    "Go straight along the corridor.": "Dumiretso sa pasilyo.",
+    "After the last bench, turn left and go toward the stairs.": "Pagkatapos ng huling bangko, kumaliwa at pumunta papunta sa hagdan.",
+    "Go up to the 4th floor via the stairs.": "Umakyat sa ika-4 na palapag gamit ang hagdan.",
+    "After reaching the 4th floor, turn left and go straight.": "Pagdating sa ika-4 na palapag, kumaliwa at dumiretso.",
+    "The first door on your right is CAESAR.": "Ang unang pinto sa iyong kanan ay CAESAR.",
+    "After reaching the 4th floor, go straight along the corridor.": "Pagdating sa ika-4 na palapag, dumiretso sa pasilyo.",
+    "The first door on your left is FABLAB.": "Ang unang pinto sa iyong kaliwa ay FABLAB.",
+    "Go straight along the corridor. The nearest landmark is the RIO Office.": "Dumiretso sa pasilyo. Ang pinakamalapit na palatandaan ay ang Tanggapan ng RIO.",
+    "Look for the plaque near ARICC.": "Hanapin ang plake malapit sa ARICC.",
+    "Continue to the ARICC entrance.": "Magpatuloy papunta sa pasukan ng ARICC.",
+    "Use FABLAB as the nearest landmark, then continue straight along the corridor.": "Gawing pinakamalapit na palatandaan ang FABLAB, pagkatapos ay dumiretso sa pasilyo.",
+    "The second door on your right is RIO.": "Ang ikalawang pinto sa iyong kanan ay RIO.",
+    "When you reach the window near the restroom, turn left.": "Pagdating sa bintana malapit sa palikuran, kumaliwa.",
+    "Use the male's restroom as your nearest landmark, then turn right.": "Gawing pinakamalapit na palatandaan ang palikuran ng lalaki, pagkatapos ay kumanan.",
+    "Turn right toward RECON.": "Kumanan papunta sa RECON.",
+    "Continue straight. The male's restroom will be on your left as the nearest landmark.": "Dumiretso. Ang palikuran ng lalaki ay nasa iyong kaliwa bilang pinakamalapit na palatandaan.",
+    "Near OLCPD office, continue toward the corridor.": "Malapit sa tanggapan ng OLCPD, magpatuloy papunta sa pasilyo."
   },
   "zh": {
     "At the CIT Entrance, go right toward the EMH Department.": "在 CIT 入口处右转，前往 EMH 部门。",
@@ -84,7 +110,32 @@ const NAV_INSTRUCTIONS = {
     "Continue straight, then turn right at the corridor corner.": "直走，然后在走廊转角右转。",
     "Turn right toward the RECON entrance.": "右转前往 RECON 入口。",
     "Arrive at RIO.": "您已到达 RIO。",
-    "Arrive at FABLAB.": "您已到达 FABLAB。"
+    "Arrive at FABLAB.": "您已到达 FABLAB。",
+    "Continue up the stairs to the 2nd floor.": "沿楼梯上到二楼。",
+    "Use the Dean's Office as your landmark, then turn left into the U-shaped stairwell.": "以院长办公室为地标，然后左转进入 U 形楼梯间。",
+    "At the Dean's Office, turn left through the U-shaped stairwell.": "在院长办公室处左转，经过 U 形楼梯间。",
+    "Climb the next flight to the 3rd floor.": "继续上楼到三楼。",
+    "On the 3rd floor, turn right.": "在三楼右转。",
+    "Go straight through the EEC Department corridor.": "直走穿过 EEC 部门走廊。",
+    "Continue straight to the TEECS Bulletin Board.": "直走前往 TEECS 公告栏。",
+    "Near the TEECS Bulletin Board, turn right.": "在 TEECS 公告栏附近右转。",
+    "Go straight along the corridor.": "沿走廊直走。",
+    "After the last bench, turn left and go toward the stairs.": "经过最后一张长椅后左转，前往楼梯。",
+    "Go up to the 4th floor via the stairs.": "沿楼梯上到四楼。",
+    "After reaching the 4th floor, turn left and go straight.": "到达四楼后左转并直走。",
+    "The first door on your right is CAESAR.": "右侧第一扇门是 CAESAR。",
+    "After reaching the 4th floor, go straight along the corridor.": "到达四楼后沿走廊直走。",
+    "The first door on your left is FABLAB.": "左侧第一扇门是 FABLAB。",
+    "Go straight along the corridor. The nearest landmark is the RIO Office.": "沿走廊直走。最近的地标是 RIO 办公室。",
+    "Look for the plaque near ARICC.": "寻找 ARICC 附近的牌匾。",
+    "Continue to the ARICC entrance.": "继续前往 ARICC 入口。",
+    "Use FABLAB as the nearest landmark, then continue straight along the corridor.": "以 FABLAB 为最近的地标，然后沿走廊直走。",
+    "The second door on your right is RIO.": "右侧第二扇门是 RIO。",
+    "When you reach the window near the restroom, turn left.": "到达洗手间附近的窗户后左转。",
+    "Use the male's restroom as your nearest landmark, then turn right.": "以男洗手间为最近的地标，然后右转。",
+    "Turn right toward RECON.": "右转前往 RECON。",
+    "Continue straight. The male's restroom will be on your left as the nearest landmark.": "直走，男洗手间会在你的左侧，作为最近的地标。",
+    "Near OLCPD office, continue toward the corridor.": "在 OLCPD 办公室附近继续前往走廊。"
   }
 };
 const NAV_LANDMARKS = {
@@ -113,7 +164,28 @@ const NAV_LANDMARKS = {
     "4th Floor Elevator": "Elevator sa ikaapat na palapag",
     "4th Floor Hallway": "Pasilyo sa ikaapat na palapag",
     "1st Floor": "Unang palapag",
-    "4th Floor": "Ikaapat na palapag"
+    "4th Floor": "Ikaapat na palapag",
+    "Stairs to 2nd floor": "Hagdan papunta sa ika-2 palapag",
+    "Dean's Office": "Tanggapan ng Dean",
+    "U-shaped stair turn": "Hagdanang hugis U",
+    "Stairs to 3rd floor": "Hagdan papunta sa ika-3 palapag",
+    "3rd-floor right turn": "Kanan sa ika-3 palapag",
+    "EEC Department": "Departamento ng EEC",
+    "TEECS Bulletin Board": "Bulletin board ng TEECS",
+    "TEECS right turn": "Kanan sa TEECS",
+    "Corridor after right turn": "Pasilyo pagkatapos ng kanan",
+    "Last bench": "Huling bangko",
+    "Stairs toward 4th floor": "Hagdan papunta sa ika-4 na palapag",
+    "4th-floor stair landing": "Landing ng hagdan sa ika-4 na palapag",
+    "First door on the right": "Unang pinto sa kanan",
+    "First door on the left": "Unang pinto sa kaliwa",
+    "RIO Office": "Tanggapan ng RIO",
+    "ARICC plaque": "Plake ng ARICC",
+    "ARICC entrance": "Pasukan ng ARICC",
+    "Second door on the right": "Ikalawang pinto sa kanan",
+    "Male's restroom": "Palikuran ng lalaki",
+    "RECON right turn": "Kanan papunta sa RECON",
+    "RECON": "RECON"
   },
   "zh": {
     "CIT Entrance": "CIT 入口",
@@ -140,7 +212,28 @@ const NAV_LANDMARKS = {
     "4th Floor Elevator": "四楼电梯",
     "4th Floor Hallway": "四楼走廊",
     "1st Floor": "一楼",
-    "4th Floor": "四楼"
+    "4th Floor": "四楼",
+    "Stairs to 2nd floor": "通往二楼的楼梯",
+    "Dean's Office": "院长办公室",
+    "U-shaped stair turn": "U 形楼梯转弯处",
+    "Stairs to 3rd floor": "通往三楼的楼梯",
+    "3rd-floor right turn": "三楼右转处",
+    "EEC Department": "EEC 部门",
+    "TEECS Bulletin Board": "TEECS 公告栏",
+    "TEECS right turn": "TEECS 右转处",
+    "Corridor after right turn": "右转后的走廊",
+    "Last bench": "最后一张长椅",
+    "Stairs toward 4th floor": "通往四楼的楼梯",
+    "4th-floor stair landing": "四楼楼梯平台",
+    "First door on the right": "右侧第一扇门",
+    "First door on the left": "左侧第一扇门",
+    "RIO Office": "RIO 办公室",
+    "ARICC plaque": "ARICC 牌匾",
+    "ARICC entrance": "ARICC 入口",
+    "Second door on the right": "右侧第二扇门",
+    "Male's restroom": "男洗手间",
+    "RECON right turn": "通往 RECON 的右转处",
+    "RECON": "RECON"
   }
 };
 const localizedInstruction = (text, language) => language === 'en' || !text ? text : (NAV_INSTRUCTIONS[language]?.[text] || text);
@@ -148,8 +241,8 @@ const localizedLandmark = (text, language) => language === 'en' || !text ? text 
 const Hologram = lazy(() => import('../hologram.jsx'));
 
 const TOUR_CENTERS = {
-  ARICC: { fullName: 'Advanced Robotics and Intelligent Control Center', location: 'CIT - 4th Floor', route: '/machine-vision-exhibit-aricc' },
-  ARICC_STAIRS: { fullName: 'Advanced Robotics and Intelligent Control Center (stairs route)', location: 'CIT - 4th Floor', route: '/machine-vision-exhibit-aricc' },
+  ARICC: { fullName: 'Advanced Robotics and Intelligent Control Center', location: 'CIT - 4th Floor', route: '/machine-vision-aricc' },
+  ARICC_STAIRS: { fullName: 'Advanced Robotics and Intelligent Control Center (stairs route)', location: 'CIT - 4th Floor', route: '/machine-vision-aricc' },
   RIO: { fullName: 'Research and Innovation Office', location: 'CIT - 4th Floor', route: '/machine-vision-rio' },
   RIO_STAIRS: { fullName: 'Research and Innovation Office (stairs route)', location: 'CIT - 4th Floor', route: '/machine-vision-rio' },
   FABLAB: { fullName: 'Center for Fabrication and Manufacture', location: 'CIT - 4th Floor', route: '/machine-vision-fablab' },
@@ -159,6 +252,7 @@ const TOUR_CENTERS = {
   RECON: { fullName: 'Resiliency Energy Continuity Center', location: 'CIT - 4th Floor', route: '/machine-vision-recon' },
   RECON_STAIRS: { fullName: 'Resiliency Energy Continuity Center (stairs route)', location: 'CIT - 4th Floor', route: '/machine-vision-recon' },
 };
+const SCANNABLE_DESTINATIONS = new Set(['ARICC', 'FABLAB', 'CAESAR', 'RECON']);
 const LOCATION_OPTIONS = [
   { value: 'manual-cit-entrance', label: 'CIT Entrance', floor: 1, step: 1 },
   { value: 'manual-emh-department', label: 'EMH Department', floor: 1, step: 2 },
@@ -198,7 +292,6 @@ function NavigationAvatar({ event, instruction, language, labels, muted, onMute,
     previousEvent.current = `${language}:${event}:${instruction}`;
     let active = true;
     setSpeaking(true);
-    handleSpeechInteraction();
     textToSpeech(instruction, false, 'taylor', language).finally(() => {
       if (active) setSpeaking(false);
     });
@@ -217,7 +310,7 @@ function NavigationAvatar({ event, instruction, language, labels, muted, onMute,
       <div className="navigation-avatar-stage">
         {show3D ? <NavigationAvatarBoundary>
           <Suspense fallback={<div className="navigation-avatar-loading">{language === 'tl' ? 'Inihahanda ang avatar…' : language === 'zh' ? '正在准备虚拟助手…' : 'Preparing avatar…'}</div>}>
-            <Hologram emotion={event === 'ARRIVED' ? 'happy' : 'neutral'} isAnimating={speaking || event !== 'IDLE'} spokenText={instruction || ''} disableAnimations={false} poseMode={eventPose[event] || 'neutral'} assetPreset="idle" />
+            <Hologram emotion={event === 'ARRIVED' ? 'happy' : 'neutral'} isAnimating={speaking || event !== 'IDLE'} spokenText={instruction || ''} disableAnimations={false} poseMode={eventPose[event] || 'relaxed'} assetPreset="optimized" />
           </Suspense>
         </NavigationAvatarBoundary> : <div className="navigation-avatar-fallback" role="status">TAYLOR voice guidance is active. 3D avatar paused to save memory.</div>}
       </div>
@@ -228,7 +321,7 @@ function NavigationAvatar({ event, instruction, language, labels, muted, onMute,
 }
 
 function StepPhoto({ evidence, landmark, language }) {
-  if (evidence.verified && evidence.photo) return <img className={`navigation-photo${evidence.photo.endsWith('/second-floor-u-turn.jpg') ? ' navigation-photo--bottom-center' : ''}${evidence.photo.endsWith('/recon-stairs-right-turn.jpg') ? ' navigation-photo--top-center' : ''}`} src={evidence.photo} alt={landmark} />;
+  if (evidence.verified && evidence.photo) return <img className={`navigation-photo navigation-photo--center-center${evidence.photo.endsWith('/second-floor-u-turn.jpg') ? ' navigation-photo--bottom-center' : ''}${evidence.photo.endsWith('/recon-stairs-right-turn.jpg') ? ' navigation-photo--top-center' : ''}`} src={evidence.photo} alt={landmark} />;
   return <div className="navigation-photo navigation-photo--placeholder" role="img" aria-label={`Verified photograph pending for ${landmark}`}><span>{language === 'tl' ? 'WALA PANG LARAWAN' : language === 'zh' ? '照片待补充' : 'PHOTO PENDING'}</span><small>{language === 'tl' ? 'Naghihintay ng napatunayang larawan ng CIT' : language === 'zh' ? '等待已核实的 CIT 路线画面' : 'Awaiting verified CIT walkthrough frame'}</small></div>;
 }
 
@@ -268,25 +361,49 @@ export default function AINavigation({ onBack }) {
   const touchStart = useRef(null);
   const locationOptions = routeMode === 'stairs' ? STAIR_LOCATION_OPTIONS : LOCATION_OPTIONS;
   const location = locationOptions.find((option) => option.value === manualLocation) || locationOptions[0];
-  const route = getDestinationRoute(routeDestination);
-  const step = route.steps[currentStep - 1];
-  const node = getNode(step?.from);
-  const evidence = getCITWalkthroughEvidence(node.id);
-  const direction = destinationConfirmed && currentStep === route.steps.length
+  const fullRoute = getDestinationRoute(routeDestination);
+  const landmarkByOption = {
+    'manual-cit-entrance': 'cit-entrance',
+    'manual-emh-department': 'emh-department',
+    'manual-elevator-1f': 'elevator-1f',
+    'manual-4f-elevator': 'elevator-4f',
+    'manual-olcpd': 'olcpd-office',
+    'manual-4f-hallway': 'hallway-straight',
+    'stairs-cit-entrance': 'second-floor-stairs',
+    'stairs-deans-office': 'deans-office-2f',
+    'stairs-eec-bulletin-board': 'teecs-department',
+  };
+  const startIndex = fullRoute.steps.findIndex((item) => item.from === landmarkByOption[manualLocation]);
+  // Renumber the visible route from the visitor's selected starting point.
+  // Never silently show CIT Entrance when a different start was requested.
+  const startUnavailable = startIndex < 0;
+  const route = {
+    ...fullRoute,
+    steps: startUnavailable ? [] : fullRoute.steps.slice(startIndex),
+  };
+  const selectedStartStep = 1;
+  // Route changes render before the reset effect runs. Clamp synchronously so
+  // the previous route's step index cannot dereference an absent step.
+  const visibleStep = route.steps.length ? Math.min(Math.max(currentStep, 1), route.steps.length) : 1;
+  const step = route.steps[visibleStep - 1];
+  const node = step ? getNode(step.from) : null;
+  const evidence = node ? getCITWalkthroughEvidence(node.id) : null;
+  const atFinalStep = !startUnavailable && route.steps.length > 0 && visibleStep === route.steps.length;
+  const direction = destinationConfirmed && atFinalStep
     ? 'arrival'
-    : (step?.transition || node.id.startsWith('elevator-') ? 'elevator' : evidence.turn || 'straight');
-  const instruction = destinationConfirmed && currentStep === route.steps.length
+    : (step?.transition || node?.id?.startsWith('elevator-') ? 'elevator' : evidence?.turn || 'straight');
+  const instruction = destinationConfirmed && atFinalStep
     ? route.arrivalInstruction || step?.instruction
     : step?.instruction;
   const destination = TOUR_CENTERS[selectedDestination];
-  const displayInstruction = localizedInstruction(instruction, language);
+  const displayInstruction = startUnavailable ? 'No verified route begins at this starting point for the selected destination and route option. Choose another starting point.' : localizedInstruction(instruction, language);
 
   useEffect(() => {
     navigationStateRef.current = new IndoorNavigationState({ destination: selectedDestination, startFloor: location.floor, targetFloor: 4 });
-    setCurrentStep(1);
+    setCurrentStep(selectedStartStep);
     setDestinationConfirmed(false);
     setNavigationEvent('START');
-  }, [routeDestination, location.floor]);
+  }, [routeDestination, manualLocation]);
 
   const getNavigationEvent = (nextDirection, nextStep) => {
     if (nextDirection === 'left') return 'TURN_LEFT';
@@ -296,7 +413,9 @@ export default function AINavigation({ onBack }) {
   };
 
   function goToStep(nextStep) {
+    if (startUnavailable || !route.steps.length || destinationConfirmed) return;
     const bounded = Math.min(Math.max(nextStep, 1), route.steps.length);
+    if (startUnavailable || !route.steps.length || destinationConfirmed) return;
     setCurrentStep(bounded);
     const nextRouteStep = route.steps[bounded - 1];
     const nextNode = getNode(nextRouteStep?.from);
@@ -308,7 +427,7 @@ export default function AINavigation({ onBack }) {
   function updateLocation(event) {
     const next = locationOptions.find((option) => option.value === event.target.value) || locationOptions[0];
     setManualLocation(next.value);
-    setCurrentStep(next.step);
+    // The route effect resolves the correct step for this destination and landmark.
     setDestinationConfirmed(false);
     navigationStateRef.current?.recoverNavigation();
     setNavigationEvent('UNCERTAIN');
@@ -325,6 +444,12 @@ export default function AINavigation({ onBack }) {
   }
 
   const confirmCurrentLandmark = () => {
+    if (startUnavailable || !route.steps.length || !step || destinationConfirmed) return;
+    if (atFinalStep && (step?.from === 'fablab-entrance' || step?.from === 'aricc' || step?.from === 'rio-entrance' || step?.from === 'caesar' || step?.from === 'recon')) {
+      setDestinationConfirmed(true);
+      setNavigationEvent('ARRIVED');
+      return;
+    }
     const confirmedLandmark = node.id === 'elevator-1f' ? 'elevator' : node.landmark;
     const confirmation = navigationStateRef.current?.confirmLandmark(confirmedLandmark);
     const isDestination = confirmation?.state?.current_landmark === selectedDestination;
@@ -333,21 +458,42 @@ export default function AINavigation({ onBack }) {
       setNavigationEvent('ARRIVED');
       return;
     }
-    if (confirmation?.state?.last_confirmed_landmark && currentStep < route.steps.length) {
-      goToStep(currentStep + 1);
+    if (confirmation?.state?.last_confirmed_landmark && visibleStep < route.steps.length) {
+      goToStep(visibleStep + 1);
     } else {
       setNavigationEvent('UNCERTAIN');
     }
   };
 
+  const scanRoute = SCANNABLE_DESTINATIONS.has(selectedDestination) ? destination.route : null;
+
   return <div className="ai-navigation-container navigation-mobile-shell">
+    {scanRoute && <button
+      type="button"
+      className="navigation-scan-fab"
+      onClick={() => navigate(scanRoute, { state: { activeCenter: selectedDestination } })}
+      aria-label={`${labels.scan} ${selectedDestination}`}
+      title={`${labels.scan} ${selectedDestination}`}
+    >
+      <FiMaximize2 aria-hidden="true" />
+      <span>{labels.scan}</span>
+    </button>}
     <main className="navigation-mobile-page">
-      <header className="navigation-mobile-header"><button className="navigation-icon-button" onClick={onBack || (() => navigate(-1))} aria-label={labels.back}>‹</button><div><span className="navigation-kicker">TAYLOR AI</span><h1>{labels.title}</h1></div><button className="navigation-map-button" onClick={() => setMapOpen((open) => !open)}>{mapOpen ? labels.steps : labels.map}</button></header>
-      <section className="navigation-route-picker"><label>{labels.language}<select aria-label={labels.language} value={language} onChange={(event) => changeLanguage(event.target.value)}><option value="en">English</option><option value="tl">Filipino (Tagalog)</option><option value="zh">中文 (Mandarin)</option></select></label><label>{labels.start}<select value={manualLocation} onChange={updateLocation}>{LOCATION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{localizedLandmark(option.label, language)}</option>)}</select></label><label>{labels.destination}<select value={selectedDestination} onChange={(event) => { setSelectedDestination(event.target.value); setCurrentStep(1); }}><option value="ARICC">ARICC</option><option>RIO</option><option>FABLAB</option><option>CAESAR</option><option>RECON</option></select></label><label>{language === 'tl' ? 'DAANAN' : language === 'zh' ? '路线方式' : 'ROUTE OPTION'}<select aria-label={language === 'tl' ? 'Piliin ang elevator o hagdan' : language === 'zh' ? '选择电梯或楼梯' : 'Choose elevator or stairs'} value={routeMode} onChange={(event) => changeRouteMode(event.target.value)}><option value="elevator">{language === 'tl' ? 'Elevator' : language === 'zh' ? '电梯' : 'Elevator'}</option><option value="stairs">{language === 'tl' ? 'Hagdan' : language === 'zh' ? '楼梯' : 'Stairs'}</option></select></label><div className="navigation-route-summary"><div><span>{labels.from}</span><strong>{localizedLandmark(location.label, language)}</strong></div><div><span>{labels.to}</span><strong>{selectedDestination}</strong></div></div></section>
+      <header className="navigation-mobile-header"><button className="navigation-icon-button" onClick={onBack || (() => navigate('/taylor'))} aria-label={labels.back}>‹</button><div><span className="navigation-kicker">TAYLOR AI</span><h1>{labels.title}</h1></div><button className="navigation-map-button" onClick={() => setMapOpen((open) => !open)}>{mapOpen ? labels.steps : labels.map}</button></header>
+      <section className="navigation-route-picker"><label>{labels.language}<select aria-label={labels.language} value={language} onChange={(event) => changeLanguage(event.target.value)}><option value="en">English</option><option value="tl">Filipino (Tagalog)</option><option value="zh">中文 (Mandarin)</option></select></label><label>{labels.start}<select value={manualLocation} onChange={updateLocation}>{locationOptions.map((option) => <option key={option.value} value={option.value}>{localizedLandmark(option.label, language)}</option>)}</select></label><label>{labels.destination}<select value={selectedDestination} onChange={(event) => { setSelectedDestination(event.target.value); setCurrentStep(1); }}><option value="ARICC">ARICC</option><option>RIO</option><option>FABLAB</option><option>CAESAR</option><option>RECON</option></select></label><label>{language === 'tl' ? 'DAANAN' : language === 'zh' ? '路线方式' : 'ROUTE OPTION'}<select aria-label={language === 'tl' ? 'Piliin ang elevator o hagdan' : language === 'zh' ? '选择电梯或楼梯' : 'Choose elevator or stairs'} value={routeMode} onChange={(event) => changeRouteMode(event.target.value)}><option value="elevator">{language === 'tl' ? 'Elevator' : language === 'zh' ? '电梯' : 'Elevator'}</option><option value="stairs">{language === 'tl' ? 'Hagdan' : language === 'zh' ? '楼梯' : 'Stairs'}</option></select></label><div className="navigation-route-summary"><div><span>{labels.from}</span><strong>{localizedLandmark(location.label, language)}</strong></div><div><span>{labels.to}</span><strong>{selectedDestination}</strong></div></div></section>
       <NavigationAvatar event={navigationEvent} instruction={displayInstruction} language={language} labels={labels} muted={avatarMuted} onMute={() => setAvatarMuted((muted) => !muted)} expanded={avatarExpanded} onToggle={() => setAvatarExpanded((expanded) => !expanded)} />
-      {mapOpen ? <section className="navigation-published-map" aria-label={language === 'tl' ? 'Mapa ng CIT' : language === 'zh' ? 'CIT 地图' : 'Geographic CIT map'}><Suspense fallback={<div role="status">Loading map…</div>}><LeafletMap destination={{ destination: selectedDestination }} isTracking /></Suspense></section> : <section className={`navigation-step-view ${['RIO', 'ARICC', 'OVPREI', 'FABLAB', 'CAESAR'].includes(selectedDestination) ? 'navigation-step-view--rio' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-live="polite"><div className="navigation-progress"><span>{language === 'tl' ? 'HAKBANG' : language === 'zh' ? '步骤' : 'STEP'} {currentStep} {language === 'tl' ? 'SA' : language === 'zh' ? '/' : 'OF'} {route.steps.length}</span><div>{route.steps.map((item, index) => <i className={index + 1 <= currentStep ? 'is-complete' : ''} key={item.id} />)}</div></div><StepPhoto evidence={evidence} landmark={localizedLandmark(node.landmark, language)} language={language} /><div className="navigation-step-content"><div className={`navigation-direction navigation-direction--${direction}`}><strong>{directionIcon[direction]}</strong><span>{language === 'tl' ? ({arrival:'Pagdating',elevator:'Paglipat ng palapag',left:'Kaliwa',right:'Kanan',straight:'Diretso'}[direction] || direction) : language === 'zh' ? ({arrival:'到达',elevator:'楼层切换',left:'左转',right:'右转',straight:'直走'}[direction] || direction) : (direction === 'arrival' ? 'Arrive' : direction === 'elevator' ? 'Floor change' : direction)}</span></div><div className="navigation-step-meta"><span>{localizedLandmark(CIT_FLOOR_LABELS[step.floor], language)}</span><span>{evidence.verified ? `${evidence.sourceVideo} · ${evidence.timestamp}` : (language === 'tl' ? 'Sinusuri pa ang ebidensiya' : language === 'zh' ? '证据待审核' : 'Evidence pending review')}</span></div><h2>{localizedLandmark(node.landmark, language)}</h2><p>{displayInstruction}</p><small className="navigation-confidence">{evidence.verified ? `${language === 'tl' ? 'Napatunayang ebidensiya' : language === 'zh' ? '已核实的路线证据' : 'Verified walkthrough evidence'} · ${language === 'tl' ? ({high:'mataas',medium:'katamtaman','medium-high':'katamtaman hanggang mataas'}[evidence.confidence] || evidence.confidence) : language === 'zh' ? ({high:'高可信度',medium:'中等可信度','medium-high':'中高可信度'}[evidence.confidence] || evidence.confidence) : `${evidence.confidence} confidence`}` : (language === 'tl' ? 'Pansamantala ang hakbang hanggang makumpirma ang larawan.' : language === 'zh' ? '在路线画面核实前，此步骤仍为暂定。' : 'Neutral step retained until a walkthrough frame is verified.')}</small>{!route.complete && <small className="navigation-route-incomplete">{language === 'tl' ? `Hindi pa kumpleto ang ruta papunta sa ${route.destination}. Hindi pa kumpirmado ang pagdating.` : language === 'zh' ? `前往 ${route.destination} 的路线尚未完整，无法确认抵达。` : `Route to ${route.destination} is incomplete after this verified step. Arrival is not reported.`}</small>}</div></section>}
-      <nav className="navigation-step-controls"><button type="button" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 1}>{labels.previous}</button><button type="button" onClick={confirmCurrentLandmark}>{labels.confirm}</button><button type="button" className="navigation-next-button" onClick={() => goToStep(currentStep + 1)} disabled={currentStep === route.steps.length}>{route.complete && currentStep === route.steps.length ? labels.arrived : labels.next}</button></nav>
-      <footer className="navigation-footer"><span>{language === 'tl' ? 'Manu-manong gabay · walang GPS o kamera' : language === 'zh' ? '手动导航 · 无 GPS 或摄像头' : 'Manual navigation · no GPS or camera'}</span><button type="button" onClick={() => navigate(destination.route, { state: { activeCenter: selectedDestination, tourMode: true } })}>{labels.explore} {selectedDestination}</button></footer>
+      {startUnavailable ? <section className="navigation-step-view" role="status" style={{ padding: 20 }}><h2>Starting point unavailable</h2><p>{displayInstruction}</p></section> : mapOpen ? <section className="navigation-published-map" aria-label={language === 'tl' ? 'Mapa ng CIT' : language === 'zh' ? 'CIT 地图' : 'Geographic CIT map'}><Suspense fallback={<div role="status">Loading map…</div>}><LeafletMap destination={{ destination: selectedDestination }} isTracking /></Suspense></section> : <section className={`navigation-step-view ${['RIO', 'ARICC', 'OVPREI', 'FABLAB', 'CAESAR'].includes(selectedDestination) ? 'navigation-step-view--rio' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-live="polite"><div className="navigation-progress"><span>{language === 'tl' ? 'HAKBANG' : language === 'zh' ? '步骤' : 'STEP'} {visibleStep} {language === 'tl' ? 'SA' : language === 'zh' ? '/' : 'OF'} {route.steps.length}</span><div>{route.steps.map((item, index) => <i className={index + 1 <= visibleStep ? 'is-complete' : ''} key={item.id} />)}</div></div><StepPhoto evidence={evidence} landmark={localizedLandmark(node.landmark, language)} language={language} /><div className="navigation-step-content"><div className={`navigation-direction navigation-direction--${direction}`}><strong>{directionIcon[direction]}</strong><span>{language === 'tl' ? ({arrival:'Pagdating',elevator:'Paglipat ng palapag',left:'Kaliwa',right:'Kanan',straight:'Diretso'}[direction] || direction) : language === 'zh' ? ({arrival:'到达',elevator:'楼层切换',left:'左转',right:'右转',straight:'直走'}[direction] || direction) : (direction === 'arrival' ? 'Arrive' : direction === 'elevator' ? 'Floor change' : direction)}</span></div><div className="navigation-step-meta"><span>{localizedLandmark(CIT_FLOOR_LABELS[step.floor], language)}</span><span>{evidence.verified ? `${evidence.sourceVideo} · ${evidence.timestamp}` : (language === 'tl' ? 'Sinusuri pa ang ebidensiya' : language === 'zh' ? '证据待审核' : 'Evidence pending review')}</span></div><h2>{localizedLandmark(node.landmark, language)}</h2><p>{displayInstruction}</p><small className="navigation-confidence">{evidence.verified ? `${language === 'tl' ? 'Napatunayang ebidensiya' : language === 'zh' ? '已核实的路线证据' : 'Verified walkthrough evidence'} · ${language === 'tl' ? ({high:'mataas',medium:'katamtaman','medium-high':'katamtaman hanggang mataas'}[evidence.confidence] || evidence.confidence) : language === 'zh' ? ({high:'高可信度',medium:'中等可信度','medium-high':'中高可信度'}[evidence.confidence] || evidence.confidence) : `${evidence.confidence} confidence`}` : (language === 'tl' ? 'Pansamantala ang hakbang hanggang makumpirma ang larawan.' : language === 'zh' ? '在路线画面核实前，此步骤仍为暂定。' : 'Neutral step retained until a walkthrough frame is verified.')}</small>{!route.complete && <small className="navigation-route-incomplete">{language === 'tl' ? `Hindi pa kumpleto ang ruta papunta sa ${route.destination}. Hindi pa kumpirmado ang pagdating.` : language === 'zh' ? `前往 ${route.destination} 的路线尚未完整，无法确认抵达。` : `Route to ${route.destination} is incomplete after this verified step. Arrival is not reported.`}</small>}</div></section>}
+      {destinationConfirmed && (
+        <section role="status" className="navigation-arrival-options" style={{ padding: '16px', marginTop: '12px', borderRadius: '12px', background: '#f1f7fa', color: '#102a3b' }}>
+          <strong>{language === 'tl' ? 'Nakarating ka na!' : language === 'zh' ? '您已到达目的地！' : 'You have arrived!'}</strong>
+          <p>{language === 'tl' ? 'Opsyonal ang pag-scan ng exhibit. Maaari mong tapusin ang pagbisita nang hindi ginagamit ang kamera.' : language === 'zh' ? '扫描展品是可选的。您可以不使用摄像头直接结束参观。' : 'Exhibit scanning is optional. You can finish your visit without using the camera.'}</p>
+          <button type="button" onClick={() => navigate('/taylor')} style={{ minHeight: 44, padding: '10px 16px', borderRadius: 10, cursor: 'pointer' }}>
+            {language === 'tl' ? 'Tapusin nang walang pag-scan' : language === 'zh' ? '不扫描，结束参观' : 'Finish without scanning'}
+          </button>
+        </section>
+      )}
+      <nav className="navigation-step-controls"><button type="button" onClick={() => goToStep(visibleStep - 1)} disabled={startUnavailable || destinationConfirmed || visibleStep === 1}>{labels.previous}</button><button type="button" onClick={confirmCurrentLandmark} disabled={startUnavailable || destinationConfirmed}>{labels.confirm}</button><button type="button" className="navigation-next-button" onClick={() => goToStep(currentStep + 1)} disabled={startUnavailable || destinationConfirmed || atFinalStep}>{destinationConfirmed ? labels.arrived : atFinalStep ? labels.confirm : labels.next}</button></nav>
+      {/* <footer className="navigation-footer"><span>{language === 'tl' ? 'Manu-manong gabay · walang GPS o kamera' : language === 'zh' ? '手动导航 · 无 GPS 或摄像头' : 'Manual navigation · no GPS or camera'}</span></footer> */}
     </main>
   </div>;
 }
