@@ -9,7 +9,7 @@ This is a **completely client-side** React.js application that provides real-tim
 - **68-Point Facial Landmark Detection**
 - **Real-time Camera Feed** with capture functionality
 - **Complete Client-Side Processing** - no data sent to servers
-- **Professional UI** with Singapore Science Centre branding
+- **Professional UI** with TAYLOR branding
 
 ## 🚀 Run Locally
 
@@ -739,7 +739,7 @@ const status = faceApiAI.getStatus();
 ```
 
 ## 📄 License
-This project is developed for Singapore Science Centre educational purposes.
+This project is developed for BULSU RIO educational purposes.
 
 ## 🤝 Support
 For technical support or questions, check the browser console for detailed logs and error messages.
